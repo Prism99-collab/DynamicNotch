@@ -27,6 +27,9 @@ internal static class Native
     public const int VK_LBUTTON = 0x01, VK_RBUTTON = 0x02, VK_CAPITAL = 0x14;
 
     public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
+    /// <summary>A message box / alert appeared; idChild says what kind (see ALERT_SYSTEM_*).</summary>
+    public const uint EVENT_SYSTEM_ALERT = 0x0002;
+    public const int ALERT_SYSTEM_WARNING = 2, ALERT_SYSTEM_ERROR = 3, ALERT_SYSTEM_CRITICAL = 5;
     public const uint WINEVENT_OUTOFCONTEXT = 0;
     public const uint MONITOR_DEFAULTTONEAREST = 2;
 
@@ -147,6 +150,12 @@ internal static class Native
     public static string? ProcessPath(IntPtr hWnd)
     {
         GetWindowThreadProcessId(hWnd, out uint pid);
+        return ProcessPathById(pid);
+    }
+
+    public static string? ProcessPathById(uint pid)
+    {
+        if (pid == 0) return null;
         var h = OpenProcess(0x1000 /* QUERY_LIMITED_INFORMATION */, false, pid);
         if (h == IntPtr.Zero) return null;
         try
@@ -156,6 +165,44 @@ internal static class Native
             return QueryFullProcessImageName(h, 0, sb, ref size) ? sb.ToString() : null;
         }
         finally { CloseHandle(h); }
+    }
+
+    [DllImport("user32.dll")] static extern IntPtr GetDlgItem(IntPtr dlg, int id);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern IntPtr SendMessageTimeout(IntPtr hWnd, int msg, IntPtr wParam, StringBuilder lParam, uint flags, uint timeout, out IntPtr result);
+
+    /// <summary>The message of a standard Windows message box (its text control), without risking a hang on a frozen app.</summary>
+    public static string DialogMessage(IntPtr dialog)
+    {
+        var text = GetDlgItem(dialog, 0xFFFF);
+        if (text == IntPtr.Zero) return "";
+        var sb = new StringBuilder(512);
+        // WM_GETTEXT, SMTO_ABORTIFHUNG, at most 150 ms
+        return SendMessageTimeout(text, 0x000D, new IntPtr(sb.Capacity), sb, 0x2, 150, out _) == IntPtr.Zero ? "" : sb.ToString();
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct DEVMODE
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+        public short dmSpecVersion, dmDriverVersion, dmSize, dmDriverExtra;
+        public int dmFields, dmPositionX, dmPositionY, dmDisplayOrientation, dmDisplayFixedOutput;
+        public short dmColor, dmDuplex, dmYResolution, dmTTOption, dmCollate;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+        public short dmLogPixels;
+        public int dmBitsPerPel, dmPelsWidth, dmPelsHeight, dmDisplayFlags, dmDisplayFrequency;
+        public int dmICMMethod, dmICMIntent, dmMediaType, dmDitherType, dmReserved1, dmReserved2, dmPanningWidth, dmPanningHeight;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool EnumDisplaySettings(string? device, int mode, ref DEVMODE dm);
+
+    /// <summary>The main screen's refresh rate in Hz (60, 144, 165, 180, 240...); 60 if Windows won't say.</summary>
+    public static int RefreshRate()
+    {
+        var dm = new DEVMODE { dmSize = (short)Marshal.SizeOf<DEVMODE>() };
+        // ENUM_CURRENT_SETTINGS; null = the primary display, where the notch lives
+        if (!EnumDisplaySettings(null, -1, ref dm) || dm.dmDisplayFrequency <= 1) return 60;
+        return Math.Clamp(dm.dmDisplayFrequency, 60, 360);
     }
 
     public static string? KnownFolder(Guid id)

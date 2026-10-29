@@ -23,7 +23,7 @@ public partial class NotchWindow
     sealed record OsdRequest(
         string Kind, string? Glyph, double? Level, string? Title, string? Subtitle, string? Right,
         ImageSource? Art, Brush? GlyphBrush, (double Level, bool Charging)? Battery,
-        double Seconds, bool Force, Prio Priority, Action? OnClick, Action<int>? OnWheel, Motion Motion = Motion.Auto);
+        double Seconds, bool Force, Prio Priority, Action? OnClick, Action<int>? OnWheel, Motion Motion = Motion.Auto, DateTime Queued = default);
 
     static readonly FontFamily SymbolFont = new("Segoe UI Symbol, Segoe UI");
 
@@ -64,6 +64,7 @@ public partial class NotchWindow
         _audio.OutputChanged += () =>
         {
             RefreshVolume();
+            if (_mode == Mode.Expanded) RefreshAppVolume(); // the player's sound moved to the new device
             if (_mode != Mode.Expanded)
                 ShowOsd("output", _audio.OutputIsHeadphones ? "" : "", null, _audio.OutputName, "Sound output · click to change", null,
                     onClick: () => { ExpandTo(0); ShowDevices(true); });
@@ -88,7 +89,8 @@ public partial class NotchWindow
         _bt.Changed += RefreshToggles;
         _bt.ConnectionChanged += (name, connected) =>
             ShowOsd("bt", BluetoothService.GlyphFor(name), null, name, connected ? "Connected" : "Disconnected", null,
-                glyphBrush: connected ? Blue : null, seconds: 2.4, onClick: () => Launch("ms-settings:bluetooth"));
+                glyphBrush: connected ? Blue : null, seconds: 2.4, onClick: () => Launch("ms-settings:bluetooth"),
+                motion: connected ? Motion.Auto : Motion.Tremble);
 
         _power.Changed += () => { RefreshBattery(); CheckBatteryLow(); ApplyPowerProfile(); };
         _power.PluggedChanged += plugged =>
@@ -102,27 +104,43 @@ public partial class NotchWindow
         _privacy.Changed += OnPrivacyChanged;
 
         _files.DownloadsChanged += RefreshBase;
-        _files.DownloadCompleted += path =>
+        _files.DownloadCompleted += async path =>
+        {
+            RefreshBase();
+            if (!_settings.SystemAlerts) return;
+            // the shell icon and file size come from disk: fetch them off the UI thread
+            var (icon, size) = await Task.Run(() => (IconHelper.ForPath(path), SafeLength(path)));
+            ShowOsd("download", null, null, "Download complete", Path.GetFileName(path), SystemMonitor.Bytes(size),
+                art: icon, seconds: 4, prio: Prio.High, onClick: () => OpenPath(path));
+        };
+        _files.DownloadFailed += name =>
         {
             RefreshBase();
             if (_settings.SystemAlerts)
-                ShowOsd("download", null, null, "Download complete", Path.GetFileName(path), SystemMonitor.Bytes(SafeLength(path)),
-                    art: IconHelper.ForPath(path), seconds: 4, prio: Prio.High, onClick: () => OpenPath(path));
+                ShowOsd("download-failed", "", null, "Download cancelled or failed", name, null, glyphBrush: Red, seconds: 3,
+                    onClick: () => { if (_files.DownloadsDir != null) Launch(_files.DownloadsDir); });
         };
-        _files.ScreenshotSaved += path =>
+        _files.ScreenshotSaved += async path =>
         {
-            if (_settings.SystemAlerts)
-                ShowOsd("screenshot", null, null, "Screenshot saved", "Click to open · also in your clipboard", null,
-                    art: IconHelper.Thumbnail(path, 96), seconds: 3, onClick: () => OpenPath(path));
+            _lastScreenshotAt = DateTime.UtcNow;
+            if (!_settings.SystemAlerts) return;
+            // decoding a full-size screenshot takes 50–150 ms: never on the UI thread
+            var thumb = await Task.Run(() => IconHelper.Thumbnail(path, 96));
+            ShowOsd("screenshot", null, null, "Screenshot saved", "Click to open · also in your clipboard", null,
+                art: thumb, seconds: 3, onClick: () => OpenPath(path));
         };
 
         _notifications.Received += t =>
         {
             if (!_settings.NotificationAlerts) return;
             if (_focus.IsOn) { _focus.Hold(t.App); return; } // kept for the end-of-focus summary
+            if (_inMeeting || _hidden || _mode == Mode.Expanded) return;
+            // a burst of messages rings once, not ten times in a row
+            if ((DateTime.UtcNow - _lastToast.At).TotalSeconds > 2) _notificationSound.Play();
             _lastToast = (t.App, DateTime.UtcNow);
             ShowOsd("toast:" + t.App, t.Icon == null ? "" : null, null, t.Title, string.IsNullOrEmpty(t.Body) ? t.App : t.Body, null,
-                art: t.Icon, seconds: 4, prio: Prio.High, onClick: () => OpenApp(t.Aumid));
+                art: t.Icon, seconds: 4, prio: Prio.High, onClick: () => OpenApp(t.Aumid),
+                motion: SoundsLikeFailure(t.Title + " " + t.Body) ? Motion.Tremble : Motion.Auto); // "Sign-in failed" shivers instead of pulsing
         };
     }
 
@@ -173,14 +191,23 @@ public partial class NotchWindow
         double v = _audio.Muted ? 0 : _audio.Volume;
         ShowOsd("volume", VolumeGlyph(), v, null, null, $"{(int)Math.Round(v * 100)}", prio: Prio.Low,
             onClick: () => ExpandTo(0),
-            onWheel: d => { _lastUserChange = DateTime.UtcNow; _audio.SetVolume(_audio.Volume + d * 0.04f); ShowVolumeOsd(); });
+            onWheel: d =>
+            {
+                // already at the end: a little bump says "that's as far as it goes"
+                if (d > 0 ? !_audio.Muted && _audio.Volume >= 0.995f : _audio.Muted || _audio.Volume <= 0.005f) { Bump(d); return; }
+                _lastUserChange = DateTime.UtcNow; _audio.SetVolume(_audio.Volume + d * 0.04f); ShowVolumeOsd();
+            });
     }
 
     void ShowBrightnessOsd()
     {
         ShowOsd("brightness", "", _bri.Level / 100.0, null, null, $"{_bri.Level}", prio: Prio.Low,
             onClick: () => ExpandTo(0),
-            onWheel: d => { _lastUserChange = DateTime.UtcNow; _bri.Set(_bri.Level + d * 5); ShowBrightnessOsd(); });
+            onWheel: d =>
+            {
+                if (d > 0 ? _bri.Level >= 100 : _bri.Level <= 0) { Bump(d); return; }
+                _lastUserChange = DateTime.UtcNow; _bri.Set(_bri.Level + d * 5); ShowBrightnessOsd();
+            });
     }
 
     // ───────────────────────────── live activities ─────────────────────────────
@@ -194,7 +221,7 @@ public partial class NotchWindow
                 var left = _timerEnd - DateTime.UtcNow;
                 if (left < TimeSpan.Zero) left = TimeSpan.Zero;
                 ActGlyph.Text = "";
-                ActGlyph.Foreground = ActText.Foreground = Orange;
+                ActGlyph.Foreground = ActText.Foreground = TimerBrush;
                 ActText.Text = FormatTimer(left);
                 break;
             case LiveActivity.Focus:
@@ -245,6 +272,7 @@ public partial class NotchWindow
 
     void Enqueue(OsdRequest req, bool front = false)
     {
+        if (req.Queued == default) req = req with { Queued = DateTime.UtcNow };
         _osdQueue.RemoveAll(q => q.Kind == req.Kind);
         if (front) _osdQueue.Insert(0, req); else _osdQueue.Add(req);
         while (_osdQueue.Count > 4) _osdQueue.RemoveAt(_osdQueue.FindIndex(q => q.Priority == _osdQueue.Min(x => x.Priority)));
@@ -394,6 +422,9 @@ public partial class NotchWindow
     void NextOsd()
     {
         _osdTimer.Stop();
+        // what waited too long (behind a game in full screen, a long hover...) is old news: drop it
+        var now = DateTime.UtcNow;
+        _osdQueue.RemoveAll(q => (now - q.Queued).TotalSeconds > 12);
         if (_osdQueue.Count > 0 && !_hidden)
         {
             var next = _osdQueue.OrderByDescending(q => q.Priority).First();
@@ -517,9 +548,13 @@ public partial class NotchWindow
             ShowOsd("caps", "⇪", null, caps ? "Caps Lock on" : "Caps Lock off", null, null, glyphBrush: caps ? Orange : null, seconds: 1.2, prio: Prio.Low);
     }
 
-    void OnClipboardChanged()
+    DateTime _lastScreenshotAt;
+    int _clipVersion;
+
+    async void OnClipboardChanged()
     {
         if (DateTime.UtcNow < _ignoreClipboardUntil) return;
+        int version = ++_clipVersion; // copies in quick succession: only the newest one counts
         // password managers mark secrets so clipboard tools leave them alone
         if (IsClipboardFormatAvailable(_fmtExclude) || IsClipboardFormatAvailable(_fmtIgnore)) return;
 
@@ -534,21 +569,29 @@ public partial class NotchWindow
                 else if (Clipboard.ContainsFileDropList()) { var n = Clipboard.GetFileDropList().Count; kind = n == 1 ? "1 file" : $"{n} files"; }
                 else return;
             }
-            catch (COMException) { Thread.Sleep(40); } // another app still holds the clipboard
+            catch (COMException) { await Task.Delay(40); } // another app still holds the clipboard: wait without freezing
             catch { return; }
         }
 
+        if (version != _clipVersion) return;
         if (text != null) AddClipboardText(text);
         if (!_settings.ClipboardAlerts || _mode == Mode.Expanded || !_alertsReady) return;
-        if (_osd?.Kind == "screenshot") return; // the screenshot alert already says it
+        if (kind == "Image")
+        {
+            // Win+Shift+S copies first and saves the file a moment later: let the screenshot alert speak alone
+            await Task.Delay(900);
+            if (version != _clipVersion || _mode == Mode.Expanded) return;
+        }
+        if (_osd?.Kind == "screenshot" || (DateTime.UtcNow - _lastScreenshotAt).TotalSeconds < 3) return; // the screenshot alert already says it
+        // only the start matters for an 80-character preview (a 10 MB log shouldn't be split on the UI thread)
         string preview = text != null
-            ? string.Join(" ", text.Split(new[] { '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+            ? string.Join(" ", (text.Length > 400 ? text[..400] : text).Split(new[] { '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries))
             : kind!;
         ShowOsd("copied", "", null, "Copied", preview.Length > 80 ? preview[..80] : preview, null, glyphBrush: Blue, seconds: 1.4,
             prio: Prio.Low, onClick: () => ExpandTo(3));
     }
 
-    void OnDeviceChange(int evt, IntPtr lParam)
+    async void OnDeviceChange(int evt, IntPtr lParam)
     {
         if (!_settings.SystemAlerts || lParam == IntPtr.Zero || (evt != DBT_DEVICEARRIVAL && evt != DBT_DEVICEREMOVECOMPLETE)) return;
         if (Marshal.ReadInt32(lParam, 4) != DBT_DEVTYP_VOLUME) return;
@@ -559,13 +602,17 @@ public partial class NotchWindow
         string drive = $"{letters[0]}:";
         if (evt == DBT_DEVICEARRIVAL)
         {
-            string sub = drive;
-            try
+            // a drive that was just plugged in can take a while to answer: ask off the UI thread
+            string sub = await Task.Run(() =>
             {
-                var d = new DriveInfo(drive);
-                if (d.IsReady) sub = $"{drive} {d.VolumeLabel} · {SystemMonitor.Bytes(d.TotalSize)}".Replace("  ", " ");
-            }
-            catch { }
+                try
+                {
+                    var d = new DriveInfo(drive);
+                    if (d.IsReady) return $"{drive} {d.VolumeLabel} · {SystemMonitor.Bytes(d.TotalSize)}".Replace("  ", " ");
+                }
+                catch { }
+                return drive;
+            });
             ShowOsd("usb", "", null, "USB drive connected", sub + " · click to open", null, glyphBrush: Blue, seconds: 3,
                 onClick: () => Launch(drive + "\\"));
         }
@@ -573,7 +620,7 @@ public partial class NotchWindow
     }
 
     /// <summary>An app flashed its taskbar button (new message in Teams, Discord, WhatsApp, a finished task...).</summary>
-    void OnWindowFlash(IntPtr hwnd)
+    async void OnWindowFlash(IntPtr hwnd)
     {
         if (!_settings.NotificationAlerts || hwnd == IntPtr.Zero || hwnd == GetForegroundWindow()) return;
         var now = DateTime.UtcNow;
@@ -582,20 +629,82 @@ public partial class NotchWindow
         foreach (var k in _flashSeen.Where(kv => (now - kv.Value).TotalMinutes > 5).Select(kv => kv.Key).ToList()) _flashSeen.Remove(k);
 
         string? path = ProcessPath(hwnd);
-        string app = "App";
-        if (path != null)
-        {
-            try { app = FileVersionInfo.GetVersionInfo(path).FileDescription is { Length: > 0 } d ? d : Path.GetFileNameWithoutExtension(path); }
-            catch { app = Path.GetFileNameWithoutExtension(path); }
-        }
+        var (app, icon) = await DescribeAppAsync(path);
         if (_lastToast.App is { Length: > 0 } && (now - _lastToast.At).TotalSeconds < 5 &&
             (app.Contains(_lastToast.App, StringComparison.OrdinalIgnoreCase) || _lastToast.App.Contains(app, StringComparison.OrdinalIgnoreCase))) return;
 
         if (_focus.IsOn) { _focus.Hold(app); return; }
         string title = WindowTitle(hwnd);
         ShowOsd("flash:" + app, path == null ? "" : null, null, app, string.IsNullOrWhiteSpace(title) || title == app ? "Needs your attention" : title, null,
-            art: path != null ? IconHelper.ForPath(path) : null, seconds: 3.5, prio: Prio.High, onClick: () => FocusWindow(hwnd));
+            art: icon, seconds: 3.5, prio: Prio.High, onClick: () => FocusWindow(hwnd));
     }
+
+    static readonly Dictionary<string, string> AppNames = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>"Microsoft Edge" rather than "msedge": the exe's description, else its file name (cached).</summary>
+    static string AppName(string? path)
+    {
+        if (path == null) return "App";
+        lock (AppNames) if (AppNames.TryGetValue(path, out var known)) return known;
+        string name;
+        try { name = FileVersionInfo.GetVersionInfo(path).FileDescription is { Length: > 0 } d ? d : Path.GetFileNameWithoutExtension(path); }
+        catch { name = Path.GetFileNameWithoutExtension(path); }
+        lock (AppNames) AppNames[path] = name;
+        return name;
+    }
+
+    /// <summary>An app's name and icon both come from its exe on disk: read them off the UI thread.</summary>
+    static Task<(string App, ImageSource? Icon)> DescribeAppAsync(string? path) =>
+        Task.Run(() => (AppName(path), path != null ? IconHelper.ForPath(path) : null));
+
+    (IntPtr Hwnd, DateTime At) _lastAppAlert;
+
+    /// <summary>
+    /// Some app put up an error or warning box ("The password is incorrect", "Access denied"...):
+    /// echo it in the notch with a small shiver; clicking brings the dialog to the front.
+    /// </summary>
+    async void OnAppAlert(IntPtr hwnd, int kind)
+    {
+        if (kind is not (ALERT_SYSTEM_WARNING or ALERT_SYSTEM_ERROR or ALERT_SYSTEM_CRITICAL)) return;
+        if (!_settings.SystemAlerts || !_alertsReady || hwnd == IntPtr.Zero) return;
+        GetWindowThreadProcessId(hwnd, out uint pid);
+        if (pid == Environment.ProcessId) return;
+        var now = DateTime.UtcNow;
+        if (_lastAppAlert.Hwnd == hwnd && (now - _lastAppAlert.At).TotalSeconds < 3) return; // the same box announced twice
+        _lastAppAlert = (hwnd, now);
+
+        string? path = ProcessPathById(pid);
+        var (app, icon) = await DescribeAppAsync(path);
+        string caption = WindowTitle(hwnd).Trim();
+        string message = string.Join(" ", DialogMessage(hwnd).Split(new[] { '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries));
+        bool warning = kind == ALERT_SYSTEM_WARNING;
+        AppLog.Write($"app {(warning ? "warning" : "error")} from {app}: {caption}" +
+            (_focus.IsOn ? " (held: focus)" : _inMeeting ? " (held: meeting)" : _hidden ? " (hidden: full screen)" : ""));
+        ShowOsd("app-alert:" + app, warning ? "" : "", null,
+            caption.Length > 0 ? caption : app, message.Length > 0 ? (message.Length > 90 ? message[..90] + "…" : message) : app, null,
+            art: icon, glyphBrush: warning ? Orange : Red,
+            seconds: 3.5, prio: Prio.High, onClick: () =>
+            {
+                // the error text lands in the clipboard, ready to search or send; the dialog comes to the front
+                string copy = string.Join(" · ", new[] { caption, message }.Where(x => x.Length > 0));
+                if (copy.Length > 0)
+                {
+                    _ignoreClipboardUntil = DateTime.UtcNow.AddMilliseconds(800); // no "Copied" pop-up for our own copy
+                    try { Clipboard.SetText(copy); } catch { }
+                }
+                FocusWindow(hwnd);
+            });
+    }
+
+    /// <summary>Words that mean "something went wrong" in a notification (English, French, Spanish).</summary>
+    static readonly string[] FailureWords =
+    {
+        "fail", "error", "incorrect", "invalid", "wrong password", "denied", "couldn't", "could not", "unable to",
+        "échec", "échoué", "erreur", "refusé", "impossible de",
+        "fallo", "falló", "no se pudo", "denegado", "contraseña incorrecta",
+    };
+
+    static bool SoundsLikeFailure(string text) => FailureWords.Any(w => text.Contains(w, StringComparison.OrdinalIgnoreCase));
 
     // ───────────────────────────── mic / camera bubble ─────────────────────────────
 

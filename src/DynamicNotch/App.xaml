@@ -214,10 +214,20 @@
                                     <ScaleTransform />
                                 </Grid.RenderTransform>
                                 <Border CornerRadius="13" Background="{StaticResource Tile}" />
+                                <!-- the tool's colour, softly: a tinted squircle with a hint of light from the top -->
+                                <Border x:Name="Tint" CornerRadius="13" Background="{TemplateBinding TintBrush}" Opacity="0.16" />
+                                <Border CornerRadius="13" IsHitTestVisible="False">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#14FFFFFF" Offset="0" />
+                                            <GradientStop Color="#00FFFFFF" Offset="0.6" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
                                 <Border x:Name="On" CornerRadius="13" Background="{TemplateBinding OnBrush}" Opacity="0" />
                                 <Border x:Name="Hover" CornerRadius="13" Background="White" Opacity="0" />
-                                <TextBlock Text="{TemplateBinding Glyph}" FontFamily="{StaticResource IconFont}" FontSize="16"
-                                           Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <TextBlock x:Name="Icon" Text="{TemplateBinding Glyph}" FontFamily="{StaticResource IconFont}" FontSize="16"
+                                           Foreground="{TemplateBinding TintBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Grid>
                             <TextBlock Text="{TemplateBinding Label}" FontSize="10" Foreground="#A6FFFFFF" Margin="0,4,0,0"
                                        HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="66" />
@@ -225,9 +235,11 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsOn" Value="True">
                                 <Setter TargetName="On" Property="Opacity" Value="1" />
+                                <Setter TargetName="Icon" Property="Foreground" Value="Black" />
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Hover" Property="Opacity" Value="0.08" />
+                                <Setter TargetName="Tint" Property="Opacity" Value="0.26" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Trigger.EnterActions>

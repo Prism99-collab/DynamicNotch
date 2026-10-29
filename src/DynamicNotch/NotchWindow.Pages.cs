@@ -14,7 +14,7 @@ using static DynamicNotch.Interop.Native;
 
 namespace DynamicNotch;
 
-/// <summary>Swipeable pages 2–5: System, Tools (timer + actions), Clipboard &amp; Files, Settings.</summary>
+/// <summary>Swipeable pages: Home, System, Tools, Clipboard &amp; Files, Smart and Settings.</summary>
 public partial class NotchWindow
 {
     static readonly string[] PageNames = { "", "System", "Tools", "Clipboard & Files", "Smart", "Settings" };
@@ -80,11 +80,28 @@ public partial class NotchWindow
         // tools
         _timerTick.Tick += (_, _) => TimerTick();
         foreach (var chip in TimerChips.Children.OfType<Button>())
-            chip.Click += (_, _) => SetTimer(TimeSpan.FromMinutes(int.Parse((string)chip.Tag)));
-        TimerStart.Click += (_, _) => { if (_timerRunning) PauseTimer(); else StartTimer(); };
+            chip.Click += (_, _) => SetTimer(TimeSpan.FromMinutes(int.Parse(chip.Tag.ToString()!)));
+        TimerStart.Click += (_, _) => ToggleTimer();
         TimerReset.Click += (_, _) => ResetTimer();
+        FocusTab.Click += (_, _) => SetTimerMode(breakTime: false);
+        BreakTab.Click += (_, _) => SetTimerMode(breakTime: true);
+        TimerFace.MouseLeftButtonUp += (_, e) => { ToggleTimer(); e.Handled = true; };
+        TimerFace.MouseWheel += (_, e) => { NudgeTimer(e.Delta > 0 ? 1 : -1); e.Handled = true; };
+        for (int i = 0; i < 4; i++)
+            RoundDots.Children.Add(new Border { Width = 6, Height = 6, CornerRadius = new CornerRadius(3), Margin = new Thickness(3, 0, 0, 0) });
         foreach (var tile in ActionsGrid.Children.OfType<QuickToggle>())
+        {
             tile.Click += (_, _) => RunAction((string)tile.Tag, tile);
+            tile.MouseRightButtonUp += (_, e) =>
+            {
+                // a second, related action on right-click
+                switch ((string)tile.Tag)
+                {
+                    case "clipboard": e.Handled = true; GoToPage(3); break;
+                    case "explorer": e.Handled = true; if (_files.DownloadsDir != null) Launch(_files.DownloadsDir); break;
+                }
+            };
+        }
         UpdateTimerUi();
 
         // clipboard & files
@@ -369,6 +386,48 @@ public partial class NotchWindow
 
     void ResetTimer() => SetTimer(_timerTotal);
 
+    // Pomodoro: focus rounds and breaks; after 4 rounds the next break is a long one
+    bool _timerBreak;
+    int _focusRounds;
+    static readonly int[] FocusPresets = { 15, 25, 45, 60 }, BreakPresets = { 5, 10, 15, 20 };
+
+    /// <summary>Orange while focusing, green on a break: the ring, the button, the live activity and the slim glow.</summary>
+    Brush TimerBrush => _timerBreak ? Green : Orange;
+
+    void ToggleTimer() { if (_timerRunning) PauseTimer(); else StartTimer(); }
+
+    void SetTimerMode(bool breakTime)
+    {
+        if (breakTime == _timerBreak && !_timerRunning) return;
+        _timerBreak = breakTime;
+        var presets = breakTime ? BreakPresets : FocusPresets;
+        int i = 0;
+        foreach (var chip in TimerChips.Children.OfType<Button>())
+        {
+            chip.Tag = presets[i];
+            chip.Content = presets[i++].ToString();
+        }
+        SetTimer(TimeSpan.FromMinutes(breakTime ? (_focusRounds >= 4 ? 15 : 5) : 25));
+    }
+
+    /// <summary>Scroll on the ring: a minute more or less (while running it moves the end time).</summary>
+    void NudgeTimer(int minutes)
+    {
+        var step = TimeSpan.FromMinutes(minutes);
+        if (_timerRunning)
+        {
+            var left = _timerEnd - DateTime.UtcNow + step;
+            if (left < TimeSpan.FromMinutes(1)) { Bump(minutes); return; }
+            _timerEnd += step;
+            _timerTotal = TimeSpan.FromMinutes(Math.Max(_timerTotal.TotalMinutes, Math.Ceiling(left.TotalMinutes)));
+            UpdateTimerUi();
+            return;
+        }
+        double total = _timerTotal.TotalMinutes + minutes;
+        if (total < 1 || total > 180) { Bump(minutes); return; }
+        SetTimer(TimeSpan.FromMinutes(total));
+    }
+
     void TimerTick()
     {
         _timerLeft = _timerEnd - DateTime.UtcNow;
@@ -377,11 +436,27 @@ public partial class NotchWindow
             _timerRunning = false;
             _timerTick.Stop();
             _timerLeft = _timerTotal;
+            try { SystemSounds.Asterisk.Play(); } catch { }
+            if (!_timerBreak)
+            {
+                // a focus round done: offer the matching break
+                _focusRounds++;
+                bool longBreak = _focusRounds >= 4;
+                int breakMin = longBreak ? 15 : 5;
+                ShowOsd("timer", "", null, longBreak ? "4 rounds done · well earned" : $"Focus round {_focusRounds} done",
+                    $"{_timerTotal.TotalMinutes:0} min of focus · click for a {breakMin} min break", null,
+                    glyphBrush: Orange, seconds: 8, force: true, prio: Prio.High,
+                    onClick: () => { SetTimerMode(breakTime: true); StartTimer(); });
+            }
+            else
+            {
+                if (_focusRounds >= 4) _focusRounds = 0; // the long break closes the set
+                ShowOsd("timer", "", null, "Break's over", "Click to start a 25 min focus round", null,
+                    glyphBrush: Green, seconds: 8, force: true, prio: Prio.High,
+                    onClick: () => { SetTimerMode(breakTime: false); StartTimer(); });
+            }
             UpdateTimerUi();
             RefreshBase();
-            try { SystemSounds.Asterisk.Play(); } catch { }
-            ShowOsd("timer", "", null, "Time's up", $"{_timerTotal.TotalMinutes:0} min timer finished · click to restart", null,
-                glyphBrush: Orange, seconds: 6, force: true, prio: Prio.High, onClick: () => { ExpandTo(2); StartTimer(); });
             return;
         }
         if (_mode == Mode.Expanded && _page == 2) UpdateTimerUi();
@@ -392,11 +467,46 @@ public partial class NotchWindow
     {
         var left = _timerRunning ? _timerEnd - DateTime.UtcNow : _timerLeft;
         if (left < TimeSpan.Zero) left = TimeSpan.Zero;
+        var accent = TimerBrush;
         TimerText.Text = FormatTimer(left);
-        TimerText.Foreground = _timerRunning ? Orange : Brushes.White;
-        TimerBar.Value = 1 - left.TotalSeconds / Math.Max(1, _timerTotal.TotalSeconds);
-        TimerStart.Content = _timerRunning ? "Pause" : left < _timerTotal ? "Resume" : "Start";
-        TimerHint.Text = _timerRunning ? $"ends {DateTime.Now + left:t}" : "";
+        TimerText.Foreground = _timerRunning ? accent : Brushes.White;
+        // the ring drains as time runs out
+        TimerRing.RingBrush = accent;
+        TimerRing.AnimateTo(left.TotalSeconds / Math.Max(1, _timerTotal.TotalSeconds));
+        bool started = left < _timerTotal;
+        TimerStartText.Text = _timerRunning ? "Pause" : started ? "Resume" : "Start";
+        TimerStartGlyph.Text = _timerRunning ? "" : "";
+        TimerStart.Background = accent;
+        TimerHint.Text = _timerRunning ? $"ends {DateTime.Now + left:t}" : _timerBreak ? (_focusRounds >= 4 ? "Long break" : "Break") : "Focus";
+
+        StyleTab(FocusTab, !_timerBreak);
+        StyleTab(BreakTab, _timerBreak);
+        for (int i = 0; i < RoundDots.Children.Count; i++)
+            ((Border)RoundDots.Children[i]).Background = i < _focusRounds ? Orange : Faint;
+        foreach (var chip in TimerChips.Children.OfType<Button>())
+        {
+            bool on = !started && Math.Abs(Convert.ToDouble(chip.Tag) - _timerTotal.TotalMinutes) < 0.01;
+            chip.Background = on ? accent : (Brush)FindResource("Tile");
+            chip.Foreground = on ? Brushes.Black : Brushes.White;
+            chip.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
+        }
+    }
+
+    // ───────────────────────────── keep awake ─────────────────────────────
+
+    bool _keepAwake;
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern uint SetThreadExecutionState(uint flags);
+
+    /// <summary>Screen stays on and the PC doesn't sleep (like PowerToys Awake) until switched off or the notch exits.</summary>
+    void SetKeepAwake(bool on)
+    {
+        _keepAwake = on;
+        // ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED, or just ES_CONTINUOUS to let go
+        SetThreadExecutionState(on ? 0x80000003u : 0x80000000u);
+        AwakeTile.IsOn = on;
+        AwakeTile.Label = on ? "Awake" : "Keep awake";
     }
 
     static string FormatTimer(TimeSpan t) =>
@@ -406,6 +516,7 @@ public partial class NotchWindow
     {
         switch (action)
         {
+            case "awake": SetKeepAwake(!_keepAwake); break;
             case "snip": Collapse(); Dispatcher.InvokeAsync(async () => { await Task.Delay(350); Launch("ms-screenclip:"); }); break;
             case "taskmgr": Launch("taskmgr.exe"); break;
             case "explorer": Launch("explorer.exe"); break;

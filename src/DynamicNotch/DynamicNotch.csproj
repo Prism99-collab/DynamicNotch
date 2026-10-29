@@ -17,16 +17,17 @@
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
 
     <!-- What Windows shows in the exe's Properties > Details and in Settings > Apps -->
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Product>Dynamic Notch</Product>
     <AssemblyTitle>Dynamic Notch</AssemblyTitle>
     <Description>A smooth Dynamic-Island-style notch and control center for Windows.</Description>
     <Company>Prism99-collab</Company>
     <Copyright>Copyright (c) 2026 Prism99-collab</Copyright>
 
-    <!-- Keep the memory footprint small: workstation, non-concurrent GC that gives memory back eagerly. -->
+    <!-- Workstation GC with background collections: full collections run beside the UI thread instead of
+         pausing it mid-animation (a blocking GC was a source of random micro-stutters). -->
     <ServerGarbageCollection>false</ServerGarbageCollection>
-    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <TieredPGO>true</TieredPGO>
   </PropertyGroup>
 
@@ -46,12 +47,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="7" />
+    <!-- gentle memory conservation (0-9); the heavy lifting is the idle compaction in NotchWindow -->
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="3" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
     <PackageReference Include="System.Management" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Assets\notification.wav" />
+    <EmbeddedResource Include="Assets\notification.wav" LogicalName="DynamicNotch.Assets.notification.wav" />
   </ItemGroup>
 
 </Project>

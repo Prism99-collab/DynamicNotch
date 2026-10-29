@@ -112,9 +112,9 @@
                                         <Grid Margin="22,0">
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="64" />
-                                                <RowDefinition Height="14" />
+                                                <RowDefinition x:Name="HomeGap1" Height="14" />
                                                 <RowDefinition Height="64" />
-                                                <RowDefinition Height="10" />
+                                                <RowDefinition x:Name="HomeGap2" Height="10" />
                                                 <RowDefinition Height="*" />
                                             </Grid.RowDefinitions>
 
@@ -143,7 +143,8 @@
                                                         <TextBlock x:Name="RemainText" Grid.Column="2" FontSize="10" Foreground="{StaticResource Dim}" VerticalAlignment="Center" />
                                                     </Grid>
                                                 </StackPanel>
-                                                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                                                <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="12,0,0,0">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                                     <Button x:Name="PrevBtn" Style="{StaticResource CircleButton}" Width="34" Height="34">
                                                         <Path Data="M21,6 L12.5,12 L21,18 Z M12,6 L3.5,12 L12,18 Z" Fill="White" Stroke="White" StrokeThickness="1.4"
                                                               StrokeLineJoin="Round" Stretch="Uniform" Width="17" />
@@ -161,6 +162,17 @@
                                                               StrokeLineJoin="Round" Stretch="Uniform" Width="17" />
                                                     </Button>
                                                 </StackPanel>
+                                                <!-- volume of just the app that's playing (Spotify, the browser...); shown when it has a sound session -->
+                                                <Grid x:Name="AppVolRow" Height="20" Margin="0,2,0,0" Visibility="Collapsed">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="18" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock x:Name="AppVolGlyph" Text="&#xE995;" FontFamily="{StaticResource IconFont}" FontSize="11"
+                                                               Foreground="{StaticResource Dim}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    <c:PillSlider x:Name="AppVolSlider" Grid.Column="1" Height="20" TrackHeight="6" Margin="4,0,4,0" />
+                                                </Grid>
+                                                </StackPanel>
                                             </Grid>
 
                                             <UniformGrid x:Name="TogglesRow" Grid.Row="2" Columns="6">
@@ -174,17 +186,38 @@
 
                                             <Grid x:Name="DevicesPanel" Grid.RowSpan="3" Visibility="Collapsed" Opacity="0">
                                                 <Grid.RowDefinitions>
-                                                    <RowDefinition Height="24" />
+                                                    <RowDefinition Height="28" />
                                                     <RowDefinition Height="*" />
                                                 </Grid.RowDefinitions>
-                                                <TextBlock Text="Sound output" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Dim}" Margin="10,0" VerticalAlignment="Center" />
+                                                <!-- speakers / headphones vs microphones, one list at a time -->
+                                                <StackPanel Orientation="Horizontal" Margin="6,0" VerticalAlignment="Center">
+                                                    <Button x:Name="OutputTab" Style="{StaticResource Capsule}" Height="24" Padding="11,0" Margin="0,0,4,0">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="&#xE7F5;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                            <TextBlock Text="Output" FontSize="11.5" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button x:Name="InputTab" Style="{StaticResource Capsule}" Height="24" Padding="11,0">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="&#xE720;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                            <TextBlock Text="Input" FontSize="11.5" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                </StackPanel>
                                                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
-                                                    <StackPanel x:Name="DevicesList" />
+                                                    <!-- soft bottom edge: a longer list reads as "scroll for more" instead of a cut-off row -->
+                                                    <ScrollViewer.OpacityMask>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                            <GradientStop Color="Black" Offset="0.8" />
+                                                            <GradientStop Color="Transparent" Offset="1" />
+                                                        </LinearGradientBrush>
+                                                    </ScrollViewer.OpacityMask>
+                                                    <StackPanel x:Name="DevicesList" Margin="0,0,0,14" />
                                                 </ScrollViewer>
                                             </Grid>
 
                                             <StackPanel Grid.Row="4" VerticalAlignment="Bottom">
-                                                <Grid Height="30">
+                                                <Grid x:Name="VolRow" Height="30">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="30" />
                                                         <ColumnDefinition Width="*" />
@@ -204,9 +237,21 @@
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="30" />
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="&#xE706;" FontFamily="{StaticResource IconFont}" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    <TextBlock x:Name="BriGlyph" Text="&#xE706;" FontFamily="{StaticResource IconFont}" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                     <c:PillSlider x:Name="BriSlider" Grid.Column="1" Height="24" TrackHeight="6" Margin="8,0" />
                                                     <TextBlock x:Name="BriText" Grid.Column="2" FontSize="10.5" Foreground="{StaticResource Dim}"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Grid>
+                                                <!-- external monitor (DDC/CI); only shown when one answers -->
+                                                <Grid x:Name="ExtBriRow" Height="30" Margin="0,2,0,0" Visibility="Collapsed" ToolTip="External monitor brightness">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="30" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="30" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="&#xE7F4;" FontFamily="{StaticResource IconFont}" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    <c:PillSlider x:Name="ExtBriSlider" Grid.Column="1" Height="24" TrackHeight="6" Margin="8,0" />
+                                                    <TextBlock x:Name="ExtBriText" Grid.Column="2" FontSize="10.5" Foreground="{StaticResource Dim}"
                                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Grid>
                                             </StackPanel>
@@ -323,37 +368,74 @@
                                                 <ColumnDefinition Width="14" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
+
+                                            <!-- Pomodoro focus card: ring + time, focus / break, rounds -->
                                             <Border CornerRadius="20" Background="#17171A" Margin="0,2,0,6">
-                                                <StackPanel Margin="14,10,14,0">
-                                                    <Grid>
-                                                        <TextBlock Text="Timer" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Dim}" />
-                                                        <TextBlock x:Name="TimerHint" FontSize="10" Foreground="{StaticResource Dim}" HorizontalAlignment="Right" />
+                                                <Grid Margin="12,9,12,10">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="24" />
+                                                        <RowDefinition Height="*" />
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Button x:Name="FocusTab" Style="{StaticResource Capsule}" Content="Focus" Height="22" Padding="10,0" FontSize="10.5" Margin="0,0,3,0" />
+                                                        <Button x:Name="BreakTab" Style="{StaticResource Capsule}" Content="Break" Height="22" Padding="10,0" FontSize="10.5" />
+                                                    </StackPanel>
+                                                    <!-- completed focus rounds (4 make a set) -->
+                                                    <StackPanel x:Name="RoundDots" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                                Background="Transparent" ToolTip="Focus rounds done (a long break after 4)" />
+
+                                                    <!-- the ring: click to start / pause, scroll to change the minutes -->
+                                                    <Grid x:Name="TimerFace" Grid.Row="1" Width="98" Height="98" Background="Transparent" Cursor="Hand" Margin="0,3,0,3"
+                                                          ToolTip="Click to start / pause · scroll to change the minutes">
+                                                        <c:RingGauge x:Name="TimerRing" RingBrush="#FF9F0A" />
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock x:Name="TimerText" Text="25:00" FontSize="25" FontWeight="Light" HorizontalAlignment="Center"
+                                                                       FontFamily="Segoe UI Variable Display, Segoe UI" Typography.NumeralAlignment="Tabular" />
+                                                            <TextBlock x:Name="TimerHint" Text="Focus" FontSize="9.5" Foreground="{StaticResource Dim}" HorizontalAlignment="Center" Margin="0,-1,0,0" />
+                                                        </StackPanel>
                                                     </Grid>
-                                                    <TextBlock x:Name="TimerText" Text="25:00" FontSize="40" FontWeight="Light" HorizontalAlignment="Center"
-                                                               FontFamily="Segoe UI Variable Display, Segoe UI" Typography.NumeralAlignment="Tabular" Margin="0,2,0,0" />
-                                                    <c:PillSlider x:Name="TimerBar" Height="8" TrackHeight="4" IsInteractive="False" IsHitTestVisible="False" FillBrush="#FF9F0A" Margin="0,2,0,10" />
-                                                    <UniformGrid x:Name="TimerChips" Columns="4" Margin="-2,0">
-                                                        <Button Style="{StaticResource Capsule}" Tag="5" Content="5m" Margin="2,0" Padding="0" />
-                                                        <Button Style="{StaticResource Capsule}" Tag="15" Content="15m" Margin="2,0" Padding="0" />
-                                                        <Button Style="{StaticResource Capsule}" Tag="25" Content="25m" Margin="2,0" Padding="0" />
-                                                        <Button Style="{StaticResource Capsule}" Tag="50" Content="50m" Margin="2,0" Padding="0" />
+
+                                                    <UniformGrid x:Name="TimerChips" Grid.Row="2" Columns="4" Margin="-2,0,-2,7">
+                                                        <Button Style="{StaticResource Capsule}" Tag="15" Content="15" Height="22" Margin="2,0" Padding="0" FontSize="10.5" />
+                                                        <Button Style="{StaticResource Capsule}" Tag="25" Content="25" Height="22" Margin="2,0" Padding="0" FontSize="10.5" />
+                                                        <Button Style="{StaticResource Capsule}" Tag="45" Content="45" Height="22" Margin="2,0" Padding="0" FontSize="10.5" />
+                                                        <Button Style="{StaticResource Capsule}" Tag="60" Content="60" Height="22" Margin="2,0" Padding="0" FontSize="10.5" />
                                                     </UniformGrid>
-                                                    <UniformGrid Columns="2" Margin="-3,8,-3,0">
-                                                        <Button x:Name="TimerStart" Style="{StaticResource Capsule}" Background="#FF9F0A" Content="Start" Margin="3,0" Height="30" FontWeight="SemiBold" />
-                                                        <Button x:Name="TimerReset" Style="{StaticResource Capsule}" Content="Reset" Margin="3,0" Height="30" />
-                                                    </UniformGrid>
-                                                </StackPanel>
+
+                                                    <Grid Grid.Row="3">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="30" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Button x:Name="TimerStart" Style="{StaticResource Capsule}" Background="#FF9F0A" Foreground="Black" Height="30" FontWeight="SemiBold">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock x:Name="TimerStartGlyph" Text="&#xE768;" FontFamily="{StaticResource IconFont}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                                <TextBlock x:Name="TimerStartText" Text="Start" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                        <Button x:Name="TimerReset" Grid.Column="2" Style="{StaticResource Capsule}" Height="30" Padding="0" ToolTip="Reset">
+                                                            <TextBlock Text="&#xE72C;" FontFamily="{StaticResource IconFont}" FontSize="12" />
+                                                        </Button>
+                                                    </Grid>
+                                                </Grid>
                                             </Border>
+
+                                            <!-- colour-coded tools; right-click Clip history / Files for more -->
                                             <UniformGrid x:Name="ActionsGrid" Grid.Column="2" Columns="3" Rows="3" Margin="0,0,0,4">
-                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="snip" Glyph="&#xE924;" Label="Snip" ToolTip="Screenshot (Win+Shift+S)" />
-                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="taskmgr" Glyph="&#xE9D9;" Label="Task Manager" />
-                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="explorer" Glyph="&#xEC50;" Label="Files" />
-                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="terminal" Glyph="&#xE756;" Label="Terminal" />
-                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="calc" Glyph="&#xE8EF;" Label="Calculator" />
-                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="clipboard" Glyph="&#xF0E3;" Label="Clip history" ToolTip="Windows clipboard history (Win+V)" />
-                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="settings" Glyph="&#xE713;" Label="Settings" />
-                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="lock" Glyph="&#xE72E;" Label="Lock" />
-                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="sleep" Glyph="&#xE7E8;" Label="Sleep" ToolTip="Click twice to sleep" />
+                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="snip" Glyph="&#xE924;" Label="Snip" TintBrush="#0A84FF" ToolTip="Screenshot (Win+Shift+S)" />
+                                                <c:QuickToggle x:Name="AwakeTile" Style="{StaticResource ActionTile}" Tag="awake" Glyph="&#xE7B3;" Label="Keep awake" TintBrush="#64D2FF" OnBrush="#64D2FF"
+                                                               ToolTip="Keep the screen on and the PC awake while you work" />
+                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="clipboard" Glyph="&#xF0E3;" Label="Clip history" TintBrush="#BF5AF2"
+                                                               ToolTip="Windows clipboard history (Win+V) · right-click: the notch's own clipboard" />
+                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="explorer" Glyph="&#xEC50;" Label="Files" TintBrush="#FFD60A" ToolTip="File Explorer · right-click: Downloads" />
+                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="terminal" Glyph="&#xE756;" Label="Terminal" TintBrush="#E5E5EA" />
+                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="taskmgr" Glyph="&#xE9D9;" Label="Task Manager" TintBrush="#30D158" />
+                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="calc" Glyph="&#xE8EF;" Label="Calculator" TintBrush="#FF9F0A" />
+                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="lock" Glyph="&#xE72E;" Label="Lock" TintBrush="#5E5CE6" ToolTip="Lock (Win+L)" />
+                                                <c:QuickToggle Style="{StaticResource ActionTile}" Tag="sleep" Glyph="&#xE7E8;" Label="Sleep" TintBrush="#FF375F" ToolTip="Click twice to sleep" />
                                             </UniformGrid>
                                         </Grid>
                                     </Grid>
@@ -431,6 +513,9 @@
                     </Grid>
 
                     <!-- thin coloured rim along the notch's sides and bottom (colour set from code) -->
+                    <!-- slim over a window but something's live: a thin line glowing in the music's / activity's colour -->
+                    <Border x:Name="SlimGlow" Height="2.5" CornerRadius="1.25" VerticalAlignment="Bottom" Margin="12,0,12,1"
+                            IsHitTestVisible="False" Opacity="0" />
                     <Border x:Name="Rim" BorderThickness="1,0,1,1.2" CornerRadius="0,0,3,3" IsHitTestVisible="False" BorderBrush="Transparent" />
                 </Grid>
             </Border>

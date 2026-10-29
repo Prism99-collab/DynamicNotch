@@ -20,6 +20,12 @@ public sealed class QuickToggle : Button
         DependencyProperty.Register(nameof(OnBrush), typeof(Brush), typeof(QuickToggle),
             new PropertyMetadata(new SolidColorBrush(Color.FromRgb(0x0A, 0x84, 0xFF))));
 
+    /// <summary>Action tiles: the tool's own colour (icon + a soft tint behind it).</summary>
+    public static readonly DependencyProperty TintBrushProperty =
+        DependencyProperty.Register(nameof(TintBrush), typeof(Brush), typeof(QuickToggle), new PropertyMetadata(Brushes.White));
+
+    public Brush TintBrush { get => (Brush)GetValue(TintBrushProperty); set => SetValue(TintBrushProperty, value); }
+
     public string Glyph { get => (string)GetValue(GlyphProperty); set => SetValue(GlyphProperty, value); }
     public string Label { get => (string)GetValue(LabelProperty); set => SetValue(LabelProperty, value); }
     public bool IsOn { get => (bool)GetValue(IsOnProperty); set => SetValue(IsOnProperty, value); }

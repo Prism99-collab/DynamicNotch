@@ -39,25 +39,33 @@ To remove it: **Settings → Apps → Installed apps → Dynamic Notch → Unins
 
 **Stays out of your way**
 - Minimal by default: a thin bar that only grows when something is happening.
-- Click-through: browser tabs and desktop icons under it keep working; it slims down over maximized windows and hides in full-screen games, videos and presentations.
+- Click-through: browser tabs and desktop icons under it keep working.
+- Over a maximized window it steps aside into a slim bar with a thin glowing line in the song's (or timer's) colour,
+  and fades away when your mouse heads for a tab underneath. Pushing against the top edge still opens it.
+- Hides in full-screen games, videos and presentations.
 
-**Live activities** — music (album art + visualizer tinted with the cover's colours), timer, downloads with live speed, Focus.
+**Smooth** — animations run at your screen's real refresh rate (144 / 180 / 240 Hz), and nothing slow ever runs
+while the notch is moving.
+
+**Live activities** — music (album art + visualizer tinted with the cover's colours), Pomodoro timer, downloads with live speed, Focus.
 Two at once? The second one splits off into its own little island.
 
 **Control center** — hover the top edge (or press <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd>) and swipe between pages:
 
 | Page | What's on it |
 |---|---|
-| **Home** | Now playing with seek, Wi-Fi, Bluetooth, Airplane, Focus, Mic, Power mode, volume + output picker, brightness |
+| **Home** | Now playing with seek and a volume slider for just the playing app, Wi-Fi, Bluetooth, Airplane, Focus, Mic, Power mode, volume + output / input picker, laptop and external monitor brightness |
 | **System** | CPU / memory / disk / battery rings, time left on battery, download / upload speed, ping & signal, battery health and power draw |
-| **Tools** | Timer, Snip, Task Manager, Files, Terminal, Calculator, Clipboard history, Settings, Lock, Sleep |
+| **Tools** | Pomodoro focus timer (focus / break, rounds, scroll to adjust), Snip, Keep awake, Clipboard history, Files, Terminal, Task Manager, Calculator, Lock, Sleep |
 | **Clipboard & Files** | Recently copied text (click to copy again), newest downloads & screenshots — drag them straight into any app |
 | **Smart** | Battery-drain warnings, shaky-connection alerts, charge reminder, Downloads tidy-up, break reminder, optional meeting mode |
 | **Settings** | Every option as a switch |
 
-**Smart, clickable alerts** — notifications (Teams, WhatsApp, Outlook…), apps asking for attention, downloads, screenshots,
-USB drives, Wi-Fi, Bluetooth, low battery, Caps Lock, copied text. Each glows in its app's colour, pulses for new things,
-shakes for problems, and opens the right thing when clicked. Hover to keep one on screen, scroll to adjust volume, right-click to dismiss.
+**Smart, clickable alerts** — notifications (Teams, WhatsApp, Outlook…) with a short ringtone at your volume, apps asking for attention,
+error and warning dialogs from any app, downloads (finished or failed), screenshots, USB drives, Wi-Fi, Bluetooth, low battery,
+Caps Lock, copied text. Each glows in its app's colour, pulses for new things, shakes for problems, gives a tiny shiver when
+something didn't work, and opens the right thing when clicked (an error alert also copies its message). Hover to keep one on
+screen, scroll to adjust volume, right-click to dismiss.
 
 **Focus** — holds notifications while you work, then shows what you missed.
 
@@ -109,8 +117,8 @@ Pushing a tag like `v1.1.0` builds both installers on GitHub Actions and publish
 src/DynamicNotch/
   NotchWindow.xaml(.cs)   window, shape state machine, spring physics, hover / hotkey, click-through
   NotchWindow.*.cs        Home, Pages, Alerts, Smart, Motion
-  Services/               media, audio, radios, Bluetooth, brightness, power, notifications, privacy,
-                          files, system monitor, focus, startup / keep-alive
+  Services/               media, audio (per-app volume, devices), radios, Bluetooth, laptop and monitor brightness,
+                          power, notifications + sound, privacy, files, system monitor, focus, startup / keep-alive
   Controls/               spring, sliders, rings, toggles, battery icon, dark tray menu
 installer/                Inno Setup script
 scripts/                  build and dev-install scripts

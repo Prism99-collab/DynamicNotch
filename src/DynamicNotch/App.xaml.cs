@@ -55,6 +55,10 @@ public partial class App : Application
 
         try { Directory.CreateDirectory(Settings.Folder); } catch { }
         _settings = Settings.Load();
+        // WPF caps every animation at 60 fps unless told otherwise: let them run at the screen's real refresh
+        // rate (144 / 180 / 240 Hz...). Animations that pick their own rate (visualizer, glow) keep theirs.
+        System.Windows.Media.Animation.Timeline.DesiredFrameRateProperty.OverrideMetadata(
+            typeof(System.Windows.Media.Animation.Timeline), new FrameworkPropertyMetadata { DefaultValue = (int?)Interop.Native.RefreshRate() });
         AppLog.Write($"started ({(restarted ? "after a crash" : auto ? "automatically" : "by user/login")}), pid {Environment.ProcessId}");
         _window = new NotchWindow(_settings);
         _window.Show();
