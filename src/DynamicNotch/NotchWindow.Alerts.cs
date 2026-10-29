@@ -87,10 +87,16 @@ public partial class NotchWindow
         _focus.Changed += OnFocusChanged;
 
         _bt.Changed += RefreshToggles;
-        _bt.ConnectionChanged += (name, connected) =>
-            ShowOsd("bt", BluetoothService.GlyphFor(name), null, name, connected ? "Connected" : "Disconnected", null,
-                glyphBrush: connected ? Blue : null, seconds: 2.4, onClick: () => Launch("ms-settings:bluetooth"),
+        _bt.ConnectionChanged += (d, connected) =>
+            ShowOsd("bt", BluetoothService.GlyphFor(d), null, d.Name,
+                !connected ? "Disconnected" : d.Battery is { } b ? $"Connected · {b}% battery" : "Connected",
+                connected && d.Battery is { } pct ? $"{pct}%" : null,
+                glyphBrush: connected ? Blue : null, seconds: 2.6, onClick: () => Launch("ms-settings:bluetooth"),
                 motion: connected ? Motion.Auto : Motion.Tremble);
+        _bt.BatteryLow += d =>
+            ShowOsd("bt-battery", BluetoothService.GlyphFor(d), null, $"{d.Name} battery low",
+                $"{d.Battery}% left · charge it soon", $"{d.Battery}%", glyphBrush: Orange, seconds: 5, prio: Prio.High,
+                onClick: () => Launch("ms-settings:bluetooth"), motion: Motion.Tremble);
 
         _power.Changed += () => { RefreshBattery(); CheckBatteryLow(); ApplyPowerProfile(); };
         _power.PluggedChanged += plugged =>
