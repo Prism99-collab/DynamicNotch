@@ -89,6 +89,7 @@ public partial class NotchWindow
         RefreshExtBrightness();
         RefreshPrivacyStatus();
         _ = _bri.RefreshAsync();
+        _ = _bt.RefreshBatteriesAsync(); // a controller's battery is fresh whenever you look
         _ = _extBri.RefreshAsync(MonitorInUse()); // picks up changes made with the monitor's own buttons
         _ = RefreshAirplaneAsync();
     }
@@ -177,7 +178,11 @@ public partial class NotchWindow
 
         BtTile.Visibility = _radio.HasBluetooth ? Visibility.Visible : Visibility.Collapsed;
         BtTile.IsOn = _radio.BluetoothOn;
-        BtTile.Label = !_radio.BluetoothOn ? "BT off" : _bt.ConnectedName ?? "Bluetooth";
+        // the connected device, battery first so it survives the label's trimming: "50% · Xbox Wireless…"
+        var bt = _radio.BluetoothOn ? _bt.Primary : null;
+        BtTile.Label = !_radio.BluetoothOn ? "BT off" : bt == null ? "Bluetooth" : bt.Battery is { } b ? $"{b}% · {bt.Name}" : bt.Name;
+        BtTile.ToolTip = bt == null ? "Bluetooth (right-click for settings)"
+            : $"{bt.Name}{(bt.Battery is { } level ? $" · {level}% battery" : "")} (right-click for settings)";
 
         AirTile.IsOn = _radio.AirplaneOn;
 

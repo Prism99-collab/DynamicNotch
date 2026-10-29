@@ -10,6 +10,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Volume slider for just the playing app (Spotify, a browser…), under the media buttons.
 - Brightness slider for an external monitor (DDC/CI), next to the laptop's.
 - Input devices in the sound picker: switch microphones as easily as speakers.
+- Bluetooth Low Energy devices (game controllers, earbuds…) on the Bluetooth tile and in connect alerts, with their battery
+  level ("50% · Xbox Wireless Controller") and a heads-up when it drops to 15 %.
 - Pomodoro focus timer on the Tools page: progress ring, focus / break, rounds, scroll to adjust, next step offered when one ends.
 - Keep awake tool, colour-coded tool tiles, right-click shortcuts (notch clipboard, Downloads).
 - Alerts for error / warning dialogs from any app (click: copies the message and brings the dialog up) and for failed downloads.
