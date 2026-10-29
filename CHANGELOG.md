@@ -3,6 +3,30 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] — 2026-10-29
+
+### Added
+- Notification ringtone, played at your own volume (one ring per burst of messages).
+- Volume slider for just the playing app (Spotify, a browser…), under the media buttons.
+- Brightness slider for an external monitor (DDC/CI), next to the laptop's.
+- Input devices in the sound picker: switch microphones as easily as speakers.
+- Pomodoro focus timer on the Tools page: progress ring, focus / break, rounds, scroll to adjust, next step offered when one ends.
+- Keep awake tool, colour-coded tool tiles, right-click shortcuts (notch clipboard, Downloads).
+- Alerts for error / warning dialogs from any app (click: copies the message and brings the dialog up) and for failed downloads.
+- A tiny shiver for things that didn't work (failure notifications, a toggle Windows refused, a disconnected Bluetooth device)
+  and a bump at the end of the volume / brightness range.
+
+### Changed
+- Over a maximized window the notch shrinks to a slim glowing bar and fades away when the mouse heads for a tab under it.
+- Animations run at the screen's real refresh rate instead of 60 fps.
+
+### Fixed
+- Lag when opening the sound picker (device names are now read once, in the background).
+- Stutters during animations: background garbage collection, and icons, thumbnails, drive info, sounds and audio lookups
+  no longer run on the UI thread.
+- Alerts that waited behind a full-screen app no longer all play minutes later; a screenshot no longer shows a "Copied" alert first.
+- Garbled icons and text in the Smart page's alerts.
+
 ## [1.0.0] — 2026-10-29
 
 First public release.
@@ -30,4 +54,5 @@ First public release.
 - Starts at sign-in and comes back after lock, sleep or a crash; Exit keeps it off until reopened.
 - Dark tray menu, automatic battery mode, about 1 % of one CPU core when idle.
 
+[1.1.0]: https://github.com/Prism99-collab/DynamicNotch/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Prism99-collab/DynamicNotch/releases/tag/v1.0.0

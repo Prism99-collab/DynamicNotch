@@ -32,11 +32,17 @@ public partial class NotchWindow
         VolSlider.ValueChanged += v => { _lastUserChange = DateTime.UtcNow; _audio.SetVolume((float)v); VolGlyph.Text = VolumeGlyph(); };
         MuteBtn.Click += (_, _) => { _lastUserChange = DateTime.UtcNow; _audio.ToggleMute(); RefreshVolume(); };
         OutputBtn.Click += (_, _) => ShowDevices(!_devicesOpen);
+        OutputTab.Click += (_, _) => { _devicesInput = false; RenderDevices(); };
+        InputTab.Click += (_, _) => { _devicesInput = true; RenderDevices(); };
+        _audio.DevicesChanged += () => { if (_devicesOpen) RenderDevices(); };
         BriSlider.ValueChanged += v => { _lastUserChange = DateTime.UtcNow; _bri.Set((int)Math.Round(v * 100)); BriText.Text = $"{(int)Math.Round(v * 100)}"; };
+        AppVolSlider.ValueChanged += v => { _audio.SetAppVolume((float)v); AppVolGlyph.Text = GlyphForLevel(v); };
+        ExtBriSlider.ValueChanged +=v => { _lastUserChange = DateTime.UtcNow; _extBri.Set((int)Math.Round(v * 100)); ExtBriText.Text = $"{(int)Math.Round(v * 100)}"; };
+        _extBri.Changed += RefreshExtBrightness;
 
-        WifiTile.Click += async (_, _) => { WifiTile.IsOn = !WifiTile.IsOn; await _radio.SetWifiAsync(WifiTile.IsOn); };
-        BtTile.Click += async (_, _) => { BtTile.IsOn = !BtTile.IsOn; await _radio.SetBluetoothAsync(BtTile.IsOn); };
-        AirTile.Click += async (_, _) => { AirTile.IsOn = !AirTile.IsOn; await _radio.SetAirplaneAsync(AirTile.IsOn); };
+        WifiTile.Click += async (_, _) => { bool on = WifiTile.IsOn = !WifiTile.IsOn; await _radio.SetWifiAsync(on); await ConfirmToggleAsync(() => _radio.WifiOn, on); };
+        BtTile.Click += async (_, _) => { bool on = BtTile.IsOn = !BtTile.IsOn; await _radio.SetBluetoothAsync(on); await ConfirmToggleAsync(() => _radio.BluetoothOn, on); };
+        AirTile.Click += async (_, _) => { bool on = AirTile.IsOn = !AirTile.IsOn; await _radio.SetAirplaneAsync(on); await ConfirmToggleAsync(() => _radio.AirplaneOn, on); };
         FocusTile.Click += (_, _) => _focus.Toggle();
         MicTile.Click += (_, _) => { _audio.ToggleMic(); RefreshToggles(); };
         PowerTile.Click += (_, _) => { _power.CycleMode(); RefreshToggles(); };
@@ -49,6 +55,15 @@ public partial class NotchWindow
         MicTile.MouseRightButtonUp += (_, e) => OpenUri("ms-settings:privacy-microphone", e);
         PowerTile.MouseRightButtonUp += (_, e) => OpenUri("ms-settings:powersleep", e);
         BatteryPanel.MouseLeftButtonUp += (_, e) => OpenUri("ms-settings:batterysaver", e);
+    }
+
+    /// <summary>Windows refused to switch a radio (hardware switch, driver, policy): flip the tile back with a small shiver.</summary>
+    async Task ConfirmToggleAsync(Func<bool> isOn, bool wanted)
+    {
+        await Task.Delay(800);
+        if (isOn() == wanted) return;
+        RefreshToggles();
+        Tremble(((SolidColorBrush)Red).Color);
     }
 
     void OpenUri(string uri, MouseButtonEventArgs? e = null)
@@ -71,8 +86,10 @@ public partial class NotchWindow
         RefreshToggles();
         RefreshVolume();
         RefreshBrightness();
+        RefreshExtBrightness();
         RefreshPrivacyStatus();
         _ = _bri.RefreshAsync();
+        _ = _extBri.RefreshAsync(MonitorInUse()); // picks up changes made with the monitor's own buttons
         _ = RefreshAirplaneAsync();
     }
 
@@ -123,8 +140,34 @@ public partial class NotchWindow
         PlayIcon.Visibility = _media.IsPlaying ? Visibility.Collapsed : Visibility.Visible;
         PauseIcon.Visibility = _media.IsPlaying ? Visibility.Visible : Visibility.Collapsed;
         PrevBtn.IsEnabled = PlayBtn.IsEnabled = NextBtn.IsEnabled = has;
+        RefreshAppVolume();
         RefreshClockAndProgress();
     }
+
+    string? _appVolLogged;
+
+    /// <summary>The small slider under the media buttons: volume of only the app that's playing.</summary>
+    int _appVolVersion;
+
+    async void RefreshAppVolume()
+    {
+        if (AppVolSlider.IsDragging) return;
+        int version = ++_appVolVersion;
+        // looked up off the UI thread; only the newest answer is applied
+        float? v = _media.HasSession ? await _audio.FindAppVolumeAsync(_media.SourceApp) : null;
+        if (version != _appVolVersion || AppVolSlider.IsDragging) return;
+        if (_media.SourceApp != _appVolLogged)
+        {
+            _appVolLogged = _media.SourceApp;
+            if (_appVolLogged != null) AppLog.Write($"media app '{_appVolLogged}': {(v == null ? "no sound session found" : "app volume available")}");
+        }
+        AppVolRow.Visibility = v != null ? Visibility.Visible : Visibility.Collapsed;
+        if (v is not { } level) return;
+        AppVolSlider.Value = level;
+        AppVolGlyph.Text = GlyphForLevel(level);
+    }
+
+    static string GlyphForLevel(double v) => v <= 0.001 ? "" : v < 0.34 ? "" : v < 0.67 ? "" : "";
 
     void RefreshToggles()
     {
@@ -168,6 +211,23 @@ public partial class NotchWindow
         BriRow.Visibility = _bri.Supported ? Visibility.Visible : Visibility.Collapsed;
         if (!BriSlider.IsDragging) BriSlider.Value = _bri.Level / 100.0;
         BriText.Text = $"{_bri.Level}";
+    }
+
+    void RefreshExtBrightness()
+    {
+        bool ext = _extBri.Supported;
+        ExtBriRow.Visibility = ext ? Visibility.Visible : Visibility.Collapsed;
+        // three sliders only fit with slightly tighter rows; with two, keep the roomier layout
+        HomeGap1.Height = new GridLength(ext ? 8 : 14);
+        HomeGap2.Height = new GridLength(ext ? 6 : 10);
+        VolRow.Height = BriRow.Height = ExtBriRow.Height = ext ? 24 : 30;
+        BriRow.Margin = ExtBriRow.Margin = new Thickness(0, ext ? 1 : 2, 0, 0);
+        // with two brightness sliders, tell them apart: laptop vs monitor
+        BriGlyph.Text = ext ? "" : "";
+        BriRow.ToolTip = ext ? "Laptop screen brightness" : null;
+        if (!ext) return;
+        if (!ExtBriSlider.IsDragging && !RecentlyTouched) ExtBriSlider.Value = _extBri.Level / 100.0;
+        ExtBriText.Text = $"{_extBri.Level}";
     }
 
     string VolumeGlyph()
@@ -278,28 +338,9 @@ public partial class NotchWindow
         _devicesOpen = open;
         if (open)
         {
-            DevicesList.Children.Clear();
-            foreach (var d in _audio.GetOutputs())
-            {
-                var row = new Grid { Height = 30 };
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
-                row.ColumnDefinitions.Add(new ColumnDefinition());
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                row.Children.Add(Glyph(d.IsHeadphones ? "" : "", 14));
-                var name = new TextBlock { Text = d.Name, FontSize = 12.5, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-                Grid.SetColumn(name, 1);
-                row.Children.Add(name);
-                if (d.IsDefault)
-                {
-                    var check = Glyph("", 12, Blue);
-                    Grid.SetColumn(check, 2);
-                    row.Children.Add(check);
-                }
-                var btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = 32 };
-                string id = d.Id;
-                btn.Click += (_, _) => { _audio.SetDefaultOutput(id); ShowDevices(false); };
-                DevicesList.Children.Add(btn);
-            }
+            _devicesInput = false; // always opens on speakers / headphones
+            RenderDevices();
+            _audio.RefreshDevices(); // just in case; the list on screen updates if anything changed
             DevicesPanel.Visibility = Visibility.Visible;
             Fade(DevicesPanel, 1, 160);
             Fade(MediaRow, 0, 120);
@@ -315,6 +356,55 @@ public partial class NotchWindow
             Fade(TogglesRow, 1, 180);
             MediaRow.IsHitTestVisible = TogglesRow.IsHitTestVisible = true;
         }
+    }
+
+    bool _devicesInput;
+
+    /// <summary>Fills the device panel from the lists the audio service keeps ready (no waiting on Windows).</summary>
+    void RenderDevices()
+    {
+        StyleTab(OutputTab, !_devicesInput);
+        StyleTab(InputTab, _devicesInput);
+        DevicesList.Children.Clear();
+        var devices = _devicesInput ? _audio.Inputs : _audio.Outputs;
+        if (devices.Count == 0)
+        {
+            DevicesList.Children.Add(new TextBlock
+            {
+                Text = _devicesInput ? "No microphone found" : "No sound output found",
+                FontSize = 11.5, Foreground = DimBrush, Margin = new Thickness(10, 8, 10, 0),
+            });
+            return;
+        }
+        foreach (var d in devices)
+        {
+            var row = new Grid { Height = 30 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
+            row.ColumnDefinitions.Add(new ColumnDefinition());
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            string glyph = _devicesInput ? (d.IsHeadphones ? "" : "") : d.IsHeadphones ? "" : "";
+            row.Children.Add(Glyph(glyph, 14));
+            var name = new TextBlock { Text = d.Name, FontSize = 12.5, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+            Grid.SetColumn(name, 1);
+            row.Children.Add(name);
+            if (d.IsDefault)
+            {
+                var check = Glyph("", 12, Blue);
+                Grid.SetColumn(check, 2);
+                row.Children.Add(check);
+            }
+            var btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = 32, ToolTip = d.Name };
+            string id = d.Id;
+            btn.Click += (_, _) => { _audio.SetDefaultDevice(id); ShowDevices(false); };
+            DevicesList.Children.Add(btn);
+        }
+    }
+
+    void StyleTab(Button tab, bool on)
+    {
+        tab.Background = on ? Brushes.White : (Brush)FindResource("Tile");
+        tab.Foreground = on ? Brushes.Black : Brushes.White;
+        tab.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
     }
 
     // shared little helpers ------------------------------------------------------------

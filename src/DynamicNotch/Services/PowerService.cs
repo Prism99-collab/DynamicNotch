@@ -74,7 +74,12 @@ public sealed class PowerService
     public PowerMode CycleMode()
     {
         var next = (PowerMode)(((int)Mode + 1) % 3);
-        var g = next switch { PowerMode.Efficiency => EfficiencyGuid, PowerMode.Performance => PerformanceGuid, _ => Guid.Empty };
+        return SetMode(next);
+    }
+
+    public PowerMode SetMode(PowerMode mode)
+    {
+        var g = mode switch { PowerMode.Efficiency => EfficiencyGuid, PowerMode.Performance => PerformanceGuid, _ => Guid.Empty };
         try { PowerSetActiveOverlayScheme(g); } catch { }
         return Mode;
     }

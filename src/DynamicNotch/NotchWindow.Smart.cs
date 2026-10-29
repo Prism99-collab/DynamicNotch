@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -11,7 +11,7 @@ using static DynamicNotch.Interop.Native;
 namespace DynamicNotch;
 
 /// <summary>
-/// Page 5 Â· Smart: small helpers that connect the dots (unusual battery drain, shaky internet,
+/// Page 5 · Smart: small helpers that connect the dots (unusual battery drain, shaky internet,
 /// time-based charge reminder, Downloads clean-up, breaks, optional meeting mode).
 /// Each one can be switched off; meeting mode is off until the user turns it on.
 /// </summary>
@@ -61,7 +61,7 @@ public partial class NotchWindow
         catch (Exception ex) { AppLog.Write("smart check failed: " + ex.Message); }
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ battery â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ───────────────────────────── battery ─────────────────────────────
 
     async Task CheckBatteryAsync()
     {
@@ -79,8 +79,8 @@ public partial class NotchWindow
             _lastDrainAlert = DateTime.UtcNow;
             _highDrainStreak = 0;
             string? hog = await Task.Run(BusiestApp);
-            string left = b.TimeLeft is { } tl ? $" Â· about {SystemMonitor.Duration(tl)} left" : "";
-            ShowOsd("smart-drain", "î¥…", null, "Battery draining fast",
+            string left = b.TimeLeft is { } tl ? $" · about {SystemMonitor.Duration(tl)} left" : "";
+            ShowOsd("smart-drain", "", null, "Battery draining fast",
                 hog != null ? $"{hog} is working hard ({w:0} W){left}" : $"Using {w:0} W, more than usual{left}",
                 $"{_power.Percent}%", glyphBrush: Orange, seconds: 6, prio: Prio.High, onClick: () => ExpandTo(1));
         }
@@ -129,7 +129,7 @@ public partial class NotchWindow
         catch { return null; }
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ connection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ───────────────────────────── connection ─────────────────────────────
 
     async Task CheckConnectionAsync()
     {
@@ -142,19 +142,19 @@ public partial class NotchWindow
         {
             _netAlerted = true;
             _lastNetAlert = DateTime.UtcNow;
-            ShowOsd("smart-net", "î¡±", null, "Connection unstable",
-                c.PingMs is { } ms ? $"Ping {ms} ms on {c.Name} Â· calls may stutter" : $"Requests timing out on {c.Name}",
+            ShowOsd("smart-net", "", null, "Connection unstable",
+                c.PingMs is { } ms ? $"Ping {ms} ms on {c.Name} · calls may stutter" : $"Requests timing out on {c.Name}",
                 null, glyphBrush: Orange, seconds: 5, onClick: () => ExpandTo(1));
         }
         else if (_netAlerted && _goodNet >= 3)
         {
             _netAlerted = false;
-            ShowOsd("smart-net", "îœ", null, "Connection stable again", c.PingMs is { } ms ? $"Ping {ms} ms" : null, null,
+            ShowOsd("smart-net", "", null, "Connection stable again", c.PingMs is { } ms ? $"Ping {ms} ms" : null, null,
                 glyphBrush: Green, seconds: 2.5, prio: Prio.Low, onClick: () => ExpandTo(1));
         }
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ downloads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ───────────────────────────── downloads ─────────────────────────────
 
     async Task CheckDownloadsAsync()
     {
@@ -176,11 +176,11 @@ public partial class NotchWindow
         if (size < 5L * 1024 * 1024 * 1024) return;
         _settings.LastDownloadsNag = DateTime.Now;
         _settings.Save();
-        ShowOsd("smart-downloads", "î¢–", null, $"Downloads folder is {SystemMonitor.Bytes(size)}", "Click to open it and tidy up", null,
+        ShowOsd("smart-downloads", "", null, $"Downloads folder is {SystemMonitor.Bytes(size)}", "Click to open it and tidy up", null,
             glyphBrush: Blue, seconds: 6, onClick: () => Launch(dir));
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ breaks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ───────────────────────────── breaks ─────────────────────────────
 
     void CheckBreak()
     {
@@ -192,11 +192,11 @@ public partial class NotchWindow
         // never interrupt a game, a film or a call; try again a bit later
         if (_hidden || _privacy.MicInUse || _privacy.CamInUse) return;
         _activeSince = DateTime.UtcNow;
-        ShowOsd("smart-break", "îŸ¼", null, "Time for a short break",
-            $"{(int)worked.TotalMinutes} min at the screen Â· stand up, look away for a bit", null, glyphBrush: Green, seconds: 7);
+        ShowOsd("smart-break", "", null, "Time for a short break",
+            $"{(int)worked.TotalMinutes} min at the screen · stand up, look away for a bit", null, glyphBrush: Green, seconds: 7);
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ meeting mode (opt-in) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ───────────────────────────── meeting mode (opt-in) ─────────────────────────────
 
     void OnMeetingCheck()
     {
@@ -206,8 +206,8 @@ public partial class NotchWindow
             _inMeeting = true;
             _pausedForMeeting = false;
             if (_media.IsPlaying) { _ = _media.TogglePlayPauseAsync(); _pausedForMeeting = true; }
-            ShowOsd("meeting", "îœ”", null, "Meeting mode on",
-                (_pausedForMeeting ? "Music paused Â· " : "") + "pop-ups silenced Â· click to turn off for this call", null,
+            ShowOsd("meeting", "", null, "Meeting mode on",
+                (_pausedForMeeting ? "Music paused · " : "") + "pop-ups silenced · click to turn off for this call", null,
                 glyphBrush: Green, seconds: 4, force: true, onClick: EndMeetingMode);
         }
         else if (!_privacy.CamInUse)
@@ -225,7 +225,7 @@ public partial class NotchWindow
         if (_pausedForMeeting && !_media.IsPlaying) _ = _media.TogglePlayPauseAsync();
         bool resumed = _pausedForMeeting;
         _pausedForMeeting = false;
-        ShowOsd("meeting", "îœ”", null, camStillOn ? "Meeting mode off for this call" : "Meeting ended",
+        ShowOsd("meeting", "", null, camStillOn ? "Meeting mode off for this call" : "Meeting ended",
             resumed ? "Music resumed" : null, null, seconds: 2.5, force: true);
     }
 
@@ -233,7 +233,7 @@ public partial class NotchWindow
     bool SilencedByMeeting(string kind, bool force) =>
         _inMeeting && !force && kind is not ("volume" or "brightness" or "meeting" or "battery" or "smart-charge");
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ the Smart page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ───────────────────────────── the Smart page ─────────────────────────────
 
     void BuildSmartPage()
     {

@@ -25,6 +25,8 @@ public sealed class MediaService
     public ImageSource? Art { get; private set; }
     public Color Accent { get; private set; } = Colors.White;
     public bool HasSession => _session != null;
+    /// <summary>App id of the player ("Spotify.exe", "Chrome", "SpotifyAB.SpotifyMusic_…!Spotify").</summary>
+    public string? SourceApp => _sessionId;
     public bool IsPlaying { get; private set; }
     public TimeSpan Duration { get; private set; }
 

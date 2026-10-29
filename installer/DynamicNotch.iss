@@ -3,7 +3,7 @@
 ; Per-user install: no administrator prompt, installs to %LOCALAPPDATA%\Programs\Dynamic Notch.
 
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.1.0"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish"
@@ -107,8 +107,25 @@ begin
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM {#AppExe}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
+procedure SetStartupTask(Enable: Boolean);
+var
+  ResultCode: Integer;
+  Switch: String;
+begin
+  { the app's own sign-in / keep-alive task (it may not exist yet: then this does nothing) }
+  if Enable then Switch := '/ENABLE' else Switch := '/DISABLE';
+  Exec(ExpandConstant('{sys}\schtasks.exe'), '/Change /TN "Dynamic Notch" ' + Switch, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
+  { the keep-alive task relaunches the notch every 5 minutes: pause it so it can't lock the exe mid-upgrade }
+  SetStartupTask(False);
   StopRunningCopy();
   Result := '';
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then SetStartupTask(True);
 end;

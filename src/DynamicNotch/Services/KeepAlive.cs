@@ -74,7 +74,8 @@ public static class KeepAlive
                 string exe = Environment.ProcessPath ?? "";
                 if (exe.Length == 0) return;
                 string xml = TaskXml(exe, logon, guard);
-                if (CurrentTaskXml() is { } existing && Normalize(existing) == Normalize(xml)) return; // already right
+                // already right (and switched on: an interrupted upgrade may have left it disabled)
+                if (CurrentTaskXml() is { } existing && !existing.Contains("<Enabled>false</Enabled>") && Normalize(existing) == Normalize(xml)) return;
                 string path = Path.Combine(Path.GetTempPath(), $"DynamicNotch-task-{Environment.ProcessId}.xml");
                 File.WriteAllText(path, xml, Encoding.Unicode);
                 RunSchtasks($"/Create /TN \"{TaskName}\" /XML \"{path}\" /F");

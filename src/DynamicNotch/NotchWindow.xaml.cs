@@ -32,11 +32,13 @@ public partial class NotchWindow : Window
     readonly RadioService _radio;
     readonly BluetoothService _bt;
     readonly BrightnessService _bri;
+    readonly MonitorBrightnessService _extBri;
     readonly PowerService _power;
     readonly FocusService _focus;
     readonly PrivacyService _privacy;
     readonly FilesService _files;
     readonly NotificationService _notifications;
+    readonly NotificationSoundService _notificationSound = new();
     readonly SystemMonitor _monitor = new();
 
     IntPtr _hwnd;
@@ -56,8 +58,8 @@ public partial class NotchWindow : Window
     double _dwell, _leave;
     bool _byHotkey, _entered;
     int _pollCount;
-    WinEventDelegate? _winEventProc;
-    IntPtr _winEventHook;
+    WinEventDelegate? _winEventProc, _alertEventProc;
+    IntPtr _winEventHook, _alertEventHook;
 
     public static readonly DependencyProperty RadiusProperty = DependencyProperty.Register(
         nameof(Radius), typeof(double), typeof(NotchWindow), new PropertyMetadata(SlimRadius, (d, _) => ((NotchWindow)d).ApplyRadius()));
@@ -74,6 +76,7 @@ public partial class NotchWindow : Window
         _radio = new RadioService(Dispatcher);
         _bt = new BluetoothService(Dispatcher);
         _bri = new BrightnessService(Dispatcher);
+        _extBri = new MonitorBrightnessService(Dispatcher);
         _power = new PowerService(Dispatcher);
         _focus = new FocusService(Dispatcher);
         _privacy = new PrivacyService(Dispatcher);
@@ -94,7 +97,8 @@ public partial class NotchWindow : Window
         }).ToArray();
 
         // ~16 checks a second: a few cheap Win32 calls, nothing is redrawn unless something changes
-        _poll = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(60) };
+        // Normal priority: the edge check keeps its rhythm even while frames are rendering (Background could lag)
+        _poll = new DispatcherTimer(DispatcherPriority.Normal) { Interval = TimeSpan.FromMilliseconds(60) };
         _poll.Tick += OnPoll;
         _osdTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.6) };
         _tick = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
@@ -137,6 +141,13 @@ public partial class NotchWindow : Window
             catch (Exception ex) { Services.AppLog.Write("foreground check failed: " + ex.Message); }
         };
         _winEventHook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, _winEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
+        // any app's error / warning dialog ("Wrong password", "Access denied"...): delivered on this thread
+        _alertEventProc = (_, _, hwnd, _, child, _, _) =>
+        {
+            try { OnAppAlert(hwnd, child); }
+            catch (Exception ex) { Services.AppLog.Write("alert check failed: " + ex.Message); }
+        };
+        _alertEventHook = SetWinEventHook(EVENT_SYSTEM_ALERT, EVENT_SYSTEM_ALERT, IntPtr.Zero, _alertEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
 
         DpiChanged += (_, _) => PositionWindow();
         SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
@@ -147,7 +158,18 @@ public partial class NotchWindow : Window
         SetMode(BaseMode);
     }
 
-    void OnDisplayChanged(object? s, EventArgs e) => Dispatcher.InvokeAsync(PositionWindow);
+    void OnDisplayChanged(object? s, EventArgs e) => Dispatcher.InvokeAsync(() =>
+    {
+        PositionWindow();
+        _ = _extBri.RefreshAsync(MonitorInUse()); // a monitor may have been plugged in or unplugged
+    });
+
+    /// <summary>The screen of the window you're working in.</summary>
+    IntPtr MonitorInUse()
+    {
+        var fg = GetForegroundWindow();
+        return MonitorFromWindow(fg != IntPtr.Zero && fg != _hwnd ? fg : _hwnd, MONITOR_DEFAULTTONEAREST);
+    }
 
     void OnSessionSwitch(object? s, SessionSwitchEventArgs e)
     {
@@ -174,6 +196,7 @@ public partial class NotchWindow : Window
             if (_mode == Mode.Expanded) Collapse();
             else SetMode(BaseMode);
             _audio.Init();
+            _ = _extBri.RefreshAsync(MonitorInUse());
         }
         catch (Exception ex) { Services.AppLog.Write("recover failed: " + ex.Message); }
     }
@@ -186,6 +209,7 @@ public partial class NotchWindow : Window
         if (primary == null || primary.Bounds.Width <= 0 || primary.Bounds.Height <= 0) return;
         var screen = primary.Bounds; // physical pixels (per-monitor DPI aware)
         _scale = GetDpiForWindow(_hwnd) / 96.0;
+        _refreshHz = RefreshRate(); // the screen may have switched between 60 and 180 Hz
         _mon = new RECT { Left = screen.Left, Top = screen.Top, Right = screen.Right, Bottom = screen.Bottom };
         _winW = (int)Math.Round(Width * _scale);
         int h = (int)Math.Round(Height * _scale);
@@ -236,6 +260,7 @@ public partial class NotchWindow : Window
     public void Shutdown()
     {
         _poll.Stop();
+        _notificationSound.Dispose();
         if (_hwnd != IntPtr.Zero)
         {
             UnregisterHotKey(_hwnd, HotkeyId);
@@ -243,6 +268,7 @@ public partial class NotchWindow : Window
             DeregisterShellHookWindow(_hwnd);
         }
         if (_winEventHook != IntPtr.Zero) UnhookWinEvent(_winEventHook);
+        if (_alertEventHook != IntPtr.Zero) UnhookWinEvent(_alertEventHook);
         SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.PowerModeChanged -= OnPowerMode;
@@ -275,6 +301,8 @@ public partial class NotchWindow : Window
     {
         get
         {
+            // over a window's tabs / title bar: step aside into the slim bar; a glowing line shows what's live
+            if (_overWindow && _settings.SlimOverWindows) return Mode.Slim;
             switch (CurrentActivity)
             {
                 case LiveActivity.Media: return Mode.Media;
@@ -291,6 +319,7 @@ public partial class NotchWindow : Window
         if (IsBase(_mode) && _mode != BaseMode) SetMode(BaseMode);
         else if (_mode == Mode.Activity) UpdateActivityContent();
         UpdateSecond();
+        UpdateSlimGlow(); // the live activity may have changed while staying slim
     }
 
     void SetMode(Mode m)
@@ -320,6 +349,8 @@ public partial class NotchWindow : Window
         UpdateOsdChrome();
         UpdateRim();
         UpdateSecond();
+        UpdateSlimGlow();
+        if (!IsBase(m)) SetDodged(false); // pop-ups and the open notch never hide from the cursor
     }
 
     // ───────────────────────────── spring-driven shape ─────────────────────────────
@@ -376,7 +407,25 @@ public partial class NotchWindow : Window
         _animating = true;
         _lastFrame = TimeSpan.Zero;
         CompositionTarget.Rendering += OnFrame;
+        StartPacer();
     }
+
+    // WPF raises CompositionTarget.Rendering only as fast as the fastest running animation asks for
+    // (60 fps by default). While the springs move, an invisible animation at the screen's refresh rate
+    // pulls the whole render loop up to 144 / 180 / 240 Hz; it stops with them, so idle stays idle.
+    readonly TranslateTransform _pacer = new();
+    int _refreshHz = 60;
+
+    void StartPacer()
+    {
+        // on battery saver keep 60 fps: same motion, a third of the frames
+        int hz = Eco ? 60 : _refreshHz;
+        var a = new DoubleAnimation(0, 1, TimeSpan.FromSeconds(1)) { RepeatBehavior = RepeatBehavior.Forever };
+        Timeline.SetDesiredFrameRate(a, hz);
+        _pacer.BeginAnimation(TranslateTransform.XProperty, a);
+    }
+
+    void StopPacer() => _pacer.BeginAnimation(TranslateTransform.XProperty, null);
 
     /// <summary>Runs once per display refresh only while something is moving; unhooks itself when settled.</summary>
     void OnFrame(object? sender, EventArgs e)
@@ -385,7 +434,7 @@ public partial class NotchWindow : Window
         if (now == _lastFrame) return; // WPF can raise this more than once per frame
         double dt = _lastFrame == TimeSpan.Zero ? 1 / 60.0 : (now - _lastFrame).TotalSeconds;
         _lastFrame = now;
-        dt = Math.Clamp(dt, 1 / 240.0, 1 / 30.0);
+        dt = Math.Clamp(dt, 1 / 400.0, 1 / 30.0); // real frame time, up to 360 Hz screens
 
         if (FrameLog != null && _lastFrameRaw != TimeSpan.Zero) FrameLog.Add((now - _lastFrameRaw).TotalMilliseconds);
         _lastFrameRaw = now;
@@ -397,6 +446,7 @@ public partial class NotchWindow : Window
 
         if (!done) return;
         CompositionTarget.Rendering -= OnFrame;
+        StopPacer();
         _animating = false;
         _lastFrameRaw = TimeSpan.Zero;
         if (FrameLog is { Count: > 0 })
@@ -506,8 +556,9 @@ public partial class NotchWindow : Window
         // poll fast only when the cursor is close to the notch; relax elsewhere to save power
         double fromTop = p.Y - _mon.Top;
         var interval = TimeSpan.FromMilliseconds(
-            _mode == Mode.Expanded ? 60 : fromTop < 40 * _scale ? 30 : fromTop < 160 * _scale ? 60 : Eco ? 300 : 180);
+            _mode == Mode.Expanded ? 60 : fromTop < 90 * _scale ? 30 : fromTop < 160 * _scale ? 60 : Eco ? 300 : 180);
         if (_poll.Interval != interval) _poll.Interval = interval;
+        TidyMemoryWhenIdle(now, fromTop);
 
         if (_mode != Mode.Expanded)
         {
@@ -520,6 +571,7 @@ public partial class NotchWindow : Window
             }
             bool wasAtEdge = _atEdge;
             _atEdge = atEdge;
+            UpdateDodge(p, atEdge);
             if (atEdge != _peek && IsBase(_mode))
             {
                 _peek = atEdge;
@@ -538,7 +590,7 @@ public partial class NotchWindow : Window
         double ex = (ExpandedSize.Width / 2 + 10 + 16) * _scale;
         double cxe = _winLeft + _winW / 2.0;
         bool inside = p.X >= cxe - ex && p.X <= cxe + ex && p.Y >= _winTop && p.Y <= _winTop + (ExpandedSize.Height + 16) * _scale;
-        bool dragging = VolSlider.IsDragging || BriSlider.IsDragging || ProgressSlider.IsDragging || _swiping || _dragOut;
+        bool dragging = VolSlider.IsDragging || BriSlider.IsDragging || ExtBriSlider.IsDragging || AppVolSlider.IsDragging || ProgressSlider.IsDragging || _swiping || _dragOut;
 
         if (inside) { _entered = true; _leave = 0; return; }
         if (button || dragging) return;
@@ -549,6 +601,24 @@ public partial class NotchWindow : Window
         }
         _leave += dt;
         if (_leave >= 300) Collapse();
+    }
+
+    DateTime _lastBusyAt = DateTime.UtcNow;
+    bool _tidied;
+
+    /// <summary>
+    /// Gives memory back while nobody is looking: once the notch has been at rest for 10 s (closed, nothing
+    /// moving, cursor away from it) it compacts the heap a single time, so a cleanup can never land in the
+    /// middle of an animation. It runs again only after the notch has been used.
+    /// </summary>
+    void TidyMemoryWhenIdle(DateTime now, double fromTop)
+    {
+        bool busy = _animating || !IsBase(_mode) || _osdQueue.Count > 0 || fromTop < 160 * _scale;
+        if (busy) { _lastBusyAt = now; _tidied = false; return; }
+        if (_tidied || (now - _lastBusyAt).TotalSeconds < 10) return;
+        _tidied = true;
+        System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
     }
 
     void CheckForeground()
@@ -619,6 +689,7 @@ public partial class NotchWindow : Window
         _power.Init();
         _focus.Init();
         _bri.Init();
+        _ = _extBri.RefreshAsync(MonitorInUse());
         _bt.Start();
         _privacy.Start();
         _files.Start();

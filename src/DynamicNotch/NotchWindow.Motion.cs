@@ -12,7 +12,7 @@ namespace DynamicNotch;
 /// </summary>
 public partial class NotchWindow
 {
-    enum Motion { Auto, None, Pulse, DoublePulse, Shake }
+    enum Motion { Auto, None, Pulse, DoublePulse, Shake, Tremble }
 
     TranslateTransform? _shellShake;
     LiveActivity _secondShown = LiveActivity.None;
@@ -26,6 +26,7 @@ public partial class NotchWindow
         if (kind.StartsWith("toast:") || kind.StartsWith("flash:") || kind is "download" or "smart-break") return Motion.Pulse;
         if (kind == "timer") return Motion.DoublePulse;
         if (kind is "battery" or "smart-net" or "smart-drain") return Motion.Shake;
+        if (kind.StartsWith("app-alert:") || kind == "download-failed") return Motion.Tremble;
         return Motion.None;
     }
 
@@ -41,8 +42,38 @@ public partial class NotchWindow
                 case Motion.Pulse: Kick(); break;
                 case Motion.DoublePulse: Kick(); After(340, Kick); break;
                 case Motion.Shake: Shake(); break;
+                case Motion.Tremble: Tremble(); break;
             }
         });
+    }
+
+    /// <summary>
+    /// A tiny, quick shiver: "that didn't work" (wrong password dialog, failed download, a toggle that
+    /// wouldn't switch). Much smaller than <see cref="Shake"/>, which is kept for real problems.
+    /// </summary>
+    void Tremble(Color? tint = null)
+    {
+        double[] xs = { -3.5, 3.2, -2.4, 1.6, -0.8, 0 };
+        PlayShellX(xs, 46, 0);
+        FlashRim(tint);
+    }
+
+    /// <summary>A little bump in one direction, like hitting a wall: volume / brightness already at 100 % or 0 %.</summary>
+    void Bump(int direction)
+    {
+        double d = Math.Sign(direction);
+        PlayShellX(new[] { 3.5 * d, -1.2 * d, 0.4 * d, 0 }, 60, 0);
+    }
+
+    void PlayShellX(double[] xs, int stepMs, int delayMs)
+    {
+        _shellShake ??= new TranslateTransform();
+        if (Shell.RenderTransform != _shellShake) Shell.RenderTransform = _shellShake;
+        var a = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(stepMs * xs.Length), BeginTime = TimeSpan.FromMilliseconds(delayMs) };
+        for (int i = 0; i < xs.Length; i++)
+            a.KeyFrames.Add(new EasingDoubleKeyFrame(xs[i], KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(stepMs * (i + 1))),
+                new SineEase { EasingMode = EasingMode.EaseInOut }));
+        _shellShake.BeginAnimation(TranslateTransform.XProperty, a);
     }
 
     /// <summary>
@@ -60,9 +91,9 @@ public partial class NotchWindow
     }
 
     /// <summary>The rim lights up for a moment with the pop-up's colour, then settles back.</summary>
-    void FlashRim()
+    void FlashRim(Color? color = null)
     {
-        var c = _osdAccent ?? Colors.White;
+        var c = color ?? _osdAccent ?? Colors.White;
         if (Rim.BorderBrush is not SolidColorBrush rb || rb.IsFrozen) Rim.BorderBrush = rb = new SolidColorBrush(Colors.Transparent);
         var settle = rb.Color;
         var a = new ColorAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(700) };
@@ -90,6 +121,90 @@ public partial class NotchWindow
         var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ms) };
         t.Tick += (_, _) => { t.Stop(); action(); };
         t.Start();
+    }
+
+    // ───────────────────────────── stepping aside ─────────────────────────────
+
+    Color? _slimGlowFor;
+    bool _slimGlowOn, _dodged;
+
+    /// <summary>
+    /// The slim bar over a window still says something's live: a thin line in the song's colour
+    /// (or the timer / download / focus colour) that breathes slowly while music plays.
+    /// </summary>
+    void UpdateSlimGlow()
+    {
+        Color? c = _mode != Mode.Slim || _hidden ? null : CurrentActivity switch
+        {
+            LiveActivity.Media => _media.Accent,
+            LiveActivity.Timer => ((SolidColorBrush)TimerBrush).Color,
+            LiveActivity.Download => ((SolidColorBrush)Blue).Color,
+            LiveActivity.Focus => ((SolidColorBrush)FocusPurple).Color,
+            _ => null,
+        };
+        if (c is not { } k)
+        {
+            if (!_slimGlowOn) return;
+            _slimGlowOn = false;
+            SlimGlow.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(180)));
+            return;
+        }
+        if (k != _slimGlowFor)
+        {
+            var g = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 0.5) };
+            g.GradientStops.Add(new GradientStop(Color.FromArgb(0, k.R, k.G, k.B), 0));
+            g.GradientStops.Add(new GradientStop(Color.FromArgb(0xF0, k.R, k.G, k.B), 0.5));
+            g.GradientStops.Add(new GradientStop(Color.FromArgb(0, k.R, k.G, k.B), 1));
+            g.Freeze();
+            SlimGlow.Background = g;
+            _slimGlowFor = k;
+        }
+        bool breathe = CurrentActivity == LiveActivity.Media && _media.IsPlaying && !Eco;
+        if (_slimGlowOn && breathe == _slimGlowBreathing) return;
+        _slimGlowOn = true;
+        _slimGlowBreathing = breathe;
+        // fade in first, then (for music) breathe; both cheap: tiny element, low frame rate
+        var a = new DoubleAnimationUsingKeyFrames();
+        a.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(260)), new CubicEase { EasingMode = EasingMode.EaseOut }));
+        if (breathe)
+        {
+            a.KeyFrames.Add(new EasingDoubleKeyFrame(0.45, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1660)), new SineEase { EasingMode = EasingMode.EaseInOut }));
+            a.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(3060)), new SineEase { EasingMode = EasingMode.EaseInOut }));
+            a.RepeatBehavior = RepeatBehavior.Forever;
+        }
+        Timeline.SetDesiredFrameRate(a, 24);
+        SlimGlow.BeginAnimation(OpacityProperty, a);
+    }
+
+    bool _slimGlowBreathing;
+
+    /// <summary>
+    /// The cursor heading for a tab or button under the notch: fade almost away so you can see and click
+    /// what's underneath (the notch is click-through there anyway). Pushing against the very top edge still
+    /// brings it back and opens it.
+    /// </summary>
+    void UpdateDodge(Interop.Native.POINT p, bool atEdge)
+    {
+        bool want = false;
+        if (IsBase(_mode) && !_hidden && !atEdge && !_peek && _settings.SlimOverWindows)
+        {
+            double margin = (_dodged ? 40 : 26) * _scale; // a little hysteresis so it doesn't flicker at the border
+            double half = Math.Max(_sw.Value / 2 + 10, 64) * _scale + margin;
+            if (_secondShown != LiveActivity.None) half += (SecondBubble.ActualWidth + 22) * _scale;
+            if (_privacyShown) half += (PrivacyBubble.ActualWidth + 20) * _scale;
+            double cx = _winLeft + _winW / 2.0;
+            double edge = _mon.Top + Math.Max(1, (int)Math.Round(_scale));
+            want = p.Y > edge && p.Y <= _mon.Top + _sh.Value * _scale + margin && Math.Abs(p.X - cx) <= half;
+        }
+        SetDodged(want);
+    }
+
+    void SetDodged(bool on)
+    {
+        if (on == _dodged) return;
+        _dodged = on;
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        Root.BeginAnimation(OpacityProperty, new DoubleAnimation(on ? 0.06 : 1, TimeSpan.FromMilliseconds(on ? 140 : 240)) { EasingFunction = ease });
     }
 
     // ───────────────────────────── split island ─────────────────────────────
@@ -183,9 +298,9 @@ public partial class NotchWindow
                 var left = _timerEnd - DateTime.UtcNow;
                 if (left < TimeSpan.Zero) left = TimeSpan.Zero;
                 SecondGlyph.Text = "";
-                SecondGlyph.Foreground = SecondText.Foreground = Orange;
+                SecondGlyph.Foreground = SecondText.Foreground = TimerBrush;
                 SecondText.Text = FormatTimer(left);
-                rim = ((SolidColorBrush)Orange).Color;
+                rim = ((SolidColorBrush)TimerBrush).Color;
                 break;
             case LiveActivity.Focus:
                 SecondGlyph.Text = "";

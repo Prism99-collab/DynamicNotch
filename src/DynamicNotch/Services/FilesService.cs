@@ -23,6 +23,8 @@ public sealed class FilesService
 
     public event Action? DownloadsChanged;
     public event Action<string>? DownloadCompleted;
+    /// <summary>A download disappeared before finishing (file name).</summary>
+    public event Action<string>? DownloadFailed;
     public event Action<string>? ScreenshotSaved;
 
     public FilesService(Dispatcher ui)
@@ -90,6 +92,10 @@ public sealed class FilesService
         // Firefox: "file.zip.part" disappears once "file.zip" is complete
         string final = path[..^Path.GetExtension(path).Length];
         if (File.Exists(final) && !IsTemp(final)) Completed(final);
+        // a browser's partial file vanished with nothing to show for it: cancelled, blocked or failed
+        // (plain .tmp files come and go for all sorts of reasons, so they don't count)
+        else if (!path.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase) && !Path.GetFileName(path).StartsWith("Unconfirmed", StringComparison.OrdinalIgnoreCase))
+            DownloadFailed?.Invoke(Path.GetFileName(final));
         DownloadsChanged?.Invoke();
         StopIfIdle();
     }
