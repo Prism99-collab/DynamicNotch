@@ -1,0 +1,19 @@
+# build output
+bin/
+obj/
+artifacts/
+publish/
+
+# IDE / OS
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.rsuser
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# logs
+*.log
