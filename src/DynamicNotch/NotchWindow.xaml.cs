@@ -456,6 +456,21 @@ public partial class NotchWindow : Window
         {
             w += 16; h += 4; r += 2; style = SpringStyle.Peek;
         }
+        else if (_pulling && IsBase(_mode))
+        {
+            // a finger pulling it down: it stretches after the finger, less and less the further it goes
+            if (_mode is Mode.Slim or Mode.Idle) { w = IdleSize.Width; h = IdleSize.Height; r = IdleRadius; }
+            double stretch = 1 - Math.Exp(-_pull / 140);
+            h += 110 * stretch;
+            w += 90 * stretch;
+            r = Math.Min(h / 2, r + 22 * stretch);
+            style = SpringStyle.Peek;
+        }
+        else if (_pressed && _touchMode && IsBase(_mode) && _mode != Mode.Game)
+        {
+            if (_mode is Mode.Slim) { w = IdleSize.Width; h = IdleSize.Height; r = IdleRadius; }
+            w -= 8; h -= 2; style = SpringStyle.Press;
+        }
         else if (_mode == Mode.Osd && (_osdHover || _pressed))
         {
             if (_pressed) { w -= 8; h -= 2; style = SpringStyle.Press; }
@@ -633,6 +648,7 @@ public partial class NotchWindow : Window
         if (!GetCursorPos(out var p)) return;
         bool button = IsButtonDown();
         UpdateDropArming(p);
+        if (_gestureLive && !button && Environment.TickCount64 - _fingerMoveAt > 600) CancelTouchGesture(); // a lift Windows never reported
 
         // check often only when the cursor is near the notch; otherwise relax to save power
         // poll fast only when the cursor is close to the notch; relax elsewhere to save power
@@ -645,7 +661,7 @@ public partial class NotchWindow : Window
         if (_mode != Mode.Expanded)
         {
             bool atEdge = false;
-            if (!_hidden && _settings.HoverToOpen && _mode != Mode.Osd)
+            if (!_hidden && _settings.HoverToOpen && _mode != Mode.Osd && !_touchMode) // a finger has its own gestures
             {
                 double half = (Math.Max(_sw.Target / 2, 70) + 6) * _scale;
                 double cx = _winLeft + _winW / 2.0;

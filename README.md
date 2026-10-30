@@ -56,14 +56,17 @@ on Home — every playing tab or app gets its own chip.
 **File shelf** — drag a file, picture or text up to the notch to keep it; drag it back out into any app later
 (Excel and Word get the picture or text itself, folders and chats get the file), or copy it for Ctrl+V.
 
-**Touch & pen** — on a touch screen, tap the notch to open it and swipe up to close.
+**Touch & pen** — on a touch screen, pull the notch down to open it (it follows your finger), swipe up to close, swipe
+sideways on it to switch what it shows.
+
+**Game mode** — in a game the notch is just a tiny live FPS counter, for any game.
 
 **Control center** — hover the top edge (or press <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd>) and swipe between pages:
 
 | Page | What's on it |
 |---|---|
-| **Home** | Now playing with seek and a volume slider for just the playing app, Wi-Fi, Bluetooth, Airplane, Focus, Mic, Power mode, volume + output / input picker, laptop and external monitor brightness |
-| **System** | CPU / memory / disk / battery rings, live network graph, downloads with real progress, ping & signal, battery health and a live charging / power graph |
+| **Home** | Now playing with seek and a volume slider for just the playing app, Wi-Fi, Bluetooth, Airplane, Focus, Mic, Power mode, volume + output / input picker and a per-app mixer, laptop and external monitor brightness |
+| **System** | CPU / memory / disk / battery rings, download / upload speed, downloads with real progress, ping & signal, battery health and power draw |
 | **Tools** | Pomodoro focus timer (focus / break, rounds, scroll to adjust), Snip, Keep awake, Clipboard history, Files, Terminal, Task Manager, Calculator, Lock, Sleep |
 | **Clipboard & Files** | The shelf, recently copied text (click to copy again), newest downloads & screenshots — drag them straight into any app |
 | **Smart** | Battery-drain warnings, shaky-connection alerts, charge reminder, Downloads tidy-up, break reminder, optional meeting mode |
