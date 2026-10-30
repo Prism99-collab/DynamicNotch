@@ -340,7 +340,12 @@ public partial class NotchWindow
         if (!_osdHover) _osdTimer.Start();
         if (_hidden) Fade(Shell, 1, 150);
         SetMode(Mode.Osd);
-        if (!sameKind) PlayMotion(ResolveMotion(r.Kind, r.Motion));
+        UpdateAura(_osdAccent);
+        if (sameKind) return;
+        PlayMotion(ResolveMotion(r.Kind, r.Motion));
+        // good news: once the pop-up has grown, a band of light sweeps across it in its colour
+        if (IsGoodNews(r.Kind, r.GlyphBrush, r.Battery))
+            After(360, () => { if (_mode == Mode.Osd && ReferenceEquals(_osd, r)) PlayShine(_osdAccent ?? Colors.White); });
     }
 
     // ───────────────────────────── colour ─────────────────────────────
@@ -396,7 +401,7 @@ public partial class NotchWindow
 
     /// <summary>What still gets through while you focus: your own key presses and things that can't wait.</summary>
     static bool FocusAllows(string kind) =>
-        kind is "volume" or "brightness" or "caps" or "mic" or "output" or "focus" or "meeting" or "timer" or "battery" or "smart-charge";
+        kind is "volume" or "brightness" or "caps" or "keyboard" or "mic" or "output" or "focus" or "meeting" or "timer" or "battery" or "smart-charge";
 
     void OnFocusChanged()
     {
@@ -655,6 +660,8 @@ public partial class NotchWindow
         string name;
         try { name = FileVersionInfo.GetVersionInfo(path).FileDescription is { Length: > 0 } d ? d : Path.GetFileNameWithoutExtension(path); }
         catch { name = Path.GetFileNameWithoutExtension(path); }
+        // some apps describe themselves as their file ("Notepad.exe"): show just the name
+        if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) name = name[..^4];
         lock (AppNames) AppNames[path] = name;
         return name;
     }

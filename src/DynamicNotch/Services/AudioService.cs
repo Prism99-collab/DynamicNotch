@@ -133,6 +133,25 @@ public sealed class AudioService : IMMNotificationClient
         });
     }
 
+    /// <summary>
+    /// How loud the speakers are right now (left / right peak, 0–1), what Windows' own volume meter shows.
+    /// A cheap read of the default output, made only while the visualizer is on screen.
+    /// </summary>
+    public bool TryGetPeaks(out float left, out float right)
+    {
+        left = right = 0;
+        if (_out == null) return false;
+        try
+        {
+            var meter = _out.AudioMeterInformation;
+            var peaks = meter.PeakValues;
+            if (peaks.Count >= 2) { left = peaks[0]; right = peaks[1]; }
+            else left = right = meter.MasterPeakValue;
+            return true;
+        }
+        catch { return false; }
+    }
+
     public void SetVolume(float v)
     {
         if (_out == null) return;

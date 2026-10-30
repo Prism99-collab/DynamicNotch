@@ -9,6 +9,8 @@
         TextOptions.TextFormattingMode="Ideal" TextOptions.TextRenderingMode="Grayscale">
 
     <Grid x:Name="Root">
+        <!-- aura: an alert casts a faint glow of its colour just below the notch -->
+        <Border x:Name="Aura" HorizontalAlignment="Center" VerticalAlignment="Top" IsHitTestVisible="False" Opacity="0" />
         <!-- Ear | notch | ear, always centered at the top of the screen -->
         <StackPanel x:Name="Shell" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top">
             <Path x:Name="EarL" Width="10" Height="10" VerticalAlignment="Top" Fill="Black"
@@ -499,7 +501,7 @@
                                                 <RowDefinition Height="*" />
                                                 <RowDefinition Height="22" />
                                             </Grid.RowDefinitions>
-                                            <UniformGrid x:Name="SettingsGrid" Columns="2" Rows="6" />
+                                            <UniformGrid x:Name="SettingsGrid" Columns="2" Rows="7" />
                                             <TextBlock Grid.Row="1" FontSize="10.5" Foreground="#66FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                        Text="Win+Alt+N opens the notch · drag sideways or swipe the touchpad to change page" />
                                         </Grid>
@@ -513,6 +515,12 @@
                     </Grid>
 
                     <!-- thin coloured rim along the notch's sides and bottom (colour set from code) -->
+                    <!-- good news: a soft band of light sweeps across the notch once, in the alert's colour -->
+                    <Border x:Name="Shine" Width="110" HorizontalAlignment="Left" IsHitTestVisible="False" Opacity="0">
+                        <Border.RenderTransform>
+                            <TranslateTransform x:Name="ShineShift" />
+                        </Border.RenderTransform>
+                    </Border>
                     <!-- slim over a window but something's live: a thin line glowing in the music's / activity's colour -->
                     <Border x:Name="SlimGlow" Height="2.5" CornerRadius="1.25" VerticalAlignment="Bottom" Margin="12,0,12,1"
                             IsHitTestVisible="False" Opacity="0" />

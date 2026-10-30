@@ -3,6 +3,22 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- "Opening …" alert with the app's icon when an app starts (switch in Settings and the tray menu).
+- Keyboard language alerts (Win+Space / Alt+Shift), screen connected / disconnected, and "Fully charged" on the charger.
+
+### Changed
+- The music visualizer follows the real sound; the slim glow over windows pulses with it.
+- Jelly morph: height and width spring on their own timing, so the notch stretches organically.
+- The notch leans toward the cursor while you touch the top edge or hover a clickable alert.
+- Good news (done, connected, charging, full) gets a light sweep; alerts cast a soft glow of their colour below the notch.
+
+### Fixed
+- The monitor brightness slider vanished after a reboot (handle 0 was taken for "no monitor"); both brightness
+  sliders now retry after startup, wake and display changes instead of disappearing.
+
 ## [1.1.0] — 2026-10-29
 
 ### Added

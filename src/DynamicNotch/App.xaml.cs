@@ -76,6 +76,7 @@ public partial class App : Application
         AddCheck(menu, "Minimal when nothing is happening", () => _settings.MinimalWhenIdle, v => _settings.MinimalWhenIdle = v);
         AddCheck(menu, "Notification alerts", () => _settings.NotificationAlerts, v => _settings.NotificationAlerts = v);
         AddCheck(menu, "System alerts", () => _settings.SystemAlerts, v => _settings.SystemAlerts = v);
+        AddCheck(menu, "App launch alerts", () => _settings.AppLaunchAlerts, v => _settings.AppLaunchAlerts = v);
         AddCheck(menu, "\"Copied\" alerts", () => _settings.ClipboardAlerts, v => _settings.ClipboardAlerts = v);
         AddCheck(menu, "Show music activity", () => _settings.ShowMediaActivity, v => _settings.ShowMediaActivity = v);
         AddCheck(menu, "Animated music visualizer", () => _settings.AnimatedVisualizer, v => _settings.AnimatedVisualizer = v);

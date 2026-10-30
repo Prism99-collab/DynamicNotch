@@ -674,6 +674,7 @@ public partial class NotchWindow
         Add("Music activity", () => _settings.ShowMediaActivity, v => _settings.ShowMediaActivity = v);
         Add("Notification alerts", () => _settings.NotificationAlerts, v => _settings.NotificationAlerts = v);
         Add("System alerts", () => _settings.SystemAlerts, v => _settings.SystemAlerts = v);
+        Add("App launch alerts", () => _settings.AppLaunchAlerts, v => _settings.AppLaunchAlerts = v);
         Add("“Copied” alerts", () => _settings.ClipboardAlerts, v => _settings.ClipboardAlerts = v);
         Add("Music visualizer", () => _settings.AnimatedVisualizer, v => _settings.AnimatedVisualizer = v);
         Add("Open at top edge", () => _settings.HoverToOpen, v => _settings.HoverToOpen = v);
