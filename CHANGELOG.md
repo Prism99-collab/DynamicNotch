@@ -3,7 +3,7 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.3.0] — 2026-10-31
 
 ### Added
 - Game mode: while a game is in front, the notch becomes the smallest pill it has, the live frame rate and nothing
@@ -12,6 +12,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
   shrinks around the pill while you play so it costs almost nothing. "FPS in games" in Settings; on a PC where the
   account can't read frame events yet, switching it on asks Windows once.
 - Mini mixer: an Apps tab in the sound picker with every app's own volume and a mute on its icon.
+- Touch screens: pull the notch down with a finger and it stretches after it, then springs open when you let go
+  (or flick); let go early and it springs back. Swipe sideways on it to switch which live activity leads, tap to
+  open, and it gives a little squeeze under your finger. None of this runs on a PC without a touch screen or pen.
 
 ### Removed
 - The scrolling network and power graphs on the System page (the numbers stay).
@@ -119,6 +122,7 @@ First public release.
 - Starts at sign-in and comes back after lock, sleep or a crash; Exit keeps it off until reopened.
 - Dark tray menu, automatic battery mode, about 1 % of one CPU core when idle.
 
+[1.3.0]: https://github.com/Prism99-collab/DynamicNotch/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Prism99-collab/DynamicNotch/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Prism99-collab/DynamicNotch/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Prism99-collab/DynamicNotch/releases/tag/v1.0.0
