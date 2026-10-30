@@ -150,9 +150,10 @@ public partial class NotchWindow
     {
         if (_mode != Mode.Expanded) return;
         if (page == 1) { _ = SampleSystemAsync(); _sysTimer.Start(); } else _sysTimer.Stop();
+        UpdateCallUi(); // the call card's voice bars run only on Home
         if (page == 0) RefreshClockAndProgress();
         if (page == 2) UpdateTimerUi();
-        if (page == 3) { RenderClipboard(); _ = RenderFilesAsync(); }
+        if (page == 3) { RenderClipboard(); _shelfTab = _shelf.Count > 0; RenderShelfOrRecent(); } // the shelf first when something is kept
         if (page == 4) SyncSmartPage();
         if (page == 5) SyncSettingsPage();
     }

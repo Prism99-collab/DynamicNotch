@@ -4,7 +4,7 @@
         xmlns:c="clr-namespace:DynamicNotch.Controls"
         Title="Dynamic Notch" Width="560" Height="300"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        Topmost="True" ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" AllowDrop="True"
         Foreground="White" FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="12"
         TextOptions.TextFormattingMode="Ideal" TextOptions.TextRenderingMode="Grayscale">
 
@@ -38,8 +38,23 @@
                           Visibility="Collapsed" Opacity="0">
                         <TextBlock x:Name="ActGlyph" FontFamily="{StaticResource IconFont}" FontSize="14" HorizontalAlignment="Left"
                                    VerticalAlignment="Center" Margin="16,0,0,1" />
-                        <TextBlock x:Name="ActText" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Margin="0,0,16,1" FontFamily="Segoe UI Variable Display, Segoe UI" Typography.NumeralAlignment="Tabular" />
+                        <!-- on a call: the app's icon with a live green dot -->
+                        <Grid x:Name="CallArtHost" Width="22" Height="20" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="13,0,0,1" Visibility="Collapsed">
+                            <Border x:Name="CallArt" Width="20" Height="20" CornerRadius="6" HorizontalAlignment="Left" Background="#2A2A2E" />
+                            <Ellipse x:Name="CallDot" Width="7" Height="7" Fill="#30D158" Stroke="Black" StrokeThickness="1.4"
+                                     HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-1,-1" />
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,16,1">
+                            <!-- your voice, live -->
+                            <StackPanel x:Name="CallBars" Orientation="Horizontal" Height="12" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="Collapsed">
+                                <Rectangle Width="2.6" Height="12" RadiusX="1.3" RadiusY="1.3" Margin="1,0" Fill="#30D158" VerticalAlignment="Center" />
+                                <Rectangle Width="2.6" Height="12" RadiusX="1.3" RadiusY="1.3" Margin="1,0" Fill="#30D158" VerticalAlignment="Center" />
+                                <Rectangle Width="2.6" Height="12" RadiusX="1.3" RadiusY="1.3" Margin="1,0" Fill="#30D158" VerticalAlignment="Center" />
+                                <Rectangle Width="2.6" Height="12" RadiusX="1.3" RadiusY="1.3" Margin="1,0" Fill="#30D158" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock x:Name="ActText" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"
+                                       FontFamily="Segoe UI Variable Display, Segoe UI" Typography.NumeralAlignment="Tabular" />
+                        </StackPanel>
                     </Grid>
 
                     <!-- ===== Transient pop-up ===== -->
@@ -73,6 +88,34 @@
                             </StackPanel>
                             <TextBlock x:Name="OsdRight" Grid.Column="2" FontSize="11.5" FontWeight="SemiBold" Foreground="#D0FFFFFF"
                                        VerticalAlignment="Center" TextAlignment="Right" MaxWidth="90" TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                    </Grid>
+
+                    <!-- ===== Drop zone: a file is being dragged to the notch ===== -->
+                    <Grid x:Name="DropPanel" Width="380" Height="92" HorizontalAlignment="Center" VerticalAlignment="Top"
+                          Visibility="Collapsed" Opacity="0">
+                        <!-- the receptacle: a marching dashed outline that turns solid when the file is over it -->
+                        <Rectangle x:Name="DropOutline" Margin="12,8,12,10" RadiusX="18" RadiusY="18" StrokeThickness="1.4"
+                                   Stroke="#66FFFFFF" StrokeDashArray="3 2.4" />
+                        <Border x:Name="DropFill" Margin="12,8,12,10" CornerRadius="18" Background="#0A84FF" Opacity="0" />
+                        <Grid Margin="26,8,24,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="40" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="DropArrow" Text="&#xE896;" FontFamily="{StaticResource IconFont}" FontSize="22" Foreground="#0A84FF"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock.RenderTransform>
+                                    <TranslateTransform x:Name="DropArrowShift" />
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
+                                <TextBlock x:Name="DropTitle" Text="Drop to keep it here" FontSize="13.5" FontWeight="SemiBold" />
+                                <TextBlock x:Name="DropSub" Text="On the shelf until you drag it out" FontSize="11" Foreground="{StaticResource Dim}" Margin="0,2,0,0" />
+                            </StackPanel>
+                            <!-- what's already on the shelf, fanned out like cards -->
+                            <Canvas x:Name="DropStack" Grid.Column="2" Width="58" Height="40" VerticalAlignment="Center" />
                         </Grid>
                     </Grid>
 
@@ -174,6 +217,41 @@
                                                                Foreground="{StaticResource Dim}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                     <c:PillSlider x:Name="AppVolSlider" Grid.Column="1" Height="20" TrackHeight="6" Margin="4,0,4,0" />
                                                 </Grid>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!-- on a call: the call card takes the music's place -->
+                                            <Grid x:Name="CallRow" Visibility="Collapsed">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="64" />
+                                                    <ColumnDefinition Width="14" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Grid Width="64" Height="64">
+                                                    <Border x:Name="CallCardArt" CornerRadius="14" Background="#1E1E21" />
+                                                    <!-- a soft green ring that breathes with your voice -->
+                                                    <Border x:Name="CallRing" CornerRadius="16" Margin="-3" BorderThickness="2" BorderBrush="#30D158" Opacity="0.35" />
+                                                </Grid>
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="CallTitle" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                        <Ellipse x:Name="CallCardDot" Width="7" Height="7" Fill="#30D158" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                        <TextBlock x:Name="CallSub" FontSize="12" Foreground="{StaticResource Dim}" Typography.NumeralAlignment="Tabular" />
+                                                    </StackPanel>
+                                                    <StackPanel x:Name="CallVoice" Orientation="Horizontal" Height="14" Margin="0,8,0,0" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                                                    <Button x:Name="CallMuteBtn" Style="{StaticResource CircleButton}" Width="42" Height="42" ToolTip="Mute / unmute your microphone">
+                                                        <Grid>
+                                                            <Ellipse x:Name="CallMuteBg" Fill="#26262A" />
+                                                            <TextBlock x:Name="CallMuteGlyph" Text="&#xE720;" FontFamily="{StaticResource IconFont}" FontSize="16"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Grid>
+                                                    </Button>
+                                                    <Button x:Name="CallBackBtn" Style="{StaticResource CircleButton}" Width="36" Height="36" Margin="6,0,0,0" ToolTip="Back to the call">
+                                                        <TextBlock Text="&#xE8A7;" FontFamily="{StaticResource IconFont}" FontSize="14" />
+                                                    </Button>
                                                 </StackPanel>
                                             </Grid>
 
@@ -468,11 +546,21 @@
                                                     <RowDefinition Height="26" />
                                                     <RowDefinition Height="*" />
                                                 </Grid.RowDefinitions>
-                                                <TextBlock Text="Recent files" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Dim}" VerticalAlignment="Center" Margin="4,0" />
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button x:Name="ShelfTab" Style="{StaticResource Capsule}" Content="Shelf" Height="22" Padding="10,0" FontSize="10.5" Margin="0,0,3,0"
+                                                            ToolTip="Files you dropped on the notch · drag them out into any app" />
+                                                    <Button x:Name="RecentTab" Style="{StaticResource Capsule}" Content="Recent" Height="22" Padding="10,0" FontSize="10.5" />
+                                                </StackPanel>
                                                 <Button x:Name="OpenDownloads" Style="{StaticResource CircleButton}" Width="24" Height="24" HorizontalAlignment="Right" ToolTip="Open Downloads">
                                                     <TextBlock Text="&#xE838;" FontFamily="{StaticResource IconFont}" FontSize="11" Foreground="{StaticResource Dim}" />
                                                 </Button>
+                                                <Button x:Name="ShelfClear" Style="{StaticResource CircleButton}" Width="24" Height="24" HorizontalAlignment="Right" ToolTip="Clear the shelf" Visibility="Collapsed">
+                                                    <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFont}" FontSize="11" Foreground="{StaticResource Dim}" />
+                                                </Button>
                                                 <StackPanel x:Name="FilesList" Grid.Row="1" />
+                                                <ScrollViewer x:Name="ShelfScroll" Grid.Row="1" VerticalScrollBarVisibility="Hidden" Visibility="Collapsed">
+                                                    <StackPanel x:Name="ShelfList" />
+                                                </ScrollViewer>
                                             </Grid>
                                         </Grid>
                                     </Grid>
@@ -570,5 +658,8 @@
                 </Grid>
             </StackPanel>
         </Border>
+        <!-- drag catcher: invisible but hit-testable, switched on only while something is dragged toward the notch -->
+        <Border x:Name="DropCatcher" Width="540" Height="110" HorizontalAlignment="Center" VerticalAlignment="Top"
+                Background="#01000000" Visibility="Collapsed" />
     </Grid>
 </Window>

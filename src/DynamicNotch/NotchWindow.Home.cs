@@ -89,6 +89,7 @@ public partial class NotchWindow
         RefreshBrightness();
         RefreshExtBrightness();
         RefreshPrivacyStatus();
+        UpdateCallUi();
         _ = _bri.RefreshAsync();
         _ = _bt.RefreshBatteriesAsync(); // a controller's battery is fresh whenever you look
         _ = _extBri.RefreshAsync(MonitorInUse()); // picks up changes made with the monitor's own buttons
@@ -338,12 +339,20 @@ public partial class NotchWindow
     void UpdateMeter()
     {
         if (!_meterWired) { _meterWired = true; _meter.Tick += (_, _) => OnMeter(); }
-        if (_eqRunning || _slimBeat) { if (!_meter.IsEnabled) _meter.Start(); }
+        if (_eqRunning || _slimBeat || _callBarsOn) { if (!_meter.IsEnabled) _meter.Start(); }
         else _meter.Stop();
     }
 
     void OnMeter()
     {
+        bool callGlow = OnCall && CurrentActivity == LiveActivity.Call;
+        if (_callBarsOn || (_slimBeat && callGlow)) OnCallMeter();
+        if (callGlow && _slimBeat)
+        {
+            double v = 0.35 + 0.65 * _voice;
+            if (Math.Abs(SlimGlow.Opacity - v) > 0.01) SlimGlow.Opacity = v;
+        }
+        if (!_eqRunning && !(_slimBeat && !callGlow)) return; // nothing else needs the speakers' level
         if (!_audio.TryGetPeaks(out float left, out float right))
         {
             // no meter on this device: fall back to the gentle looping bars
@@ -367,7 +376,7 @@ public partial class NotchWindow
                 if (Math.Abs(_eqBars[i].ScaleY - _eqLevel[i]) > 0.008) _eqBars[i].ScaleY = _eqLevel[i];
             }
         }
-        if (_slimBeat)
+        if (_slimBeat && !callGlow)
         {
             _beat += (Math.Clamp(loud * 1.35, 0, 1) - _beat) * 0.3;
             double o = 0.35 + 0.65 * _beat;
@@ -404,8 +413,9 @@ public partial class NotchWindow
             DevicesPanel.Visibility = Visibility.Visible;
             Fade(DevicesPanel, 1, 160);
             Fade(MediaRow, 0, 120);
+            Fade(CallRow, 0, 120);
             Fade(TogglesRow, 0, 120);
-            MediaRow.IsHitTestVisible = TogglesRow.IsHitTestVisible = false;
+            MediaRow.IsHitTestVisible = CallRow.IsHitTestVisible = TogglesRow.IsHitTestVisible = false;
         }
         else
         {
@@ -413,8 +423,9 @@ public partial class NotchWindow
             a.Completed += (_, _) => { if (!_devicesOpen) DevicesPanel.Visibility = Visibility.Collapsed; };
             DevicesPanel.BeginAnimation(OpacityProperty, a);
             Fade(MediaRow, 1, 180);
+            Fade(CallRow, 1, 180);
             Fade(TogglesRow, 1, 180);
-            MediaRow.IsHitTestVisible = TogglesRow.IsHitTestVisible = true;
+            MediaRow.IsHitTestVisible = CallRow.IsHitTestVisible = TogglesRow.IsHitTestVisible = true;
         }
     }
 

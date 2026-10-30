@@ -108,6 +108,30 @@ internal static class Native
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern uint RegisterWindowMessage(string name);
     [DllImport("user32.dll")] public static extern bool LockWorkStation();
     [DllImport("user32.dll")] public static extern IntPtr GetKeyboardLayout(uint threadId);
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc proc, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hWnd, uint cmd);
+
+    /// <summary>The main visible window of the app whose exe path matches (for Store apps: contains every part).</summary>
+    public static (IntPtr Window, string? Path) FindAppWindow(Func<string, bool> matchesPath)
+    {
+        IntPtr found = IntPtr.Zero;
+        string? foundPath = null;
+        var pathOf = new Dictionary<uint, string?>();
+        EnumWindows((h, _) =>
+        {
+            if (!IsWindowVisible(h) || GetWindow(h, 4 /* GW_OWNER */) != IntPtr.Zero || WindowTitle(h).Length == 0) return true;
+            if ((GetWindowLongPtr(h, GWL_EXSTYLE).ToInt64() & WS_EX_TOOLWINDOW) != 0) return true;
+            GetWindowThreadProcessId(h, out uint pid);
+            if (!pathOf.TryGetValue(pid, out var path)) pathOf[pid] = path = ProcessPathById(pid);
+            if (path == null || !matchesPath(path)) return true;
+            found = h;
+            foundPath = path;
+            return false; // windows come front-to-back: the first match is the one you saw last
+        }, IntPtr.Zero);
+        return (found, foundPath);
+    }
     [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int cmd);
     [DllImport("user32.dll")] public static extern void SwitchToThisWindow(IntPtr hWnd, bool altTab);

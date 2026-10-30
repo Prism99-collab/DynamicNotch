@@ -18,12 +18,12 @@ namespace DynamicNotch;
 /// </summary>
 public partial class NotchWindow : Window
 {
-    enum Mode { Idle, Slim, Media, Activity, Osd, Expanded }
+    enum Mode { Idle, Slim, Media, Activity, Osd, Expanded, Drop }
 
     // Shapes, in device-independent pixels (rendered crisply at the monitor's real DPI).
     static readonly Size IdleSize = new(150, 26), SlimSize = new(118, 6), MediaSize = new(252, 30),
-        ActivitySize = new(230, 30), ExpandedSize = new(440, 268);
-    const double IdleRadius = 13, SlimRadius = 3, MediaRadius = 15, ExpandedRadius = 30;
+        ActivitySize = new(230, 30), ExpandedSize = new(440, 268), DropSize = new(380, 92);
+    const double IdleRadius = 13, SlimRadius = 3, MediaRadius = 15, ExpandedRadius = 30, DropRadius = 28;
     const int HotkeyId = 0x4E01;
 
     readonly Settings _settings;
@@ -83,7 +83,7 @@ public partial class NotchWindow : Window
         _files = new FilesService(Dispatcher);
         _notifications = new NotificationService(Dispatcher);
 
-        foreach (var p in new FrameworkElement[] { CompactMedia, CompactActivity, Osd, Expanded })
+        foreach (var p in new FrameworkElement[] { CompactMedia, CompactActivity, Osd, Expanded, DropPanel })
         {
             p.RenderTransformOrigin = new Point(0.5, 0);
             p.RenderTransform = new ScaleTransform(1, 1);
@@ -117,6 +117,8 @@ public partial class NotchWindow : Window
         WireAlerts();
         WireSmart();
         WireAwareness();
+        WireShelf();
+        WireCall();
     }
 
     // ───────────────────────────── window plumbing ─────────────────────────────
@@ -253,6 +255,13 @@ public partial class NotchWindow : Window
         return IntPtr.Zero;
     }
 
+    /// <summary>
+    /// The notch takes the mouse only when it has something to offer: open, a clickable pop-up, the drop zone,
+    /// or while something is being dragged toward it. Otherwise everything under it keeps working.
+    /// </summary>
+    void RefreshClickThrough() =>
+        SetClickThrough(!(_mode is Mode.Expanded or Mode.Drop || (_mode == Mode.Osd && _osd?.OnClick != null) || _dropArmed));
+
     void SetClickThrough(bool on)
     {
         if (on == _clickThrough || _hwnd == IntPtr.Zero) return;
@@ -313,7 +322,7 @@ public partial class NotchWindow : Window
             switch (CurrentActivity)
             {
                 case LiveActivity.Media: return Mode.Media;
-                case LiveActivity.Timer or LiveActivity.Download or LiveActivity.Focus: return Mode.Activity;
+                case LiveActivity.Timer or LiveActivity.Download or LiveActivity.Focus or LiveActivity.Call: return Mode.Activity;
             }
             return _settings.MinimalWhenIdle || (_overWindow && _settings.SlimOverWindows) ? Mode.Slim : Mode.Idle;
         }
@@ -340,6 +349,7 @@ public partial class NotchWindow : Window
         FrameworkElement? panel = m switch
         {
             Mode.Expanded => Expanded,
+            Mode.Drop => DropPanel,
             Mode.Osd => Osd,
             Mode.Media => CompactMedia,
             Mode.Activity => CompactActivity,
@@ -351,7 +361,7 @@ public partial class NotchWindow : Window
         ShowPanel(panel);
         Fade(EarL, m == Mode.Slim ? 0 : 1, 160);
         Fade(EarR, m == Mode.Slim ? 0 : 1, 160);
-        SetClickThrough(!(m == Mode.Expanded || (m == Mode.Osd && _osd?.OnClick != null)));
+        RefreshClickThrough();
         UpdateEqualizer();
         UpdatePrivacyBubble();
         UpdateOsdChrome();
@@ -359,6 +369,7 @@ public partial class NotchWindow : Window
         if (m != Mode.Osd) UpdateAura(null); // the glow leaves with the pop-up
         UpdateSecond();
         UpdateSlimGlow();
+        UpdateCallUi();
         if (!IsBase(m)) SetDodged(false); // pop-ups and the open notch never hide from the cursor
     }
 
@@ -379,6 +390,9 @@ public partial class NotchWindow : Window
         switch (_mode)
         {
             case Mode.Expanded: w = ExpandedSize.Width; h = ExpandedSize.Height; r = ExpandedRadius; break;
+            case Mode.Drop:
+                // the file is right over it: the receptacle swells to welcome it
+                w = DropSize.Width + (_dropHot ? 16 : 0); h = DropSize.Height + (_dropHot ? 6 : 0); r = DropRadius; break;
             case Mode.Osd: w = _osdSize.Width; h = _osdSize.Height; r = _osdSize.Height / 2; break;
             case Mode.Media: w = MediaSize.Width; h = MediaSize.Height; r = MediaRadius; break;
             case Mode.Activity: w = ActivitySize.Width; h = ActivitySize.Height; r = MediaRadius; break;
@@ -573,6 +587,7 @@ public partial class NotchWindow : Window
 
         if (!GetCursorPos(out var p)) return;
         bool button = IsButtonDown();
+        UpdateDropArming(p);
 
         // check often only when the cursor is near the notch; otherwise relax to save power
         // poll fast only when the cursor is close to the notch; relax elsewhere to save power
@@ -594,7 +609,7 @@ public partial class NotchWindow : Window
             bool wasAtEdge = _atEdge;
             _atEdge = atEdge;
             UpdateDodge(p, atEdge);
-            UpdateLean(p, atEdge || _osdHover);
+            UpdateLean(p, atEdge || _osdHover || _mode == Mode.Drop); // the drop zone leans toward the dragged file
             if (atEdge != _peek && IsBase(_mode))
             {
                 _peek = atEdge;

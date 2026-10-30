@@ -18,6 +18,10 @@ public sealed class PrivacyService
     public bool CamInUse { get; private set; }
     public string? MicApp { get; private set; }
     public string? CamApp { get; private set; }
+    /// <summary>Which app holds the microphone: its exe path, or its package name for Store apps.</summary>
+    public string? MicAppKey { get; private set; }
+    /// <summary>Every app holding the microphone right now (an always-on one like NVIDIA Broadcast can sit beside a call).</summary>
+    public IReadOnlyList<string> MicAppKeys { get; private set; } = Array.Empty<string>();
     public event Action? Changed;
 
     public PrivacyService(Dispatcher ui) => _ui = ui;
@@ -47,22 +51,27 @@ public sealed class PrivacyService
 
     void Scan()
     {
-        var (mic, micApp) = InUse("microphone");
-        var (cam, camApp) = InUse("webcam");
+        var mics = Active("microphone");
+        var cams = Active("webcam");
+        bool mic = mics.Count > 0, cam = cams.Count > 0;
+        string? micApp = mic ? mics[0].Name : null, micKey = mic ? mics[0].Key : null, camApp = cam ? cams[0].Name : null;
+        var micKeys = mics.Select(m => m.Key).ToList();
         _ui.InvokeAsync(() =>
         {
-            if (mic == MicInUse && cam == CamInUse && micApp == MicApp && camApp == CamApp) return;
-            MicInUse = mic; CamInUse = cam; MicApp = micApp; CamApp = camApp;
+            if (mic == MicInUse && cam == CamInUse && micApp == MicApp && camApp == CamApp && micKeys.SequenceEqual(MicAppKeys)) return;
+            MicInUse = mic; CamInUse = cam; MicApp = micApp; CamApp = camApp; MicAppKey = micKey; MicAppKeys = micKeys;
             Changed?.Invoke();
         });
     }
 
-    static (bool, string?) InUse(string capability)
+    /// <summary>Every app using a capability right now: a display name and its key (exe path, or package name for Store apps).</summary>
+    static List<(string Name, string Key)> Active(string capability)
     {
+        var list = new List<(string Name, string Key)>();
         try
         {
             using var k = Registry.CurrentUser.OpenSubKey($@"{Root}\{capability}");
-            if (k == null) return (false, null);
+            if (k == null) return list;
             foreach (var name in k.GetSubKeyNames())
             {
                 if (name == "NonPackaged")
@@ -72,18 +81,19 @@ public sealed class PrivacyService
                     foreach (var exe in np.GetSubKeyNames())
                     {
                         using var e = np.OpenSubKey(exe);
-                        if (Active(e)) return (true, Path.GetFileNameWithoutExtension(exe.Replace('#', '\\')));
+                        string path = exe.Replace('#', '\\');
+                        if (Active(e)) list.Add((Path.GetFileNameWithoutExtension(path), path));
                     }
                 }
                 else
                 {
                     using var s = k.OpenSubKey(name);
-                    if (Active(s)) return (true, PrettyPackage(name));
+                    if (Active(s)) list.Add((PrettyPackage(name), name));
                 }
             }
         }
         catch { }
-        return (false, null);
+        return list;
     }
 
     static bool Active(RegistryKey? k) =>

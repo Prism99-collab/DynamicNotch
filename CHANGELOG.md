@@ -6,6 +6,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- File shelf: drag a file, picture or text up to the notch and it morphs into a drop zone (marching outline,
+  bobbing arrow, what's already kept fanned out); let go and it swallows it. Drag things back out from the new
+  Shelf tab on the Clipboard & Files page. Kept across restarts.
+- Live call activity: while Discord, Teams, Zoom, WhatsApp, Slack, a browser (Meet)… records from a microphone, the
+  notch becomes a call pill (app icon, live dot, voice bars that move with you, timer; red when muted). The control
+  center shows a call card with a big mute button and "back to the call".
 - "Opening …" alert with the app's icon when an app starts (switch in Settings and the tray menu).
 - Keyboard language alerts (Win+Space / Alt+Shift), screen connected / disconnected, and "Fully charged" on the charger.
 

@@ -165,7 +165,7 @@ public partial class NotchWindow
 
     /// <summary>Things worth a little celebration: done, connected, charging, full.</summary>
     static bool IsGoodNews(string kind, Brush? glyph, (double Level, bool Charging)? battery) =>
-        kind is "download" or "timer" or "full-charge" or "screenshot"
+        kind is "download" or "timer" or "full-charge" or "screenshot" or "shelf" or "call"
         || (kind == "power" && battery is { Charging: true })
         || (kind is "bt" or "wifi" or "usb" or "display" && glyph == Blue);
 
@@ -174,10 +174,11 @@ public partial class NotchWindow
     /// <summary>An alert with a colour casts a faint glow of it just below the notch; it fades with the alert.</summary>
     void UpdateAura(Color? c)
     {
-        if (c is { } k && _mode == Mode.Osd && !_hidden)
+        if (c is { } k && _mode is Mode.Osd or Mode.Drop && !_hidden)
         {
-            Aura.Width = _osdSize.Width + 90;
-            Aura.Height = _osdSize.Height + 44;
+            var size = _mode == Mode.Drop ? DropSize : _osdSize;
+            Aura.Width = size.Width + 90;
+            Aura.Height = size.Height + 44;
             if (k != _auraFor)
             {
                 var g = new RadialGradientBrush
@@ -216,6 +217,7 @@ public partial class NotchWindow
             LiveActivity.Timer => ((SolidColorBrush)TimerBrush).Color,
             LiveActivity.Download => ((SolidColorBrush)Blue).Color,
             LiveActivity.Focus => ((SolidColorBrush)FocusPurple).Color,
+            LiveActivity.Call => ((SolidColorBrush)CallBrush).Color,
             _ => null,
         };
         if (c is not { } k)
@@ -236,7 +238,8 @@ public partial class NotchWindow
             SlimGlow.Background = g;
             _slimGlowFor = k;
         }
-        bool breathe = CurrentActivity == LiveActivity.Media && _media.IsPlaying && !Eco;
+        // music pulses the glow to the song, a call to your voice
+        bool breathe = (CurrentActivity == LiveActivity.Media && _media.IsPlaying || CurrentActivity == LiveActivity.Call) && !Eco;
         if (_slimGlowOn && breathe == _slimGlowBreathing) return;
         _slimGlowOn = true;
         _slimGlowBreathing = breathe;
@@ -290,7 +293,8 @@ public partial class NotchWindow
     /// <summary>Everything live right now, most important first.</summary>
     List<LiveActivity> Activities()
     {
-        var list = new List<LiveActivity>(4);
+        var list = new List<LiveActivity>(5);
+        if (OnCall) list.Add(LiveActivity.Call); // a call beats everything
         if (_timerRunning) list.Add(LiveActivity.Timer);
         if (_focus.IsOn) list.Add(LiveActivity.Focus);
         if (_files.ActiveDownloads > 0) list.Add(LiveActivity.Download);
