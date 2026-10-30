@@ -152,6 +152,54 @@ public sealed class AudioService : IMMNotificationClient
         catch { return false; }
     }
 
+    /// <summary>
+    /// The apps recording from any microphone right now (exe paths), straight from Windows' audio engine:
+    /// every active capture stream, whichever app or virtual mic setup it goes through. Off the UI thread.
+    /// </summary>
+    public static Task<List<string>> ActiveCaptureAppsAsync() => Task.Run(() =>
+    {
+        var paths = new List<string>();
+        try
+        {
+            using var en = new MMDeviceEnumerator();
+            foreach (var dev in en.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
+            {
+                using (dev)
+                {
+                    try
+                    {
+                        var sessions = dev.AudioSessionManager.Sessions;
+                        for (int i = 0; i < sessions.Count; i++)
+                        {
+                            using var s = sessions[i];
+                            try
+                            {
+                                if (s.State != NAudio.CoreAudioApi.Interfaces.AudioSessionState.AudioSessionStateActive) continue;
+                                uint pid = s.GetProcessID;
+                                if (pid == 0 || pid == Environment.ProcessId) continue;
+                                if (Interop.Native.ProcessPathById(pid) is { } path && !paths.Contains(path, StringComparer.OrdinalIgnoreCase)) paths.Add(path);
+                            }
+                            catch { }
+                        }
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch { }
+        return paths;
+    });
+
+    /// <summary>How loud your microphone hears you right now (0–1); 0 while it's muted.</summary>
+    public bool TryGetMicPeak(out float level)
+    {
+        level = 0;
+        if (_mic == null) return false;
+        if (MicMuted) return true;
+        try { level = _mic.AudioMeterInformation.MasterPeakValue; return true; }
+        catch { return false; }
+    }
+
     public void SetVolume(float v)
     {
         if (_out == null) return;

@@ -16,7 +16,7 @@ namespace DynamicNotch;
 /// </summary>
 public partial class NotchWindow
 {
-    enum LiveActivity { None, Media, Download, Timer, Focus }
+    enum LiveActivity { None, Media, Download, Timer, Focus, Call }
     enum Prio { Low, Normal, High }
 
     /// <summary>One pop-up. <see cref="OnClick"/> makes it clickable; <see cref="OnWheel"/> lets the wheel adjust it.</summary>
@@ -221,6 +221,8 @@ public partial class NotchWindow
     void UpdateActivityContent()
     {
         if (_secondShown != LiveActivity.None) FillSecond(_secondShown);
+        if (CurrentActivity == LiveActivity.Call) { FillCallPill(); return; }
+        ResetCallPill();
         switch (CurrentActivity)
         {
             case LiveActivity.Timer:
@@ -257,6 +259,8 @@ public partial class NotchWindow
         if (SilencedByMeeting(kind, force)) return;
         if (_focus.IsOn && !force && !FocusAllows(kind)) return;
         if (_hidden && !force) return;
+        // a file is being dragged into the drop zone: don't yank it away, show this right after
+        if (_mode == Mode.Drop) { Enqueue(req); return; }
         if (_mode == Mode.Expanded)
         {
             if (!force) return;
@@ -388,6 +392,7 @@ public partial class NotchWindow
         {
             Mode.Osd => _osdAccent,
             Mode.Media or Mode.Expanded when _media.HasSession && _media.Art != null && _media.Accent != Colors.White => _media.Accent,
+            Mode.Activity when CurrentActivity == LiveActivity.Call => ((SolidColorBrush)CallBrush).Color,
             Mode.Activity when CurrentActivity == LiveActivity.Focus => ((SolidColorBrush)FocusPurple).Color,
             _ => null,
         };
@@ -401,7 +406,7 @@ public partial class NotchWindow
 
     /// <summary>What still gets through while you focus: your own key presses and things that can't wait.</summary>
     static bool FocusAllows(string kind) =>
-        kind is "volume" or "brightness" or "caps" or "keyboard" or "mic" or "output" or "focus" or "meeting" or "timer" or "battery" or "smart-charge";
+        kind is "volume" or "brightness" or "caps" or "keyboard" or "call" or "call-end" or "mic" or "output" or "focus" or "meeting" or "timer" or "battery" or "smart-charge";
 
     void OnFocusChanged()
     {
