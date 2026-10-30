@@ -107,6 +107,7 @@ internal static class Native
     [DllImport("user32.dll")] public static extern bool DeregisterShellHookWindow(IntPtr hWnd);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern uint RegisterWindowMessage(string name);
     [DllImport("user32.dll")] public static extern bool LockWorkStation();
+    [DllImport("user32.dll")] public static extern IntPtr GetKeyboardLayout(uint threadId);
     [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int cmd);
     [DllImport("user32.dll")] public static extern void SwitchToThisWindow(IntPtr hWnd, bool altTab);
@@ -196,12 +197,12 @@ internal static class Native
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool EnumDisplaySettings(string? device, int mode, ref DEVMODE dm);
 
-    /// <summary>The main screen's refresh rate in Hz (60, 144, 165, 180, 240...); 60 if Windows won't say.</summary>
-    public static int RefreshRate()
+    /// <summary>A screen's refresh rate in Hz (null: the main screen) (60, 144, 165, 180, 240...); 60 if Windows won't say.</summary>
+    public static int RefreshRate(string? device = null)
     {
         var dm = new DEVMODE { dmSize = (short)Marshal.SizeOf<DEVMODE>() };
         // ENUM_CURRENT_SETTINGS; null = the primary display, where the notch lives
-        if (!EnumDisplaySettings(null, -1, ref dm) || dm.dmDisplayFrequency <= 1) return 60;
+        if (!EnumDisplaySettings(device, -1, ref dm) || dm.dmDisplayFrequency <= 1) return 60;
         return Math.Clamp(dm.dmDisplayFrequency, 60, 360);
     }
 

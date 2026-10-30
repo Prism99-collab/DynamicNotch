@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using DynamicNotch.Services;
 
 namespace DynamicNotch;
@@ -309,31 +310,85 @@ public partial class NotchWindow
         return b;
     }
 
+    // ───────────────────────────── visualizer: follows the real sound ─────────────────────────────
+
+    readonly DispatcherTimer _meter = new(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) };
+    readonly double[] _eqLevel = { 0.35, 0.35, 0.35, 0.35 };
+    double _beat;
+    bool _meterWired, _eqFallback, _slimBeat;
+
     void UpdateEqualizer()
     {
         bool run = _mode == Mode.Media && _media.IsPlaying && _settings.AnimatedVisualizer && !Eco;
         if (run == _eqRunning) return;
         _eqRunning = run;
+        if (!run)
+        {
+            _eqFallback = false;
+            for (int i = 0; i < _eqBars.Length; i++)
+            {
+                _eqBars[i].BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                _eqBars[i].ScaleY = _eqLevel[i] = 0.35;
+            }
+        }
+        UpdateMeter();
+    }
+
+    /// <summary>The meter runs only while something on screen dances to it: the bars, or the slim glow over a window.</summary>
+    void UpdateMeter()
+    {
+        if (!_meterWired) { _meterWired = true; _meter.Tick += (_, _) => OnMeter(); }
+        if (_eqRunning || _slimBeat) { if (!_meter.IsEnabled) _meter.Start(); }
+        else _meter.Stop();
+    }
+
+    void OnMeter()
+    {
+        if (!_audio.TryGetPeaks(out float left, out float right))
+        {
+            // no meter on this device: fall back to the gentle looping bars
+            if (_eqRunning && !_eqFallback) { _eqFallback = true; StartLoopingBars(); }
+            _meter.Stop();
+            return;
+        }
+        double t = Environment.TickCount64 / 1000.0;
+        double loud = Math.Sqrt(Math.Max(left, right)); // perceived loudness, not raw amplitude
+
+        if (_eqRunning && !_eqFallback)
+        {
+            for (int i = 0; i < _eqBars.Length; i++)
+            {
+                // outer bars follow each channel, inner ones the mix; a slow wobble keeps neighbours apart
+                double src = i == 0 ? left : i == _eqBars.Length - 1 ? right : (left + right) / 2;
+                double wobble = 0.82 + 0.18 * Math.Sin(t * (4.3 + i * 1.9) + i * 1.3);
+                double target = 0.22 + 0.78 * Math.Clamp(Math.Sqrt(src) * 1.3 * wobble, 0, 1);
+                // quick to jump on a beat, slower to fall: reads as music, not noise
+                _eqLevel[i] += (target - _eqLevel[i]) * (target > _eqLevel[i] ? 0.7 : 0.2);
+                if (Math.Abs(_eqBars[i].ScaleY - _eqLevel[i]) > 0.008) _eqBars[i].ScaleY = _eqLevel[i];
+            }
+        }
+        if (_slimBeat)
+        {
+            _beat += (Math.Clamp(loud * 1.35, 0, 1) - _beat) * 0.3;
+            double o = 0.35 + 0.65 * _beat;
+            if (Math.Abs(SlimGlow.Opacity - o) > 0.01) SlimGlow.Opacity = o;
+        }
+    }
+
+    void StartLoopingBars()
+    {
         double[] periods = { 0.42, 0.58, 0.36, 0.5 };
         for (int i = 0; i < _eqBars.Length; i++)
         {
-            if (run)
+            var a = new DoubleAnimation(0.25, 1, TimeSpan.FromSeconds(periods[i % periods.Length]))
             {
-                var a = new DoubleAnimation(0.25, 1, TimeSpan.FromSeconds(periods[i % periods.Length]))
-                {
-                    AutoReverse = true,
-                    RepeatBehavior = RepeatBehavior.Forever,
-                    BeginTime = TimeSpan.FromMilliseconds(i * 90),
-                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
-                };
-                Timeline.SetDesiredFrameRate(a, 30); // smooth enough for bars, half the redraw cost
-                _eqBars[i].BeginAnimation(ScaleTransform.ScaleYProperty, a);
-            }
-            else
-            {
-                _eqBars[i].BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                _eqBars[i].ScaleY = 0.35;
-            }
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                BeginTime = TimeSpan.FromMilliseconds(i * 90),
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
+            };
+            Timeline.SetDesiredFrameRate(a, 30);
+            _eqBars[i].BeginAnimation(ScaleTransform.ScaleYProperty, a);
         }
     }
 

@@ -104,6 +104,8 @@ public partial class NotchWindow : Window
         _tick = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
         _tick.Tick += (_, _) => RefreshClockAndProgress();
 
+        Root.RenderTransform = _leanShift;
+        _lean.Configure(SpringStyle.Peek);
         Pill.SizeChanged += (_, _) => { UpdateClip(); PlacePrivacyBubble(); PlaceSecond(); };
         SecondBubble.SizeChanged += (_, _) => PlaceSecond();
         PrivacyBubble.SizeChanged += (_, _) => PlacePrivacyBubble();
@@ -114,6 +116,7 @@ public partial class NotchWindow : Window
         WirePages();
         WireAlerts();
         WireSmart();
+        WireAwareness();
     }
 
     // ───────────────────────────── window plumbing ─────────────────────────────
@@ -135,9 +138,9 @@ public partial class NotchWindow : Window
         RegisterShellHookWindow(_hwnd);
 
         // called straight from Windows: an exception escaping here would end the app, so contain it
-        _winEventProc = (_, _, _, _, _, _, _) =>
+        _winEventProc = (_, _, hwnd, _, _, _, _) =>
         {
-            try { CheckForeground(); }
+            try { CheckForeground(); OnForegroundChanged(hwnd); }
             catch (Exception ex) { Services.AppLog.Write("foreground check failed: " + ex.Message); }
         };
         _winEventHook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, _winEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
@@ -161,6 +164,7 @@ public partial class NotchWindow : Window
     void OnDisplayChanged(object? s, EventArgs e) => Dispatcher.InvokeAsync(() =>
     {
         PositionWindow();
+        OnScreensChanged();
         // a monitor may have been plugged in, unplugged or switched on: look again, and keep looking a little while
         _ = _extBri.RefreshAsync(MonitorInUse(), rescan: true);
         _extBri.RetryUntilFound(MonitorInUse);
@@ -331,6 +335,7 @@ public partial class NotchWindow : Window
         _mode = m;
         if (m != Mode.Osd) _osd = null;
         if (m == Mode.Expanded) _osdQueue.Clear(); // you're looking at the notch already
+        if (m == Mode.Expanded) _lean.Target = 0; // open: centred, no leaning
         if (modeChanged) { _peek = false; _osdHover = false; _pressed = false; }
         FrameworkElement? panel = m switch
         {
@@ -351,6 +356,7 @@ public partial class NotchWindow : Window
         UpdatePrivacyBubble();
         UpdateOsdChrome();
         UpdateRim();
+        if (m != Mode.Osd) UpdateAura(null); // the glow leaves with the pop-up
         UpdateSecond();
         UpdateSlimGlow();
         if (!IsBase(m)) SetDodged(false); // pop-ups and the open notch never hide from the cursor
@@ -358,7 +364,8 @@ public partial class NotchWindow : Window
 
     // ───────────────────────────── spring-driven shape ─────────────────────────────
 
-    readonly Spring _sw = new(SlimSize.Width), _sh = new(SlimSize.Height), _sr = new(SlimRadius), _pageX = new(0);
+    readonly Spring _sw = new(SlimSize.Width), _sh = new(SlimSize.Height), _sr = new(SlimRadius), _pageX = new(0), _lean = new(0);
+    readonly TranslateTransform _leanShift = new();
     bool _animating, _peek, _osdHover, _pressed, _atEdge;
     RectangleGeometry? _clip;
     TimeSpan _lastFrameRaw;
@@ -397,7 +404,17 @@ public partial class NotchWindow : Window
             else { w += 14; h += 4; r += 2; style = SpringStyle.Peek; }
         }
 
-        foreach (var s in new[] { _sw, _sh, _sr }) s.Configure(style);
+        _sw.Configure(style);
+        _sr.Configure(style);
+        // jelly: height has its own timing, so the shape stretches like a drop instead of scaling like a box.
+        // Opening, it trails the width and overshoots a touch; closing, it tucks in first.
+        switch (style)
+        {
+            case SpringStyle.Open: _sh.Configure(0.54, 0.72); break;
+            case SpringStyle.Pop: _sh.Configure(0.46, 0.66); break;
+            case SpringStyle.Close: _sh.Configure(0.28, 1.0); break;
+            default: _sh.Configure(style); break;
+        }
         _sw.Target = w;
         _sh.Target = h;
         _sr.Target = r;
@@ -441,11 +458,12 @@ public partial class NotchWindow : Window
 
         if (FrameLog != null && _lastFrameRaw != TimeSpan.Zero) FrameLog.Add((now - _lastFrameRaw).TotalMilliseconds);
         _lastFrameRaw = now;
-        bool done = _sw.Step(dt) & _sh.Step(dt) & _sr.Step(dt) & _pageX.Step(dt);
+        bool done = _sw.Step(dt) & _sh.Step(dt) & _sr.Step(dt) & _pageX.Step(dt) & _lean.Step(dt);
         Pill.Width = Math.Max(4, _sw.Value);
         Pill.Height = Math.Max(3, _sh.Value);
         Radius = _sr.Value;
         if (_pageX.Active) PagesShift.X = _pageX.Value;
+        _leanShift.X = _lean.Value;
 
         if (!done) return;
         CompositionTarget.Rendering -= OnFrame;
@@ -551,6 +569,7 @@ public partial class NotchWindow : Window
         _lastPoll = now;
         if (++_pollCount % 8 == 0) CheckForeground(); // catches maximize / F11 without a focus change
         CheckLockKeys();
+        CheckKeyboardLayout();
 
         if (!GetCursorPos(out var p)) return;
         bool button = IsButtonDown();
@@ -575,6 +594,7 @@ public partial class NotchWindow : Window
             bool wasAtEdge = _atEdge;
             _atEdge = atEdge;
             UpdateDodge(p, atEdge);
+            UpdateLean(p, atEdge || _osdHover);
             if (atEdge != _peek && IsBase(_mode))
             {
                 _peek = atEdge;

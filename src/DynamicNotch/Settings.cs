@@ -11,6 +11,8 @@ public sealed class Settings
     public bool NotificationAlerts { get; set; } = true;
     public bool ClipboardAlerts { get; set; } = true;
     public bool SystemAlerts { get; set; } = true;
+    /// <summary>"Opening Spotify" when an app starts.</summary>
+    public bool AppLaunchAlerts { get; set; } = true;
     public bool ShowMediaActivity { get; set; } = true;
     public bool AnimatedVisualizer { get; set; } = true;
     public bool HoverToOpen { get; set; } = true;

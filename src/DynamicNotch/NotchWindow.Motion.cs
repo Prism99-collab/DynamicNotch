@@ -123,6 +123,82 @@ public partial class NotchWindow
         t.Start();
     }
 
+    // ───────────────────────────── alive: lean, shine, aura ─────────────────────────────
+
+    /// <summary>
+    /// The notch leans a few pixels toward the cursor while you touch the top edge or hover a clickable
+    /// alert, like something that noticed you. It settles back to the centre otherwise.
+    /// </summary>
+    void UpdateLean(Interop.Native.POINT p, bool engaged)
+    {
+        double target = 0;
+        if (engaged && !_hidden && _mode != Mode.Expanded)
+        {
+            double cx = _winLeft + _winW / 2.0;
+            target = Math.Clamp((p.X - cx) / _scale * 0.06, -7, 7);
+        }
+        if (Math.Abs(target - _lean.Target) < 0.25) return;
+        _lean.Target = target;
+        StartAnimating();
+    }
+
+    /// <summary>Good news gets a soft band of light sweeping across the notch once, in its colour.</summary>
+    void PlayShine(Color c)
+    {
+        var g = new LinearGradientBrush { StartPoint = new Point(0, 0.2), EndPoint = new Point(1, 0.8) };
+        g.GradientStops.Add(new GradientStop(Color.FromArgb(0, c.R, c.G, c.B), 0));
+        g.GradientStops.Add(new GradientStop(Color.FromArgb(0x3C, c.R, c.G, c.B), 0.42));
+        g.GradientStops.Add(new GradientStop(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF), 0.5));
+        g.GradientStops.Add(new GradientStop(Color.FromArgb(0x3C, c.R, c.G, c.B), 0.58));
+        g.GradientStops.Add(new GradientStop(Color.FromArgb(0, c.R, c.G, c.B), 1));
+        g.Freeze();
+        Shine.Background = g;
+        double across = Math.Max(Pill.ActualWidth, _osdSize.Width) + 20;
+        var ease = new CubicEase { EasingMode = EasingMode.EaseInOut };
+        ShineShift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(-120, across, TimeSpan.FromMilliseconds(820)) { EasingFunction = ease });
+        var fade = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(820) };
+        fade.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(180))));
+        fade.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(600))));
+        fade.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(820))));
+        Shine.BeginAnimation(OpacityProperty, fade);
+    }
+
+    /// <summary>Things worth a little celebration: done, connected, charging, full.</summary>
+    static bool IsGoodNews(string kind, Brush? glyph, (double Level, bool Charging)? battery) =>
+        kind is "download" or "timer" or "full-charge" or "screenshot"
+        || (kind == "power" && battery is { Charging: true })
+        || (kind is "bt" or "wifi" or "usb" or "display" && glyph == Blue);
+
+    Color? _auraFor;
+
+    /// <summary>An alert with a colour casts a faint glow of it just below the notch; it fades with the alert.</summary>
+    void UpdateAura(Color? c)
+    {
+        if (c is { } k && _mode == Mode.Osd && !_hidden)
+        {
+            Aura.Width = _osdSize.Width + 90;
+            Aura.Height = _osdSize.Height + 44;
+            if (k != _auraFor)
+            {
+                var g = new RadialGradientBrush
+                {
+                    Center = new Point(0.5, 0), GradientOrigin = new Point(0.5, 0), RadiusX = 0.5, RadiusY = 1,
+                    GradientStops =
+                    {
+                        new GradientStop(Color.FromArgb(0x46, k.R, k.G, k.B), 0),
+                        new GradientStop(Color.FromArgb(0x18, k.R, k.G, k.B), 0.55),
+                        new GradientStop(Color.FromArgb(0, k.R, k.G, k.B), 1),
+                    },
+                };
+                g.Freeze();
+                Aura.Background = g;
+                _auraFor = k;
+            }
+            Fade(Aura, 1, 260);
+        }
+        else Fade(Aura, 0, 220);
+    }
+
     // ───────────────────────────── stepping aside ─────────────────────────────
 
     Color? _slimGlowFor;
@@ -130,7 +206,7 @@ public partial class NotchWindow
 
     /// <summary>
     /// The slim bar over a window still says something's live: a thin line in the song's colour
-    /// (or the timer / download / focus colour) that breathes slowly while music plays.
+    /// (or the timer / download / focus colour) that pulses with the music while it plays.
     /// </summary>
     void UpdateSlimGlow()
     {
@@ -146,6 +222,7 @@ public partial class NotchWindow
         {
             if (!_slimGlowOn) return;
             _slimGlowOn = false;
+            if (_slimBeat) { _slimBeat = false; UpdateMeter(); }
             SlimGlow.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(180)));
             return;
         }
@@ -163,16 +240,17 @@ public partial class NotchWindow
         if (_slimGlowOn && breathe == _slimGlowBreathing) return;
         _slimGlowOn = true;
         _slimGlowBreathing = breathe;
-        // fade in first, then (for music) breathe; both cheap: tiny element, low frame rate
-        var a = new DoubleAnimationUsingKeyFrames();
-        a.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(260)), new CubicEase { EasingMode = EasingMode.EaseOut }));
-        if (breathe)
+        // fade in; with music playing, the glow then pulses to the song's real loudness (the visualizer meter)
+        var a = new DoubleAnimation(breathe ? 0.6 : 1, TimeSpan.FromMilliseconds(260)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+        if (breathe) a.Completed += (_, _) =>
         {
-            a.KeyFrames.Add(new EasingDoubleKeyFrame(0.45, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1660)), new SineEase { EasingMode = EasingMode.EaseInOut }));
-            a.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(3060)), new SineEase { EasingMode = EasingMode.EaseInOut }));
-            a.RepeatBehavior = RepeatBehavior.Forever;
-        }
-        Timeline.SetDesiredFrameRate(a, 24);
+            if (!_slimGlowBreathing || !_slimGlowOn) return;
+            SlimGlow.BeginAnimation(OpacityProperty, null); // hand the opacity to the meter
+            SlimGlow.Opacity = 0.6;
+            _slimBeat = true;
+            UpdateMeter();
+        };
+        else if (_slimBeat) { _slimBeat = false; UpdateMeter(); }
         SlimGlow.BeginAnimation(OpacityProperty, a);
     }
 
