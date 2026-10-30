@@ -20,6 +20,8 @@ public sealed class Settings
     public bool SlimOverWindows { get; set; } = true;
     public bool StartWithWindows { get; set; } = true;
     public bool KeepRunning { get; set; } = true;
+    /// <summary>The first-start hello was shown (a new install says where the notch is and how to open it).</summary>
+    public bool Welcomed { get; set; }
 
     // Smart page: every helper can be switched off; meeting mode is opt-in
     public bool SmartBatteryDrain { get; set; } = true;

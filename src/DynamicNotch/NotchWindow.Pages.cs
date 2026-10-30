@@ -138,6 +138,7 @@ public partial class NotchWindow
     void UpdateDots(bool animate)
     {
         PageTitle.Text = PageNames[_page];
+        RenderSwitch();
         for (int i = 0; i < _dots.Count; i++)
         {
             double w = i == _page ? 16 : 5;
@@ -150,7 +151,7 @@ public partial class NotchWindow
     void OnPageShown(int page)
     {
         if (_mode != Mode.Expanded) return;
-        if (page == 1) { _ = SampleSystemAsync(); _sysTimer.Start(); } else _sysTimer.Stop();
+        if (page == 1) { OnSystemShown(); _ = SampleSystemAsync(); _sysTimer.Start(); } else _sysTimer.Stop();
         UpdateCallUi(); // the call card's voice bars run only on Home
         if (page == 0) RefreshClockAndProgress();
         if (page == 2) UpdateTimerUi();
@@ -176,6 +177,7 @@ public partial class NotchWindow
         if (!_swiping)
         {
             if (Mouse.Captured is PillSlider) { _maybeSwipe = false; return; }
+            if (TouchSwipeUpToClose(dx, dy)) { e.Handled = true; return; }
             if (Math.Abs(dx) < 8 || Math.Abs(dx) < Math.Abs(dy) * 1.2) return;
             _swiping = true;
             Pager.CaptureMouse(); // steals capture from any button, so it won't "click"
@@ -282,10 +284,12 @@ public partial class NotchWindow
 
         NetDown.Text = SystemMonitor.Bytes(s.DownBps) + "/s";
         NetUp.Text = SystemMonitor.Bytes(s.UpBps) + "/s";
+        PushNetwork(s.DownBps, s.UpBps);
         var up = s.Uptime;
         UptimeText.Text = up.TotalDays >= 1 ? $"{(int)up.TotalDays}d {up.Hours}h" : $"{up.Hours}h {up.Minutes}m";
 
         RenderBattery(bt);
+        PushPower(bt);
         RenderConnection(await pingTask);
     }
 

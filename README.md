@@ -32,7 +32,8 @@ Live activities, smart alerts, quick controls — and it stays out of your way.
 > may warn about an unknown publisher. Click **More info → Run anyway**. You can check the download against
 > `SHA256SUMS.txt` on the release page.
 
-The notch appears at the top of your screen and starts automatically when you sign in.
+The notch appears at the top of your screen, says hello on its first start, and starts automatically when you sign in.
+It's minimal by default (a thin bar at the top edge): push the mouse against the top edge or press <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd> to open it.
 To remove it: **Settings → Apps → Installed apps → Dynamic Notch → Uninstall** (removes everything, including its startup entry).
 
 ## Features
@@ -47,17 +48,24 @@ To remove it: **Settings → Apps → Installed apps → Dynamic Notch → Unins
 **Smooth** — animations run at your screen's real refresh rate (144 / 180 / 240 Hz), and nothing slow ever runs
 while the notch is moving.
 
-**Live activities** — music (album art + visualizer tinted with the cover's colours), Pomodoro timer, downloads with live speed, Focus.
-Two at once? The second one splits off into its own little island.
+**Live activities** — music (album art + visualizer tinted with the cover's colours), calls (Discord, Teams, Zoom, WhatsApp, Meet…
+with a timer and bars that move with your voice), Pomodoro timer, downloads with real progress, Focus.
+Two at once? The second one splits off into its own little island. Lots at once? Pick what the notch shows from the switcher
+on Home — every playing tab or app gets its own chip.
+
+**File shelf** — drag a file, picture or text up to the notch to keep it; drag it back out into any app later
+(Excel and Word get the picture or text itself, folders and chats get the file), or copy it for Ctrl+V.
+
+**Touch & pen** — on a touch screen, tap the notch to open it and swipe up to close.
 
 **Control center** — hover the top edge (or press <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd>) and swipe between pages:
 
 | Page | What's on it |
 |---|---|
 | **Home** | Now playing with seek and a volume slider for just the playing app, Wi-Fi, Bluetooth, Airplane, Focus, Mic, Power mode, volume + output / input picker, laptop and external monitor brightness |
-| **System** | CPU / memory / disk / battery rings, time left on battery, download / upload speed, ping & signal, battery health and power draw |
+| **System** | CPU / memory / disk / battery rings, live network graph, downloads with real progress, ping & signal, battery health and a live charging / power graph |
 | **Tools** | Pomodoro focus timer (focus / break, rounds, scroll to adjust), Snip, Keep awake, Clipboard history, Files, Terminal, Task Manager, Calculator, Lock, Sleep |
-| **Clipboard & Files** | Recently copied text (click to copy again), newest downloads & screenshots — drag them straight into any app |
+| **Clipboard & Files** | The shelf, recently copied text (click to copy again), newest downloads & screenshots — drag them straight into any app |
 | **Smart** | Battery-drain warnings, shaky-connection alerts, charge reminder, Downloads tidy-up, break reminder, optional meeting mode |
 | **Settings** | Every option as a switch |
 
@@ -94,7 +102,9 @@ or the "Bad connection" helper is on.
 
 ## Troubleshooting
 
-- **The notch didn't appear** — open *Dynamic Notch* from the Start menu. Check *Settings → Start with Windows* is on.
+- **The notch didn't appear** — it's a thin bar at the top edge by default: push the mouse against the top edge or press
+  <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd>. Still nothing? Open *Dynamic Notch* from the Start menu; if it can't start it now
+  says why. Check *Settings → Start with Windows* is on.
 - **Something looks wrong** — logs are in `%APPDATA%\DynamicNotch\app.log` and `error.log`; please attach them to an [issue](https://github.com/Prism99-collab/DynamicNotch/issues).
 - **Reset settings** — exit the notch from its tray icon, delete `%APPDATA%\DynamicNotch\settings.json`, and open it again.
 

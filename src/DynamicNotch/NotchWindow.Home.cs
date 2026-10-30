@@ -136,8 +136,11 @@ public partial class NotchWindow
     {
         bool has = _media.HasSession;
         var brush = ArtBrush(_media.Art);
-        ArtBox.Background = brush ?? (Brush)new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x21));
-        ArtPlaceholder.Visibility = brush == null ? Visibility.Visible : Visibility.Collapsed;
+        FlipArt(ArtBox, _media.Art, () =>
+        {
+            ArtBox.Background = brush ?? (Brush)new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x21));
+            ArtPlaceholder.Visibility = brush == null ? Visibility.Visible : Visibility.Collapsed;
+        });
         TitleText.Text = has && _media.Title.Length > 0 ? _media.Title : "Nothing playing";
         ArtistText.Text = has ? _media.Artist : "Play something in Spotify, YouTube…";
         PlayIcon.Visibility = _media.IsPlaying ? Visibility.Collapsed : Visibility.Visible;
@@ -246,7 +249,7 @@ public partial class NotchWindow
     void OnMediaChanged()
     {
         var brush = ArtBrush(_media.Art);
-        CompactArt.Background = brush ?? (Brush)new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2E));
+        FlipArt(CompactArt, _media.Art, () => CompactArt.Background = brush ?? (Brush)new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2E)));
         var accent = new SolidColorBrush(_media.Accent);
         accent.Freeze();
         foreach (var r in Eq.Children.OfType<Rectangle>()) r.Fill = accent;
@@ -352,6 +355,7 @@ public partial class NotchWindow
             double v = 0.35 + 0.65 * _voice;
             if (Math.Abs(SlimGlow.Opacity - v) > 0.01) SlimGlow.Opacity = v;
         }
+        if (callGlow && _mode == Mode.Activity) BeatAura(_voice * 1.2);
         if (!_eqRunning && !(_slimBeat && !callGlow)) return; // nothing else needs the speakers' level
         if (!_audio.TryGetPeaks(out float left, out float right))
         {
@@ -376,6 +380,7 @@ public partial class NotchWindow
                 if (Math.Abs(_eqBars[i].ScaleY - _eqLevel[i]) > 0.008) _eqBars[i].ScaleY = _eqLevel[i];
             }
         }
+        if (_mode == Mode.Media) BeatAura(loud * 1.4);
         if (_slimBeat && !callGlow)
         {
             _beat += (Math.Clamp(loud * 1.35, 0, 1) - _beat) * 0.3;

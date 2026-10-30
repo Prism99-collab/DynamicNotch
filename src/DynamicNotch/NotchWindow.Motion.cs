@@ -174,11 +174,18 @@ public partial class NotchWindow
     /// <summary>An alert with a colour casts a faint glow of it just below the notch; it fades with the alert.</summary>
     void UpdateAura(Color? c)
     {
-        if (c is { } k && _mode is Mode.Osd or Mode.Drop && !_hidden)
+        _auraLive = false;
+        // (not with a finger: the notch takes taps then, and the glow would catch the ones just below it)
+        if (c == null && !_hidden && !Eco && !_touchMode && _mode is Mode.Media or Mode.Activity)
         {
-            var size = _mode == Mode.Drop ? DropSize : _osdSize;
-            Aura.Width = size.Width + 90;
-            Aura.Height = size.Height + 44;
+            c = LiveAuraColor();
+            _auraLive = c != null;
+        }
+        if (c is { } k && _mode is Mode.Osd or Mode.Drop or Mode.Media or Mode.Activity && !_hidden)
+        {
+            var size = _mode switch { Mode.Drop => DropSize, Mode.Osd => _osdSize, Mode.Media => MediaSize, _ => ActivitySize };
+            Aura.Width = size.Width + (_auraLive ? 70 : 90);
+            Aura.Height = size.Height + (_auraLive ? 30 : 44);
             if (k != _auraFor)
             {
                 var g = new RadialGradientBrush
@@ -195,9 +202,43 @@ public partial class NotchWindow
                 Aura.Background = g;
                 _auraFor = k;
             }
-            Fade(Aura, 1, 260);
+            if (_auraLive && AuraBeats && _auraDriven) return; // the sound drives it already
+            _auraDriven = false;
+            Fade(Aura, _auraLive ? 0.45 : 1, 260);
         }
-        else Fade(Aura, 0, 220);
+        else { _auraDriven = false; Fade(Aura, 0, 220); }
+    }
+
+    bool _auraLive, _auraDriven;
+    double _auraLevel;
+
+    /// <summary>Music with a cover glows in its colour, a call in green (red muted), Focus in purple.</summary>
+    Color? LiveAuraColor() => _mode switch
+    {
+        Mode.Media when _media.Art != null && _media.Accent != Colors.White => _media.Accent,
+        Mode.Activity when CurrentActivity == LiveActivity.Call => ((SolidColorBrush)CallBrush).Color,
+        Mode.Activity when CurrentActivity == LiveActivity.Focus => ((SolidColorBrush)FocusPurple).Color,
+        _ => null,
+    };
+
+    bool AuraBeats => _mode == Mode.Media ? _eqRunning && !_eqFallback : CurrentActivity == LiveActivity.Call && _callBarsOn;
+
+    /// <summary>From the ~30 Hz meter: the glow under the notch swells with the beat or your voice.</summary>
+    void BeatAura(double level)
+    {
+        if (!_auraLive || !AuraBeats) return;
+        _auraLevel += (level - _auraLevel) * (level > _auraLevel ? 0.45 : 0.12);
+        if (!_auraDriven)
+        {
+            // take over from the fade-in without a jump
+            double cur = Aura.Opacity;
+            Aura.BeginAnimation(OpacityProperty, null);
+            Aura.Opacity = cur;
+            _auraDriven = true;
+        }
+        double o = 0.28 + 0.62 * Math.Clamp(_auraLevel, 0, 1);
+        o = Aura.Opacity + (o - Aura.Opacity) * 0.35;
+        if (Math.Abs(Aura.Opacity - o) > 0.004) Aura.Opacity = o;
     }
 
     // ───────────────────────────── stepping aside ─────────────────────────────
@@ -267,7 +308,7 @@ public partial class NotchWindow
     void UpdateDodge(Interop.Native.POINT p, bool atEdge)
     {
         bool want = false;
-        if (IsBase(_mode) && !_hidden && !atEdge && !_peek && _settings.SlimOverWindows)
+        if (IsBase(_mode) && !_hidden && !atEdge && !_peek && _settings.SlimOverWindows && !_touchMode) // a finger has no hover to step aside from
         {
             double margin = (_dodged ? 40 : 26) * _scale; // a little hysteresis so it doesn't flicker at the border
             double half = Math.Max(_sw.Value / 2 + 10, 64) * _scale + margin;
@@ -299,6 +340,7 @@ public partial class NotchWindow
         if (_focus.IsOn) list.Add(LiveActivity.Focus);
         if (_files.ActiveDownloads > 0) list.Add(LiveActivity.Download);
         if (_settings.ShowMediaActivity && _media.IsPlaying) list.Add(LiveActivity.Media);
+        ApplyPin(list); // what you picked on Home goes first
         return list;
     }
 
@@ -316,12 +358,23 @@ public partial class NotchWindow
     {
         var second = _mode is Mode.Media or Mode.Activity && !_hidden ? SecondActivity : LiveActivity.None;
         if (second != LiveActivity.None) FillSecond(second);
+        int more = second != LiveActivity.None ? Activities().Count - 2 : 0;
+        SecondMore.Text = more > 0 ? $"+{more}" : "";
+        SecondMore.Visibility = more > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         if (second == _secondShown) return;
         bool wasShown = _secondShown != LiveActivity.None;
         _secondShown = second;
 
-        if (second != LiveActivity.None && !wasShown)
+        if (second != LiveActivity.None && wasShown)
+        {
+            // the two islands traded places: a quick squeeze-and-pop says so
+            var swap = new DoubleAnimation(0.7, 1, TimeSpan.FromMilliseconds(480)) { EasingFunction = new SpringEase { Damping = 0.55 } };
+            SecondScale.BeginAnimation(ScaleTransform.ScaleXProperty, swap);
+            SecondScale.BeginAnimation(ScaleTransform.ScaleYProperty, swap);
+            SecondBubble.BeginAnimation(OpacityProperty, new DoubleAnimation(0.3, 1, TimeSpan.FromMilliseconds(260)));
+        }
+        else if (second != LiveActivity.None && !wasShown)
         {
             // split off: start tucked against the pill's edge, then slide out with a springy pop
             SecondBubble.Visibility = Visibility.Visible;
@@ -397,7 +450,19 @@ public partial class NotchWindow
                 SecondText.Text = _files.BytesPerSecond > 1024 ? $"{Services.SystemMonitor.Bytes(_files.BytesPerSecond)}/s" : Services.SystemMonitor.Bytes(_files.ActiveBytes);
                 rim = ((SolidColorBrush)Blue).Color;
                 break;
+            case LiveActivity.Call when _call is { } call:
+                // the calling app's icon and the call's running time, green (red when muted)
+                SecondArt.Background = call.Icon != null ? IconBrush(call.Icon) : null;
+                SecondArt.CornerRadius = new CornerRadius(5);
+                SecondArt.Visibility = call.Icon != null ? Visibility.Visible : Visibility.Collapsed;
+                SecondGlyph.Visibility = call.Icon != null ? Visibility.Collapsed : Visibility.Visible;
+                SecondGlyph.Text = "\uE717";
+                SecondGlyph.Foreground = SecondText.Foreground = CallBrush;
+                SecondText.Text = FormatTimer(DateTime.UtcNow - call.Started);
+                rim = ((SolidColorBrush)CallBrush).Color;
+                break;
             default: // music: the album cover as a tiny round disc
+                SecondArt.CornerRadius = new CornerRadius(9);
                 SecondArt.Background = ArtBrush(_media.Art) ?? (Brush)new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2E));
                 SecondArt.Visibility = Visibility.Visible;
                 SecondGlyph.Visibility = Visibility.Collapsed;
