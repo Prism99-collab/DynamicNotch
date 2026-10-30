@@ -16,7 +16,7 @@ namespace DynamicNotch;
 /// </summary>
 public partial class NotchWindow
 {
-    enum LiveActivity { None, Media, Download, Timer, Focus, Call }
+    enum LiveActivity { None, Media, Download, Timer, Focus, Call, Game }
     enum Prio { Low, Normal, High }
 
     /// <summary>One pop-up. <see cref="OnClick"/> makes it clickable; <see cref="OnWheel"/> lets the wheel adjust it.</summary>
@@ -258,6 +258,7 @@ public partial class NotchWindow
     {
         var req = new OsdRequest(kind, glyph, level, title, subtitle, right, art, glyphBrush, battery, seconds, force, prio, onClick, onWheel, motion);
         if (SilencedByMeeting(kind, force)) return;
+        if (InGame && kind != "battery") return; // nothing pops up in the middle of a game
         if (_focus.IsOn && !force && !FocusAllows(kind)) return;
         if (_hidden && !force) return;
         // a file is being dragged into the drop zone: don't yank it away, show this right after
@@ -771,7 +772,7 @@ public partial class NotchWindow
 
     void UpdatePrivacyBubble()
     {
-        bool show = (_privacy.MicInUse || _privacy.CamInUse) && _mode != Mode.Expanded && !_hidden;
+        bool show = (_privacy.MicInUse || _privacy.CamInUse) && _mode is not (Mode.Expanded or Mode.Game) && !_hidden;
         MicDot.Visibility = _privacy.MicInUse ? Visibility.Visible : Visibility.Collapsed;
         CamDot.Visibility = _privacy.CamInUse ? Visibility.Visible : Visibility.Collapsed;
         CamDot.Margin = new Thickness(_privacy.MicInUse ? 6 : 0, 0, 0, 0);

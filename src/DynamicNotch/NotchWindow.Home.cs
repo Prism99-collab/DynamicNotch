@@ -33,8 +33,8 @@ public partial class NotchWindow
         VolSlider.ValueChanged += v => { _lastUserChange = DateTime.UtcNow; _audio.SetVolume((float)v); VolGlyph.Text = VolumeGlyph(); };
         MuteBtn.Click += (_, _) => { _lastUserChange = DateTime.UtcNow; _audio.ToggleMute(); RefreshVolume(); };
         OutputBtn.Click += (_, _) => ShowDevices(!_devicesOpen);
-        OutputTab.Click += (_, _) => { _devicesInput = false; RenderDevices(); };
-        InputTab.Click += (_, _) => { _devicesInput = true; RenderDevices(); };
+        OutputTab.Click += (_, _) => { _devicesInput = false; _devicesMixer = false; StopMixer(); RenderDevices(); };
+        InputTab.Click += (_, _) => { _devicesInput = true; _devicesMixer = false; StopMixer(); RenderDevices(); };
         _audio.DevicesChanged += () => { if (_devicesOpen) RenderDevices(); };
         BriSlider.ValueChanged += v => { _lastUserChange = DateTime.UtcNow; _bri.Set((int)Math.Round(v * 100)); BriText.Text = $"{(int)Math.Round(v * 100)}"; };
         AppVolSlider.ValueChanged += v => { _audio.SetAppVolume((float)v); AppVolGlyph.Text = GlyphForLevel(v); };
@@ -413,6 +413,7 @@ public partial class NotchWindow
         if (open)
         {
             _devicesInput = false; // always opens on speakers / headphones
+            _devicesMixer = false;
             RenderDevices();
             _audio.RefreshDevices(); // just in case; the list on screen updates if anything changed
             DevicesPanel.Visibility = Visibility.Visible;
@@ -424,6 +425,7 @@ public partial class NotchWindow
         }
         else
         {
+            StopMixer();
             var a = new DoubleAnimation(0, TimeSpan.FromMilliseconds(120));
             a.Completed += (_, _) => { if (!_devicesOpen) DevicesPanel.Visibility = Visibility.Collapsed; };
             DevicesPanel.BeginAnimation(OpacityProperty, a);
@@ -439,8 +441,10 @@ public partial class NotchWindow
     /// <summary>Fills the device panel from the lists the audio service keeps ready (no waiting on Windows).</summary>
     void RenderDevices()
     {
+        if (_devicesMixer) { RenderMixer(); return; }
         StyleTab(OutputTab, !_devicesInput);
         StyleTab(InputTab, _devicesInput);
+        StyleTab(MixerTab, false);
         DevicesList.Children.Clear();
         var devices = _devicesInput ? _audio.Inputs : _audio.Outputs;
         if (devices.Count == 0)

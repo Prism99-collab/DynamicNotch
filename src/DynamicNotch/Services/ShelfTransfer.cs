@@ -163,7 +163,14 @@ public static class ShelfTransfer
             "soffice.bin", "scalc", "swriter", "simpress", "wps", "et", "wpp", "photoshop", "illustrator", "figma", "canva",
         };
 
-        /// <summary>The app under the cursor right now (the drop target asks while the drag is over it).</summary>
+        static IntPtr _lastWindow;
+        static bool _lastWasEditor;
+        static long _lastCheck;
+
+        /// <summary>
+        /// The app under the cursor right now (the drop target asks while the drag is over it, many times a second:
+        /// the answer is reused for 150 ms, and for as long as the cursor stays over the same window).
+        /// </summary>
         static bool OverEditor()
         {
             try
@@ -171,9 +178,14 @@ public static class ShelfTransfer
                 GetCursorPos(out var p);
                 IntPtr h = WindowFromPoint(p);
                 if (h == IntPtr.Zero) return false;
+                long now = Environment.TickCount64;
+                if (h == _lastWindow && now - _lastCheck < 150) return _lastWasEditor;
                 GetWindowThreadProcessId(h, out uint pid);
                 using var proc = Process.GetProcessById((int)pid);
-                return Editors.Contains(proc.ProcessName);
+                _lastWindow = h;
+                _lastCheck = now;
+                _lastWasEditor = Editors.Contains(proc.ProcessName);
+                return _lastWasEditor;
             }
             catch { return false; }
         }

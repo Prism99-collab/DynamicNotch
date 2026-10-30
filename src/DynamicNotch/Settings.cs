@@ -17,6 +17,8 @@ public sealed class Settings
     public bool AnimatedVisualizer { get; set; } = true;
     public bool HoverToOpen { get; set; } = true;
     public bool HideInFullscreen { get; set; } = true;
+    /// <summary>Game mode: a tiny frame-rate pill while a game is in front.</summary>
+    public bool GameStats { get; set; } = true;
     public bool SlimOverWindows { get; set; } = true;
     public bool StartWithWindows { get; set; } = true;
     public bool KeepRunning { get; set; } = true;

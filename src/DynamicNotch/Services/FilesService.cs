@@ -185,8 +185,8 @@ public sealed class FilesService
     /// </summary>
     void LookUpTotals()
     {
-        if (_lookingUp || (DateTime.UtcNow - _lastLookup).TotalSeconds < 4) return;
-        var missing = _items.Values.Where(d => d.Total <= 0 && DateTime.UtcNow - d.Started < TimeSpan.FromMinutes(3)).Select(d => d.Path).ToList();
+        if (_lookingUp || (DateTime.UtcNow - _lastLookup).TotalSeconds < 6) return;
+        var missing = _items.Values.Where(d => d.Total <= 0 && DateTime.UtcNow - d.Started < TimeSpan.FromMinutes(2)).Select(d => d.Path).ToList();
         if (missing.Count == 0) return;
         _lookingUp = true;
         _lastLookup = DateTime.UtcNow;
