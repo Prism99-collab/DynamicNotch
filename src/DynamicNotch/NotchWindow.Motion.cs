@@ -334,7 +334,8 @@ public partial class NotchWindow
     /// <summary>Everything live right now, most important first.</summary>
     List<LiveActivity> Activities()
     {
-        var list = new List<LiveActivity>(5);
+        var list = new List<LiveActivity>(6);
+        if (InGame) { list.Add(LiveActivity.Game); return list; } // you're playing: the frame rate alone, nothing to distract
         if (OnCall) list.Add(LiveActivity.Call); // a call beats everything
         if (_timerRunning) list.Add(LiveActivity.Timer);
         if (_focus.IsOn) list.Add(LiveActivity.Focus);

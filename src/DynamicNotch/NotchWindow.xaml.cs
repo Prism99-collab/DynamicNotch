@@ -18,11 +18,12 @@ namespace DynamicNotch;
 /// </summary>
 public partial class NotchWindow : Window
 {
-    enum Mode { Idle, Slim, Media, Activity, Osd, Expanded, Drop }
+    enum Mode { Idle, Slim, Media, Activity, Osd, Expanded, Drop, Game }
 
     // Shapes, in device-independent pixels (rendered crisply at the monitor's real DPI).
     static readonly Size IdleSize = new(150, 26), SlimSize = new(118, 6), MediaSize = new(252, 30),
-        ActivitySize = new(230, 30), ExpandedSize = new(440, 268), DropSize = new(380, 92);
+        ActivitySize = new(230, 30), ExpandedSize = new(440, 268), DropSize = new(380, 92),
+        GameSize = new(54, 18); // in a game: just the frame rate, as small as it can be
     const double IdleRadius = 13, SlimRadius = 3, MediaRadius = 15, ExpandedRadius = 30, DropRadius = 28;
     const int HotkeyId = 0x4E01;
 
@@ -83,7 +84,7 @@ public partial class NotchWindow : Window
         _files = new FilesService(Dispatcher);
         _notifications = new NotificationService(Dispatcher);
 
-        foreach (var p in new FrameworkElement[] { CompactMedia, CompactActivity, Osd, Expanded, DropPanel })
+        foreach (var p in new FrameworkElement[] { CompactMedia, CompactActivity, Osd, Expanded, DropPanel, GamePanel })
         {
             p.RenderTransformOrigin = new Point(0.5, 0);
             p.RenderTransform = new ScaleTransform(1, 1);
@@ -125,6 +126,8 @@ public partial class NotchWindow : Window
         Safe(nameof(WirePriority), WirePriority);
         Safe(nameof(WireSystemLive), WireSystemLive);
         Safe(nameof(WireTouch), WireTouch);
+        Safe(nameof(WireGame), WireGame);
+        Safe(nameof(WireMixer), WireMixer);
     }
 
     static void Safe(string what, Action action)
@@ -228,6 +231,20 @@ public partial class NotchWindow : Window
         catch (Exception ex) { Services.AppLog.Write("recover failed: " + ex.Message); }
     }
 
+    // In a game the notch is a 54 px pill: the window shrinks around it, so each refresh of the frame rate redraws
+    // a few thousand pixels instead of the whole 560 x 300 transparent window.
+    const double FullWidth = 560, FullHeight = 300, SmallWidth = 140, SmallHeight = 36;
+    bool _smallWindow;
+
+    void SetSmallWindow(bool small)
+    {
+        if (small == _smallWindow) return;
+        _smallWindow = small;
+        Width = small ? SmallWidth : FullWidth;
+        Height = small ? SmallHeight : FullHeight;
+        PositionWindow();
+    }
+
     void PositionWindow()
     {
         if (_hwnd == IntPtr.Zero) return;
@@ -295,6 +312,7 @@ public partial class NotchWindow : Window
     public void Shutdown()
     {
         _poll.Stop();
+        StopGameTracing(); // a frame-count trace must not outlive the notch
         _notificationSound.Dispose();
         if (_hwnd != IntPtr.Zero)
         {
@@ -337,6 +355,8 @@ public partial class NotchWindow : Window
         get
         {
             // over a window's tabs / title bar: step aside into the slim bar; a glowing line shows what's live
+            // (a game is the exception: the frame rate stays, in its own tiny pill)
+            if (CurrentActivity == LiveActivity.Game) return Mode.Game;
             if (_overWindow && _settings.SlimOverWindows) return Mode.Slim;
             switch (CurrentActivity)
             {
@@ -347,7 +367,7 @@ public partial class NotchWindow : Window
         }
     }
 
-    bool IsBase(Mode m) => m is Mode.Idle or Mode.Slim or Mode.Media or Mode.Activity;
+    bool IsBase(Mode m) => m is Mode.Idle or Mode.Slim or Mode.Media or Mode.Activity or Mode.Game;
 
     void RefreshBase()
     {
@@ -362,6 +382,8 @@ public partial class NotchWindow : Window
     {
         bool modeChanged = m != _mode;
         if (modeChanged) { HideTip(); HideLiveMenu(); }
+        if (m != Mode.Game) SetSmallWindow(false); // anything else gets the full window back before it starts to grow
+        else if (modeChanged) After(600, () => { if (_mode == Mode.Game) SetSmallWindow(true); }); // once the pill has settled
         _mode = m;
         if (m != Mode.Osd) _osd = null;
         if (m == Mode.Expanded) _osdQueue.Clear(); // you're looking at the notch already
@@ -374,6 +396,7 @@ public partial class NotchWindow : Window
             Mode.Osd => Osd,
             Mode.Media => CompactMedia,
             Mode.Activity => CompactActivity,
+            Mode.Game => GamePanel,
             _ => null,
         };
         if (m == Mode.Activity) UpdateActivityContent();
@@ -416,6 +439,7 @@ public partial class NotchWindow : Window
             case Mode.Osd: w = _osdSize.Width; h = _osdSize.Height; r = _osdSize.Height / 2; break;
             case Mode.Media: w = MediaSize.Width; h = MediaSize.Height; r = MediaRadius; break;
             case Mode.Activity: w = ActivitySize.Width; h = ActivitySize.Height; r = MediaRadius; break;
+            case Mode.Game: w = GameSize.Width; h = GameSize.Height; r = GameSize.Height / 2; break;
             case Mode.Slim: w = SlimSize.Width; h = SlimSize.Height; r = SlimRadius; break;
             default: w = IdleSize.Width; h = IdleSize.Height; r = IdleRadius; break;
         }
@@ -702,7 +726,8 @@ public partial class NotchWindow : Window
         // which would hide the notch forever; a real full-screen window is caught by the size check above.)
         if (!fullscreen && SHQueryUserNotificationState(out int state) == 0 && state == 3) fullscreen = true;
 
-        SetHidden(fullscreen && _settings.HideInFullscreen);
+        CheckGame(fg, fullscreen);
+        SetHidden(fullscreen && _settings.HideInFullscreen && !InGame); // in a game the stats pill stays
         if (over != _overWindow)
         {
             _overWindow = over;

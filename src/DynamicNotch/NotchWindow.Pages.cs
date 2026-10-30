@@ -284,12 +284,11 @@ public partial class NotchWindow
 
         NetDown.Text = SystemMonitor.Bytes(s.DownBps) + "/s";
         NetUp.Text = SystemMonitor.Bytes(s.UpBps) + "/s";
-        PushNetwork(s.DownBps, s.UpBps);
         var up = s.Uptime;
         UptimeText.Text = up.TotalDays >= 1 ? $"{(int)up.TotalDays}d {up.Hours}h" : $"{up.Hours}h {up.Minutes}m";
 
         RenderBattery(bt);
-        PushPower(bt);
+        UpdateChargeBolt(bt);
         RenderConnection(await pingTask);
     }
 
@@ -685,6 +684,7 @@ public partial class NotchWindow
         Add("Music visualizer", () => _settings.AnimatedVisualizer, v => _settings.AnimatedVisualizer = v);
         Add("Open at top edge", () => _settings.HoverToOpen, v => _settings.HoverToOpen = v);
         Add("Hide in full screen", () => _settings.HideInFullscreen, v => _settings.HideInFullscreen = v);
+        Add("FPS in games", () => _settings.GameStats && FpsService.AccountCanTrace(), SetFpsInGames);
         Add("Slim over windows", () => _settings.SlimOverWindows, v => _settings.SlimOverWindows = v);
         Add("Battery mode", () => _settings.EcoOnBattery, v => _settings.EcoOnBattery = v);
         Add("Always keep running", () => _settings.KeepRunning, v => { _settings.KeepRunning = v; KeepAlive.Sync(_settings); });

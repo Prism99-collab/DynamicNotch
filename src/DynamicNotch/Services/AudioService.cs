@@ -8,6 +8,9 @@ namespace DynamicNotch.Services;
 
 public sealed record AudioDevice(string Id, string Name, bool IsHeadphones, bool IsDefault);
 
+/// <summary>One app in the mixer: all of its sound sessions on the current output, as one volume.</summary>
+public sealed record MixerApp(string Key, string? Path, bool IsSystem, float Volume, bool Muted, bool Active);
+
 /// <summary>Volume, mute, microphone and output-device switching through Windows Core Audio. Fully event driven.</summary>
 public sealed class AudioService : IMMNotificationClient
 {
@@ -356,6 +359,125 @@ public sealed class AudioService : IMMNotificationClient
 
     // Everything here runs on background threads with its own device handle (Core Audio is free-threaded),
     // so opening the control center or dragging the slider never waits on the audio service.
+    // ───────────── mixer ─────────────
+    readonly object _mixGate = new();
+    MMDeviceEnumerator? _mixEnum;
+    MMDevice? _mixDevice;
+    readonly Dictionary<string, List<AudioSessionControl>> _mix = new(StringComparer.OrdinalIgnoreCase);
+    readonly System.Collections.Concurrent.ConcurrentDictionary<string, float> _mixPending = new();
+    int _mixBusy;
+
+    /// <summary>
+    /// Every app with a sound session on the current output (one entry per app, however many sessions it has),
+    /// plus Windows' own system sounds. Read off the UI thread; the sessions are kept for the volume writes.
+    /// </summary>
+    public Task<List<MixerApp>> MixerAppsAsync() => Task.Run(() =>
+    {
+        var result = new List<MixerApp>();
+        lock (_mixGate)
+        {
+            ReleaseMix();
+            try
+            {
+                _mixEnum ??= new MMDeviceEnumerator();
+                _mixDevice = _mixEnum.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                var mgr = _mixDevice.AudioSessionManager;
+                mgr.RefreshSessions();
+                var sessions = mgr.Sessions;
+                for (int i = 0; i < sessions.Count; i++)
+                {
+                    var s = sessions[i];
+                    try
+                    {
+                        if (s.State == AudioSessionState.AudioSessionStateExpired) { s.Dispose(); continue; }
+                        string key;
+                        if (s.IsSystemSoundsSession) key = "system";
+                        else
+                        {
+                            uint pid = s.GetProcessID;
+                            if (pid == 0 || pid == Environment.ProcessId) { s.Dispose(); continue; }
+                            key = Interop.Native.ProcessPathById(pid) ?? $"pid:{pid}";
+                        }
+                        if (!_mix.TryGetValue(key, out var list)) _mix[key] = list = new();
+                        list.Add(s);
+                    }
+                    catch { try { s.Dispose(); } catch { } }
+                }
+                foreach (var (key, list) in _mix)
+                {
+                    float vol = 0; bool muted = true, active = false;
+                    foreach (var s in list)
+                    {
+                        try
+                        {
+                            var sv = s.SimpleAudioVolume;
+                            vol = Math.Max(vol, sv.Volume);
+                            muted &= sv.Mute;
+                            active |= s.State == AudioSessionState.AudioSessionStateActive;
+                        }
+                        catch { }
+                    }
+                    bool system = key == "system";
+                    result.Add(new MixerApp(key, system || key.StartsWith("pid:") ? null : key, system, vol, muted, active));
+                }
+            }
+            catch { }
+        }
+        return result;
+    });
+
+    /// <summary>Called continuously while a mixer slider is dragged; only each app's latest value is written.</summary>
+    public void SetMixerVolume(string key, float v)
+    {
+        _mixPending[key] = Math.Clamp(v, 0f, 1f);
+        if (Interlocked.Exchange(ref _mixBusy, 1) == 1) return;
+        Task.Run(() =>
+        {
+            while (true)
+            {
+                foreach (var k in _mixPending.Keys.ToList())
+                {
+                    if (!_mixPending.TryRemove(k, out float level)) continue;
+                    lock (_mixGate)
+                    {
+                        if (!_mix.TryGetValue(k, out var list)) continue;
+                        foreach (var s in list)
+                        {
+                            try
+                            {
+                                var sv = s.SimpleAudioVolume;
+                                sv.Volume = level;
+                                if (sv.Mute && level > 0) sv.Mute = false; // dragging up unmutes, like Windows' own mixer
+                            }
+                            catch { }
+                        }
+                    }
+                }
+                Interlocked.Exchange(ref _mixBusy, 0);
+                if (_mixPending.IsEmpty || Interlocked.Exchange(ref _mixBusy, 1) == 1) return;
+            }
+        });
+    }
+
+    public void SetMixerMute(string key, bool mute) => Task.Run(() =>
+    {
+        lock (_mixGate)
+            if (_mix.TryGetValue(key, out var list))
+                foreach (var s in list) try { s.SimpleAudioVolume.Mute = mute; } catch { }
+    });
+
+    /// <summary>The mixer was closed: let go of the sessions.</summary>
+    public void ReleaseMixer() => Task.Run(() => { lock (_mixGate) ReleaseMix(); });
+
+    void ReleaseMix()
+    {
+        foreach (var list in _mix.Values)
+            foreach (var s in list) try { s.Dispose(); } catch { }
+        _mix.Clear();
+        try { _mixDevice?.Dispose(); } catch { }
+        _mixDevice = null;
+    }
+
     readonly object _appGate = new();
     readonly List<AudioSessionControl> _appSessions = new();
     MMDeviceEnumerator? _appEnum;

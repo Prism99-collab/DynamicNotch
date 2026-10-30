@@ -8,8 +8,8 @@ using DynamicNotch.Services;
 namespace DynamicNotch;
 
 /// <summary>
-/// The System page, live: a download card with the real progress (the browser's own total), the last minute of
-/// network traffic scrolling behind the speeds, and the battery card's power going in or out.
+/// The System page, live: a download card with the real progress (the browser's own total), and a bolt that
+/// breathes while the battery charges.
 /// </summary>
 public partial class NotchWindow
 {
@@ -19,22 +19,9 @@ public partial class NotchWindow
     int _dlDoneVersion;
     double _dlSheenSecs;
     Brush? _dlFillBrush;
-    static readonly Brush PowerOut = Frozen(Color.FromRgb(0xFF, 0xB3, 0x40));
 
     void WireSystemLive()
     {
-        LiveGraph.ClipRounded(NetGraphHost, 10);
-        LiveGraph.ClipRounded(PowerCardHost, 14);
-        LiveGraph.ClipRounded(DlHost, 14);
-        NetDownGraph.Color = ((SolidColorBrush)Green).Color;
-        NetUpGraph.FillOpacity = 0.16;
-        NetUpGraph.LineOpacity = 0.75;
-        NetUpGraph.Color = ((SolidColorBrush)Blue).Color;
-        PowerGraph.FillOpacity = 0.22;
-        PowerGraph.Color = ((SolidColorBrush)Green).Color;
-        DlGraph.FillOpacity = 0.2;
-        DlGraph.LineOpacity = 0.55;
-        DlGraph.Color = ((SolidColorBrush)Blue).Color;
         _dlFillBrush = DlFill.Background;
 
         _files.DownloadsChanged += () => { if (SystemVisible) RenderDownload(); };
@@ -56,13 +43,9 @@ public partial class NotchWindow
 
     bool SystemVisible => _mode == Mode.Expanded && _page == 1;
 
-    /// <summary>The page just came into view: fresh graphs (they only sample while you look) and the download card.</summary>
+    /// <summary>The page just came into view: the download card as it is now.</summary>
     void OnSystemShown()
     {
-        NetDownGraph.Clear();
-        NetUpGraph.Clear();
-        PowerGraph.Clear();
-        DlGraph.Clear();
         _dlShown = false;
         DlCard.Visibility = Visibility.Collapsed;
         SysCards.BeginAnimation(OpacityProperty, null);
@@ -70,26 +53,10 @@ public partial class NotchWindow
         RenderDownload();
     }
 
-    /// <summary>Feeds the network graph: download and upload share one scale so they compare honestly.</summary>
-    void PushNetwork(double down, double up)
+    /// <summary>A bolt that breathes beside "Charging at … W" while it charges.</summary>
+    void UpdateChargeBolt(BatteryDetails b)
     {
-        double max = Math.Max(Math.Max(NetDownGraph.Peak, NetUpGraph.Peak), Math.Max(down, up)) * 1.2;
-        NetDownGraph.Max = NetUpGraph.Max = Math.Max(max, 64 * 1024); // a quiet line stays low instead of filling the strip
-        NetDownGraph.Push(down, _sysTimer.Interval);
-        NetUpGraph.Push(up, _sysTimer.Interval);
-    }
-
-    /// <summary>Power in (charging, green) or out (on battery, amber), and a bolt that breathes while it charges.</summary>
-    void PushPower(BatteryDetails b)
-    {
-        if (!_power.HasBattery || !b.Present) { PowerGraph.Visibility = Visibility.Collapsed; ChargeBolt.Visibility = Visibility.Collapsed; return; }
-        PowerGraph.Visibility = Visibility.Visible;
-        bool charging = b.Charging;
-        PowerGraph.Color = charging ? ((SolidColorBrush)Green).Color : ((SolidColorBrush)PowerOut).Color;
-        PowerGraph.Floor = 5;
-        PowerGraph.Push(b.WattsNow ?? 0, _sysTimer.Interval);
-
-        bool bolt = charging && !Eco;
+        bool bolt = _power.HasBattery && b.Present && b.Charging && !Eco;
         if (bolt == (ChargeBolt.Visibility == Visibility.Visible)) return;
         ChargeBolt.Visibility = bolt ? Visibility.Visible : Visibility.Collapsed;
         if (bolt)
@@ -108,7 +75,6 @@ public partial class NotchWindow
         ShowDownloadCard(d != null || done);
         if (d == null && !done) return;
 
-        DlGraph.Push(_files.BytesPerSecond, TimeSpan.FromSeconds(1));
         if (done)
         {
             string name = Path.GetFileName(_dlDone!);

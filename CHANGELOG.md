@@ -3,6 +3,25 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Game mode: while a game is in front, the notch becomes the smallest pill it has, the live frame rate and nothing
+  else (no pop-ups, glow or side island). The rate is worked out from every real frame's timestamp, refreshed
+  20 times a second, for any game (DirectX 9 to 12, Vulkan, OpenGL), counted through the graphics kernel. Its window
+  shrinks around the pill while you play so it costs almost nothing. "FPS in games" in Settings; on a PC where the
+  account can't read frame events yet, switching it on asks Windows once.
+- Mini mixer: an Apps tab in the sound picker with every app's own volume and a mute on its icon.
+
+### Removed
+- The scrolling network and power graphs on the System page (the numbers stay).
+
+### Fixed
+- A game could be set up twice, and leaving one game for another quickly could stop the new frame count.
+- Turning on "FPS in games" no longer freezes the notch while Windows' permission prompt is open.
+- Dragging from the shelf no longer looks up the app under the cursor on every mouse move; the browser's download
+  list is read less often.
+
 ## [1.2.0] — 2026-10-30
 
 ### Added

@@ -41,6 +41,15 @@
                         </StackPanel>
                     </Grid>
 
+                    <!-- ===== In a game: the frame rate, nothing else ===== -->
+                    <Grid x:Name="GamePanel" Width="54" Height="18" HorizontalAlignment="Center" VerticalAlignment="Top" Visibility="Collapsed" Opacity="0">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,1">
+                            <TextBlock x:Name="GameFps" FontSize="11" FontWeight="SemiBold" Foreground="#D9FFFFFF" VerticalAlignment="Center"
+                                       FontFamily="Segoe UI Variable Display, Segoe UI" Typography.NumeralAlignment="Tabular" Text="–" />
+                            <TextBlock Text="fps" FontSize="8.5" Foreground="#73FFFFFF" VerticalAlignment="Center" Margin="2,1,0,0" />
+                        </StackPanel>
+                    </Grid>
+
                     <!-- ===== Compact generic activity (timer, download) ===== -->
                     <Grid x:Name="CompactActivity" Width="230" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
                           Visibility="Collapsed" Opacity="0">
@@ -304,10 +313,17 @@
                                                             <TextBlock Text="Output" FontSize="11.5" VerticalAlignment="Center" />
                                                         </StackPanel>
                                                     </Button>
-                                                    <Button x:Name="InputTab" Style="{StaticResource Capsule}" Height="24" Padding="11,0">
+                                                    <Button x:Name="InputTab" Style="{StaticResource Capsule}" Height="24" Padding="11,0" Margin="0,0,4,0">
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock Text="&#xE720;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
                                                             <TextBlock Text="Input" FontSize="11.5" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <!-- every app's own volume -->
+                                                    <Button x:Name="MixerTab" Style="{StaticResource Capsule}" Height="24" Padding="11,0">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="&#xE9E9;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                            <TextBlock Text="Apps" FontSize="11.5" VerticalAlignment="Center" />
                                                         </StackPanel>
                                                     </Button>
                                                 </StackPanel>
@@ -370,8 +386,8 @@
                                         <Grid Margin="22,0">
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="84" />
-                                                <RowDefinition Height="6" />
-                                                <RowDefinition Height="34" />
+                                                <RowDefinition Height="8" />
+                                                <RowDefinition Height="28" />
                                                 <RowDefinition Height="6" />
                                                 <RowDefinition Height="*" />
                                             </Grid.RowDefinitions>
@@ -406,12 +422,6 @@
                                                 </StackPanel>
                                             </UniformGrid>
                                             <Border Grid.Row="2" CornerRadius="10" Background="#17171A">
-                                                <Grid>
-                                                <!-- the last minute of download (green) and upload (blue), scrolling live -->
-                                                <Grid x:Name="NetGraphHost" IsHitTestVisible="False">
-                                                    <c:LiveGraph x:Name="NetDownGraph" />
-                                                    <c:LiveGraph x:Name="NetUpGraph" />
-                                                </Grid>
                                                 <Grid Margin="12,0">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition />
@@ -430,7 +440,6 @@
                                                         <TextBlock Text="&#xE823;" FontFamily="{StaticResource IconFont}" FontSize="11" Foreground="{StaticResource Dim}" VerticalAlignment="Center" />
                                                         <TextBlock x:Name="UptimeText" FontSize="11.5" Margin="6,0,0,0" />
                                                     </StackPanel>
-                                                </Grid>
                                                 </Grid>
                                             </Border>
                                             <Grid x:Name="SysCards" Grid.Row="4" Margin="0,0,0,8">
@@ -461,9 +470,7 @@
                                                 </Border>
                                                 <!-- battery health -->
                                                 <Border Grid.Column="2" CornerRadius="14" Background="#17171A">
-                                                    <Grid x:Name="PowerCardHost">
-                                                        <!-- watts going in (charging) or out, the last minute -->
-                                                        <c:LiveGraph x:Name="PowerGraph" Height="34" VerticalAlignment="Bottom" />
+                                                    <Grid>
                                                         <StackPanel VerticalAlignment="Center" Margin="13,8,13,8">
                                                             <Grid>
                                                                 <TextBlock Text="Battery health" FontSize="12" FontWeight="SemiBold" />
@@ -485,8 +492,7 @@
                                                 <Border.RenderTransform>
                                                     <TranslateTransform x:Name="DlCardShift" />
                                                 </Border.RenderTransform>
-                                                <Grid x:Name="DlHost">
-                                                    <c:LiveGraph x:Name="DlGraph" Height="40" VerticalAlignment="Bottom" />
+                                                <Grid>
                                                     <Grid Margin="12,9,13,10">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="36" />

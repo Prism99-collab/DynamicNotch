@@ -81,7 +81,7 @@ public partial class NotchWindow
 
     static int Rank(LiveActivity a) => a switch
     {
-        LiveActivity.Call => 0, LiveActivity.Media => 1, LiveActivity.Timer => 2, LiveActivity.Focus => 3, _ => 4,
+        LiveActivity.Game => -1, LiveActivity.Call => 0, LiveActivity.Media => 1, LiveActivity.Timer => 2, LiveActivity.Focus => 3, _ => 4,
     };
 
     /// <summary>Everything you could put in the notch: each live activity, and every player that's playing right now.</summary>
@@ -184,6 +184,7 @@ public partial class NotchWindow
                 LiveActivity.Media => "",
                 LiveActivity.Timer => "",
                 LiveActivity.Focus => "",
+                LiveActivity.Game => "\uE7FC",
                 _ => "",
             },
             FontFamily = (FontFamily)FindResource("IconFont"),
@@ -286,6 +287,7 @@ public partial class NotchWindow
         LiveActivity.Timer => ((SolidColorBrush)TimerBrush).Color,
         LiveActivity.Focus => ((SolidColorBrush)FocusPurple).Color,
         LiveActivity.Download => ((SolidColorBrush)Blue).Color,
+        LiveActivity.Game => ((SolidColorBrush)Green).Color,
         _ => Colors.White,
     };
 
@@ -296,6 +298,7 @@ public partial class NotchWindow
         LiveActivity.Call => _call?.Name is { } n ? $"Call · {n}" : "Call",
         LiveActivity.Timer => "Timer",
         LiveActivity.Focus => "Focus",
+        LiveActivity.Game => _game?.Name ?? "Game",
         _ => "Download",
     };
 
@@ -306,6 +309,7 @@ public partial class NotchWindow
         LiveActivity.Call => _audio.MicMuted ? "Muted" : "On a call" + (_call is { } c ? " · " + FormatTimer(DateTime.UtcNow - c.Started) : ""),
         LiveActivity.Timer => FormatTimer(_timerEnd - DateTime.UtcNow < TimeSpan.Zero ? TimeSpan.Zero : _timerEnd - DateTime.UtcNow) + " left",
         LiveActivity.Focus => "Notifications held",
+        LiveActivity.Game => _gameFps is { } f ? $"{f:0} fps" : "Playing",
         _ => "Downloading",
     };
 

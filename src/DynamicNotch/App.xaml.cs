@@ -95,6 +95,7 @@ public partial class App : Application
         AddCheck(menu, "Open by touching the top edge", () => _settings.HoverToOpen, v => _settings.HoverToOpen = v);
         AddCheck(menu, "Slim notch over browser tabs / windows", () => _settings.SlimOverWindows, v => _settings.SlimOverWindows = v);
         AddCheck(menu, "Hide in full-screen apps", () => _settings.HideInFullscreen, v => _settings.HideInFullscreen = v);
+        AddCheck(menu, "FPS in games", () => _settings.GameStats, v => _settings.GameStats = v);
         AddCheck(menu, "Battery mode when unplugged", () => _settings.EcoOnBattery, v => _settings.EcoOnBattery = v);
         AddCheck(menu, "Start with Windows", () => _settings.StartWithWindows, v =>
         {
