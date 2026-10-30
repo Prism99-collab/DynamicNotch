@@ -20,6 +20,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Jelly morph: height and width spring on their own timing, so the notch stretches organically.
 - The notch leans toward the cursor while you touch the top edge or hover a clickable alert.
 - Good news (done, connected, charging, full) gets a light sweep; alerts cast a soft glow of their colour below the notch.
+- Hover hints are drawn inside the notch (dark glass, in front of it) instead of white Windows tooltips hidden behind it.
 
 ### Fixed
 - The monitor brightness slider vanished after a reboot (handle 0 was taken for "no monitor"); both brightness
