@@ -161,7 +161,9 @@ public partial class NotchWindow : Window
     void OnDisplayChanged(object? s, EventArgs e) => Dispatcher.InvokeAsync(() =>
     {
         PositionWindow();
-        _ = _extBri.RefreshAsync(MonitorInUse()); // a monitor may have been plugged in or unplugged
+        // a monitor may have been plugged in, unplugged or switched on: look again, and keep looking a little while
+        _ = _extBri.RefreshAsync(MonitorInUse(), rescan: true);
+        _extBri.RetryUntilFound(MonitorInUse);
     });
 
     /// <summary>The screen of the window you're working in.</summary>
@@ -196,7 +198,8 @@ public partial class NotchWindow : Window
             if (_mode == Mode.Expanded) Collapse();
             else SetMode(BaseMode);
             _audio.Init();
-            _ = _extBri.RefreshAsync(MonitorInUse());
+            _ = _extBri.RefreshAsync(MonitorInUse(), rescan: true); // the monitor may still be waking up
+            _extBri.RetryUntilFound(MonitorInUse);
         }
         catch (Exception ex) { Services.AppLog.Write("recover failed: " + ex.Message); }
     }
@@ -689,7 +692,8 @@ public partial class NotchWindow : Window
         _power.Init();
         _focus.Init();
         _bri.Init();
-        _ = _extBri.RefreshAsync(MonitorInUse());
+        _ = _extBri.RefreshAsync(MonitorInUse(), rescan: true); // the monitor may still be waking up
+        _extBri.RetryUntilFound(MonitorInUse);
         _bt.Start();
         _privacy.Start();
         _files.Start();

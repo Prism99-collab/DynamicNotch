@@ -21,15 +21,31 @@ public sealed class BrightnessService
 
     static ManagementScope Scope => new(@"\\.\root\WMI");
 
-    public void Init() => Task.Run(() =>
+    /// <summary>
+    /// Finds the laptop panel's brightness. Right after a cold boot Windows' WMI service can be slow to answer,
+    /// so it keeps trying for about two minutes instead of hiding the slider for the whole session.
+    /// </summary>
+    public void Init() => Task.Run(async () =>
+    {
+        foreach (int seconds in new[] { 0, 3, 6, 10, 15, 25, 30, 40 })
+        {
+            if (seconds > 0) await Task.Delay(TimeSpan.FromSeconds(seconds));
+            if (Attach()) return;
+        }
+        AppLog.Write("laptop brightness: not available on this screen");
+    });
+
+    /// <summary>Reads the level; the first success also starts listening for brightness keys. True once attached.</summary>
+    bool Attach()
     {
         int l = Read();
-        if (l < 0) return;
+        if (l < 0) return false;
         _ui.InvokeAsync(() => { Supported = true; Level = l; Changed?.Invoke(false); });
+        if (_watch != null) return true;
         try
         {
-            _watch = new ManagementEventWatcher(Scope, new EventQuery("SELECT * FROM WmiMonitorBrightnessEvent"));
-            _watch.EventArrived += (_, e) =>
+            var watch = new ManagementEventWatcher(Scope, new EventQuery("SELECT * FROM WmiMonitorBrightnessEvent"));
+            watch.EventArrived += (_, e) =>
             {
                 // runs on a background thread: an exception here would end the whole app
                 int v;
@@ -43,16 +59,15 @@ public sealed class BrightnessService
                     Changed?.Invoke(!self);
                 });
             };
-            _watch.Start();
+            watch.Start();
+            _watch = watch;
         }
         catch { }
-    });
+        return true;
+    }
 
-    public Task RefreshAsync() => Task.Run(() =>
-    {
-        int l = Read();
-        if (l >= 0) _ui.InvokeAsync(() => { Level = l; Changed?.Invoke(false); });
-    });
+    /// <summary>Re-reads the level (control center opened); also recovers a slider that was missing.</summary>
+    public Task RefreshAsync() => Task.Run(() => Attach());
 
     static int Read()
     {
