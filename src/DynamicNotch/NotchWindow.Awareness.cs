@@ -35,6 +35,23 @@ public partial class NotchWindow
     /// An app's first window came to the front within a few seconds of the app starting: a short
     /// "Opening ..." with its icon. Switching between apps that were already open never triggers it.
     /// </summary>
+    /// <summary>
+    /// First start on this PC: the notch introduces itself (it's minimal by default, a thin bar at the top edge,
+    /// easy to miss), then opens briefly so you see what it does.
+    /// </summary>
+    void Welcome()
+    {
+        if (_settings.Welcomed) return;
+        _settings.Welcomed = true;
+        _settings.Save();
+        Services.AppLog.Write("first start: welcome");
+        After(900, () =>
+        {
+            ShowOsd("welcome", "\uE7E8", null, "Dynamic Notch is on", "Mouse to the top edge, or Win+Alt+N", null,
+                glyphBrush: Blue, seconds: 6, force: true, motion: Motion.Pulse, onClick: () => Expand(byHotkey: true));
+        });
+    }
+
     async void OnForegroundChanged(IntPtr hwnd)
     {
         if (!_settings.AppLaunchAlerts || !_alertsReady || hwnd == IntPtr.Zero || hwnd == _hwnd) return;

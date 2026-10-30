@@ -3,26 +3,47 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.2.0] — 2026-10-30
 
 ### Added
 - File shelf: drag a file, picture or text up to the notch and it morphs into a drop zone (marching outline,
   bobbing arrow, what's already kept fanned out); let go and it swallows it. Drag things back out from the new
-  Shelf tab on the Clipboard & Files page. Kept across restarts.
+  Shelf tab on the Clipboard & Files page. Kept across restarts. Dragging out adapts to the app: Excel, Word,
+  PowerPoint and other editors get the picture or text itself, folders and chats get the file; a Copy button
+  puts it on the clipboard for Ctrl+V anywhere. Pictures from a browser or an Office app, and Outlook
+  attachments, are kept as real files.
 - Live call activity: while Discord, Teams, Zoom, WhatsApp, Slack, a browser (Meet)… records from a microphone, the
   notch becomes a call pill (app icon, live dot, voice bars that move with you, timer; red when muted). The control
   center shows a call card with a big mute button and "back to the call".
 - "Opening …" alert with the app's icon when an app starts (switch in Settings and the tray menu).
 - Keyboard language alerts (Win+Space / Alt+Shift), screen connected / disconnected, and "Fully charged" on the charger.
+- Choose what the notch shows when several things are live: a switcher on Home lists the call, the timer, Focus,
+  downloads and every tab or app playing sound (each browser tab separately); a "+N" list when they don't fit.
+  During a call with music, scroll or drag the Home card to flip between them. Tap the side island on a touch screen to swap.
+- System page, live: a download card with the real progress from the browser ("24 MB of 65 MB · 5 MB/s · 9 s left"),
+  then Open / Show in folder; the last minute of network traffic scrolling behind the speeds; the battery card's
+  charging or discharging watts as a live graph with a pulsing bolt.
+- Touch screens and pens: tap the notch to open it, swipe up to close, lists scroll with a finger.
+- A hello on the first start, so a new install is never mistaken for "nothing happened".
+- Hover hints drawn inside the notch (dark glass, in front of it) instead of white Windows tooltips hidden behind it.
 
 ### Changed
 - The music visualizer follows the real sound; the slim glow over windows pulses with it.
 - Jelly morph: height and width spring on their own timing, so the notch stretches organically.
 - The notch leans toward the cursor while you touch the top edge or hover a clickable alert.
 - Good news (done, connected, charging, full) gets a light sweep; alerts cast a soft glow of their colour below the notch.
-- Hover hints are drawn inside the notch (dark glass, in front of it) instead of white Windows tooltips hidden behind it.
+- Crisper edges: a one-pixel rim that fades up the sides, a faint glass bevel when idle, and a glow under live
+  music or calls that moves with the sound.
+- Opening the notch: rows rise in one after another; album covers flip to the next song.
+- App and notification icons are loaded in high resolution.
+- Installed as a normal app folder with its own .NET runtime instead of one self-extracting file: nothing is
+  unpacked to a temp folder at start (some antivirus tools and locked-down PCs blocked that).
 
 ### Fixed
+- On some PCs the notch didn't appear after installing: one feature failing at start (no Bluetooth radio, no
+  battery, no audio device...) took the whole notch down silently. Each feature now starts on its own, and if
+  the notch can't start at all it says why. A "presentation mode" flag left on by some PCs no longer hides it.
+- The Home card could go blank after a call ended.
 - The monitor brightness slider vanished after a reboot (handle 0 was taken for "no monitor"); both brightness
   sliders now retry after startup, wake and display changes instead of disappearing.
 
@@ -79,5 +100,6 @@ First public release.
 - Starts at sign-in and comes back after lock, sleep or a crash; Exit keeps it off until reopened.
 - Dark tray menu, automatic battery mode, about 1 % of one CPU core when idle.
 
+[1.2.0]: https://github.com/Prism99-collab/DynamicNotch/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Prism99-collab/DynamicNotch/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Prism99-collab/DynamicNotch/releases/tag/v1.0.0

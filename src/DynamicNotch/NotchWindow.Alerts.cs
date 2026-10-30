@@ -242,6 +242,7 @@ public partial class NotchWindow
                 ActGlyph.Text = "";
                 ActGlyph.Foreground = ActText.Foreground = Blue;
                 string count = _files.ActiveDownloads > 1 ? $"{_files.ActiveDownloads} · " : "";
+                if (_files.Items.FirstOrDefault()?.Progress is { } share) count += $"{share * 100:0}% · ";
                 ActText.Text = _files.BytesPerSecond > 1024
                     ? $"{count}{SystemMonitor.Bytes(_files.BytesPerSecond)}/s"
                     : $"{count}{SystemMonitor.Bytes(_files.ActiveBytes)}";
@@ -396,10 +397,33 @@ public partial class NotchWindow
             Mode.Activity when CurrentActivity == LiveActivity.Focus => ((SolidColorBrush)FocusPurple).Color,
             _ => null,
         };
-        byte alpha = _mode == Mode.Expanded ? (byte)0x55 : (byte)0x80;
-        var target = c is { } k ? Color.FromArgb(alpha, k.R, k.G, k.B) : Color.FromArgb(0, 0, 0, 0);
-        if (Rim.BorderBrush is not SolidColorBrush rb || rb.IsFrozen) Rim.BorderBrush = rb = new SolidColorBrush(Colors.Transparent);
-        rb.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(target, TimeSpan.FromMilliseconds(260)));
+        // a colour: bright along the bottom, fading up the sides into the screen's edge.
+        // nothing live: a faint glass bevel so the black shape still reads crisp on a dark wallpaper.
+        Color k = c ?? Colors.White;
+        double strength = c != null ? (_mode == Mode.Expanded ? 0.42 : 0.62) : _mode switch
+        {
+            Mode.Slim => 0,
+            Mode.Expanded => 0.13,
+            _ => 0.10,
+        };
+        Color At(double f) => Color.FromArgb((byte)Math.Round(255 * strength * f), k.R, k.G, k.B);
+        if (Rim.BorderBrush is not LinearGradientBrush g || g.IsFrozen)
+        {
+            g = new LinearGradientBrush { StartPoint = new Point(0.5, 0), EndPoint = new Point(0.5, 1), MappingMode = BrushMappingMode.RelativeToBoundingBox };
+            g.GradientStops.Add(new GradientStop(Colors.Transparent, 0));
+            g.GradientStops.Add(new GradientStop(Colors.Transparent, 0.5));
+            g.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
+            Rim.BorderBrush = g;
+        }
+        double[] f = { 0, 0.45, 1 };
+        var dur = TimeSpan.FromMilliseconds(320);
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        for (int i = 0; i < 3; i++)
+            g.GradientStops[i].BeginAnimation(GradientStop.ColorProperty, new ColorAnimation(At(f[i]), dur) { EasingFunction = ease });
+        // exactly one device pixel: a hairline that stays sharp at any display scaling
+        double px = Math.Max(1, Math.Round(_scale)) / Math.Max(1, _scale);
+        Rim.BorderThickness = new Thickness(px, 0, px, px);
+        if (_mode != Mode.Drop) UpdateAura(_mode == Mode.Osd ? _osdAccent : null); // the drop zone sets its own
     }
 
     // ───────────────────────────── focus ─────────────────────────────

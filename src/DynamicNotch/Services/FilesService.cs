@@ -21,6 +21,38 @@ public sealed class FilesService
     public long ActiveBytes { get; private set; }
     public double BytesPerSecond { get; private set; }
 
+    /// <summary>One download in progress: what it is, how much has arrived, how fast, and its full size when the browser says.</summary>
+    public sealed class Download
+    {
+        public string Path { get; init; } = "";
+        public DateTime Started { get; init; } = DateTime.UtcNow;
+        public long Bytes { get; internal set; }
+        public double Speed { get; internal set; }
+        public long Total { get; internal set; }
+        public string? Target { get; internal set; }
+
+        /// <summary>The file's real name: the browser's target, else the partial file's name without ".crdownload".</summary>
+        public string Name
+        {
+            get
+            {
+                if (Target != null) return System.IO.Path.GetFileName(Target);
+                string n = System.IO.Path.GetFileNameWithoutExtension(Path);
+                return n.StartsWith("Unconfirmed", StringComparison.OrdinalIgnoreCase) ? "Starting download…" : n;
+            }
+        }
+
+        public double? Progress => Total > 0 ? Math.Clamp(Bytes / (double)Total, 0, 1) : null;
+        public TimeSpan? Left => Total > 0 && Speed > 1024 ? TimeSpan.FromSeconds(Math.Max(0, Total - Bytes) / Speed) : null;
+    }
+
+    readonly Dictionary<string, Download> _items = new(StringComparer.OrdinalIgnoreCase);
+    bool _lookingUp;
+    DateTime _lastLookup;
+
+    /// <summary>Downloads in progress, newest first.</summary>
+    public IReadOnlyList<Download> Items => _items.Values.OrderByDescending(d => d.Started).ToList();
+
     public event Action? DownloadsChanged;
     public event Action<string>? DownloadCompleted;
     /// <summary>A download disappeared before finishing (file name).</summary>
@@ -72,6 +104,10 @@ public sealed class FilesService
     {
         if (_active.ContainsKey(path)) return;
         _active[path] = 0;
+        // a rename from "Unconfirmed 123.crdownload" to "name.crdownload" is the same download: keep its history
+        var carried = _items.Values.FirstOrDefault(d => !_active.ContainsKey(d.Path) && !File.Exists(d.Path));
+        if (carried != null) _items.Remove(carried.Path);
+        _items[path] = new Download { Path = path, Started = carried?.Started ?? DateTime.UtcNow, Bytes = carried?.Bytes ?? 0, Speed = carried?.Speed ?? 0, Total = carried?.Total ?? 0, Target = carried?.Target };
         if (!_sizeTimer.IsEnabled) _sizeTimer.Start();
         DownloadsChanged?.Invoke();
     }
@@ -80,6 +116,7 @@ public sealed class FilesService
     {
         bool wasTemp = IsTemp(oldPath), isTemp = IsTemp(newPath);
         if (wasTemp) _active.Remove(oldPath);
+        if (wasTemp && !isTemp) _items.Remove(oldPath);
         if (isTemp) Track(newPath);
         else if (wasTemp) Completed(newPath);
         if (wasTemp || isTemp) DownloadsChanged?.Invoke();
@@ -88,6 +125,7 @@ public sealed class FilesService
 
     void OnDeleted(string path)
     {
+        _items.Remove(path);
         if (!_active.Remove(path)) return;
         // Firefox: "file.zip.part" disappears once "file.zip" is complete
         string final = path[..^Path.GetExtension(path).Length];
@@ -109,6 +147,7 @@ public sealed class FilesService
     void StopIfIdle()
     {
         if (_active.Count > 0) return;
+        _items.Clear();
         _sizeTimer.Stop();
         ActiveBytes = 0;
         BytesPerSecond = 0;
@@ -124,13 +163,47 @@ public sealed class FilesService
                 var fi = new FileInfo(p);
                 if (!fi.Exists) { _active.Remove(p); continue; }
                 total += fi.Length;
+                if (_items.TryGetValue(p, out var d))
+                {
+                    d.Speed = d.Speed * 0.5 + Math.Max(0, fi.Length - d.Bytes) * 0.5;
+                    d.Bytes = fi.Length;
+                }
             }
             catch { }
         }
+        foreach (var gone in _items.Keys.Where(k => !_active.ContainsKey(k)).ToList()) _items.Remove(gone);
         BytesPerSecond = BytesPerSecond * 0.5 + Math.Max(0, total - ActiveBytes) * 0.5;
         ActiveBytes = total;
         StopIfIdle();
+        LookUpTotals();
         DownloadsChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Asks the browsers for the full size of downloads that don't have one yet. They save it a few seconds after
+    /// a download starts, so this retries every few seconds, off the UI thread, and stops once every size is known.
+    /// </summary>
+    void LookUpTotals()
+    {
+        if (_lookingUp || (DateTime.UtcNow - _lastLookup).TotalSeconds < 4) return;
+        var missing = _items.Values.Where(d => d.Total <= 0 && DateTime.UtcNow - d.Started < TimeSpan.FromMinutes(3)).Select(d => d.Path).ToList();
+        if (missing.Count == 0) return;
+        _lookingUp = true;
+        _lastLookup = DateTime.UtcNow;
+        Task.Run(BrowserDownloads.InProgress).ContinueWith(t => _ui.InvokeAsync(() =>
+        {
+            _lookingUp = false;
+            if (t.IsFaulted) return;
+            bool found = false;
+            foreach (var d in _items.Values)
+            {
+                if (d.Total > 0 || !t.Result.TryGetValue(d.Path, out var info)) continue;
+                if (info.Total > 0) d.Total = info.Total;
+                d.Target = info.Target ?? d.Target;
+                found = true;
+            }
+            if (found) DownloadsChanged?.Invoke();
+        }));
     }
 
     /// <summary>Newest files across Downloads, Screenshots and Desktop.</summary>

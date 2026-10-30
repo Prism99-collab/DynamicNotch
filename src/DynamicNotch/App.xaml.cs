@@ -60,9 +60,21 @@ public partial class App : Application
         System.Windows.Media.Animation.Timeline.DesiredFrameRateProperty.OverrideMetadata(
             typeof(System.Windows.Media.Animation.Timeline), new FrameworkPropertyMetadata { DefaultValue = (int?)Interop.Native.RefreshRate() });
         AppLog.Write($"started ({(restarted ? "after a crash" : auto ? "automatically" : "by user/login")}), pid {Environment.ProcessId}");
-        _window = new NotchWindow(_settings);
-        _window.Show();
-        BuildTray();
+        try
+        {
+            _window = new NotchWindow(_settings);
+            _window.Show();
+        }
+        catch (Exception ex)
+        {
+            // never run invisibly: tell the user what happened and where the details are
+            AppLog.Write($"FATAL (startup): {ex}");
+            MessageBox.Show($"Dynamic Notch couldn't start on this PC.\n\n{ex.GetBaseException().Message}\n\nDetails are in {Path.Combine(Settings.Folder, "app.log")}",
+                "Dynamic Notch", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
+            return;
+        }
+        try { BuildTray(); } catch (Exception ex) { AppLog.Write("tray icon skipped: " + ex.Message); }
         KeepAlive.Sync(_settings); // start-at-sign-in and keep-alive, repaired on every launch
     }
 

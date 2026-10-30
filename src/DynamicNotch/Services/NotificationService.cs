@@ -134,7 +134,7 @@ public sealed class NotificationService
             ImageSource? icon = null;
             try
             {
-                var logo = n.AppInfo?.DisplayInfo?.GetLogo(new Windows.Foundation.Size(64, 64));
+                var logo = n.AppInfo?.DisplayInfo?.GetLogo(new Windows.Foundation.Size(256, 256));
                 if (logo != null)
                 {
                     using var ras = await logo.OpenReadAsync();
@@ -145,7 +145,7 @@ public sealed class NotificationService
                     var bmp = new BitmapImage();
                     bmp.BeginInit();
                     bmp.CacheOption = BitmapCacheOption.OnLoad;
-                    bmp.DecodePixelWidth = 64;
+                    bmp.DecodePixelWidth = 128; // crisp at any display scaling
                     bmp.StreamSource = ms;
                     bmp.EndInit();
                     bmp.Freeze();

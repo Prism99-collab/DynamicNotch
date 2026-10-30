@@ -112,14 +112,31 @@ public partial class NotchWindow : Window
         SourceInitialized += OnSourceInitialized;
         Loaded += async (_, _) => await InitServicesAsync();
 
-        WireHome();
-        WirePages();
-        WireAlerts();
-        WireSmart();
-        WireAwareness();
-        WireShelf();
-        WireCall();
-        WireTips();
+        // each feature starts on its own: one that can't (no Bluetooth radio, no battery, no audio device on
+        // this PC...) is logged and skipped, and the notch still comes up
+        Safe(nameof(WireHome), WireHome);
+        Safe(nameof(WirePages), WirePages);
+        Safe(nameof(WireAlerts), WireAlerts);
+        Safe(nameof(WireSmart), WireSmart);
+        Safe(nameof(WireAwareness), WireAwareness);
+        Safe(nameof(WireShelf), WireShelf);
+        Safe(nameof(WireCall), WireCall);
+        Safe(nameof(WireTips), WireTips);
+        Safe(nameof(WirePriority), WirePriority);
+        Safe(nameof(WireSystemLive), WireSystemLive);
+        Safe(nameof(WireTouch), WireTouch);
+    }
+
+    static void Safe(string what, Action action)
+    {
+        try { action(); }
+        catch (Exception ex) { Services.AppLog.Write($"startup: {what} skipped: {ex.GetBaseException().Message}"); }
+    }
+
+    static async Task SafeAsync(string what, Func<Task> action)
+    {
+        try { await action(); }
+        catch (Exception ex) { Services.AppLog.Write($"startup: {what} skipped: {ex.GetBaseException().Message}"); }
     }
 
     // ───────────────────────────── window plumbing ─────────────────────────────
@@ -261,7 +278,8 @@ public partial class NotchWindow : Window
     /// or while something is being dragged toward it. Otherwise everything under it keeps working.
     /// </summary>
     void RefreshClickThrough() =>
-        SetClickThrough(!(_mode is Mode.Expanded or Mode.Drop || (_mode == Mode.Osd && _osd?.OnClick != null) || _dropArmed));
+        SetClickThrough(!(_mode is Mode.Expanded or Mode.Drop || (_mode == Mode.Osd && _osd?.OnClick != null) || _dropArmed
+            || (_touchMode && IsBase(_mode) && !_hidden))); // with a finger the notch itself takes the tap (only its own pixels)
 
     void SetClickThrough(bool on)
     {
@@ -337,12 +355,13 @@ public partial class NotchWindow : Window
         else if (_mode == Mode.Activity) UpdateActivityContent();
         UpdateSecond();
         UpdateSlimGlow(); // the live activity may have changed while staying slim
+        RenderSwitch();
     }
 
     void SetMode(Mode m)
     {
         bool modeChanged = m != _mode;
-        if (modeChanged) HideTip();
+        if (modeChanged) { HideTip(); HideLiveMenu(); }
         _mode = m;
         if (m != Mode.Osd) _osd = null;
         if (m == Mode.Expanded) _osdQueue.Clear(); // you're looking at the notch already
@@ -367,8 +386,7 @@ public partial class NotchWindow : Window
         UpdateEqualizer();
         UpdatePrivacyBubble();
         UpdateOsdChrome();
-        UpdateRim();
-        if (m != Mode.Osd) UpdateAura(null); // the glow leaves with the pop-up
+        UpdateRim(); // and the glow under the notch: the pop-up's colour, or what's live
         UpdateSecond();
         UpdateSlimGlow();
         UpdateCallUi();
@@ -560,6 +578,7 @@ public partial class NotchWindow : Window
         if (_hidden) Fade(Shell, 1, 150);
         RefreshExpanded();
         SetMode(Mode.Expanded);
+        PlayEntrance();
         _tick.Start();
         OnPageShown(_page);
         KeepOnTop();
@@ -611,7 +630,7 @@ public partial class NotchWindow : Window
             bool wasAtEdge = _atEdge;
             _atEdge = atEdge;
             UpdateDodge(p, atEdge);
-            UpdateLean(p, atEdge || _osdHover || _mode == Mode.Drop); // the drop zone leans toward the dragged file
+            UpdateLean(p, !_touchMode && (atEdge || _osdHover || _mode == Mode.Drop)); // the drop zone leans toward the dragged file
             if (atEdge != _peek && IsBase(_mode))
             {
                 _peek = atEdge;
@@ -679,7 +698,9 @@ public partial class NotchWindow : Window
                 over = r.Top <= _mon.Top + 12 * _scale && r.Left < cx + half && r.Right > cx - half;
             }
         }
-        if (!fullscreen && SHQueryUserNotificationState(out int state) == 0 && state is 3 or 4) fullscreen = true; // D3D game / presentation
+        // a D3D game in exclusive full screen. ("Presentation mode" isn't trusted: some PCs leave it on for good,
+        // which would hide the notch forever; a real full-screen window is caught by the size check above.)
+        if (!fullscreen && SHQueryUserNotificationState(out int state) == 0 && state == 3) fullscreen = true;
 
         SetHidden(fullscreen && _settings.HideInFullscreen);
         if (over != _overWindow)
@@ -725,23 +746,27 @@ public partial class NotchWindow : Window
 
     async Task InitServicesAsync()
     {
-        _audio.Init();
-        _power.Init();
-        _focus.Init();
-        _bri.Init();
-        _ = _extBri.RefreshAsync(MonitorInUse(), rescan: true); // the monitor may still be waking up
-        _extBri.RetryUntilFound(MonitorInUse);
-        _bt.Start();
-        _privacy.Start();
-        _files.Start();
-        await _media.InitAsync();
-        await _radio.InitAsync();
+        Safe("audio", _audio.Init);
+        Safe("power", _power.Init);
+        Safe("focus", _focus.Init);
+        Safe("brightness", _bri.Init);
+        Safe("monitor brightness", () =>
+        {
+            _ = _extBri.RefreshAsync(MonitorInUse(), rescan: true); // the monitor may still be waking up
+            _extBri.RetryUntilFound(MonitorInUse);
+        });
+        Safe("bluetooth", _bt.Start);
+        Safe("privacy", _privacy.Start);
+        Safe("files", _files.Start);
+        await SafeAsync("media", _media.InitAsync);
+        await SafeAsync("network", _radio.InitAsync);
         _lastNetwork = _radio.NetworkName;
-        OnMediaChanged();
+        Safe("media ui", OnMediaChanged);
         _alertsReady = true;
-        ApplyPowerProfile();
-        await Dispatcher.InvokeAsync(PrewarmPanels, DispatcherPriority.ApplicationIdle);
-        await _notifications.InitAsync();
+        Safe("power profile", ApplyPowerProfile);
+        await Dispatcher.InvokeAsync(() => Safe("prewarm", PrewarmPanels), DispatcherPriority.ApplicationIdle);
+        Safe("welcome", Welcome);
+        await SafeAsync("notifications", _notifications.InitAsync);
         Services.AppLog.Write($"notifications: {_notifications.Status} | render tier: {System.Windows.Media.RenderCapability.Tier >> 16}, mode: {(HwndSource.FromHwnd(_hwnd)?.CompositionTarget as HwndTarget)?.RenderMode}");
     }
 }

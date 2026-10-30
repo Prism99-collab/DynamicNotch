@@ -44,7 +44,7 @@ public partial class NotchWindow
         Drop += OnShelfDrop;
         ShelfTab.Click += (_, _) => { _shelfTab = true; RenderShelfOrRecent(); };
         RecentTab.Click += (_, _) => { _shelfTab = false; RenderShelfOrRecent(); };
-        ShelfClear.Click += (_, _) => { _shelf.Clear(); SaveShelf(); RenderShelfOrRecent(); };
+        ShelfClear.Click += (_, _) => { foreach (var i in _shelf) Forget(i); _shelf.Clear(); SaveShelf(); RenderShelfOrRecent(); };
 
         // the drop zone's life: marching dashed outline and a bobbing arrow (only animate while it's on screen)
         DropPanel.IsVisibleChanged += (_, _) =>
@@ -105,7 +105,8 @@ public partial class NotchWindow
     }
 
     static bool HasShelfData(IDataObject d) =>
-        d.GetDataPresent(DataFormats.FileDrop) || d.GetDataPresent(DataFormats.UnicodeText) || d.GetDataPresent(DataFormats.Text);
+        d.GetDataPresent(DataFormats.FileDrop) || d.GetDataPresent(DataFormats.UnicodeText) || d.GetDataPresent(DataFormats.Text) ||
+        d.GetDataPresent(DataFormats.Bitmap) || d.GetDataPresent("PNG") || d.GetDataPresent("FileGroupDescriptorW");
 
     void OnShelfDragEnter(object sender, DragEventArgs e)
     {
@@ -147,6 +148,21 @@ public partial class NotchWindow
         if (hot) FlashRim(((SolidColorBrush)Blue).Color);
     }
 
+    void CopyShelfItem(ShelfItem item, Button row)
+    {
+        _ignoreClipboardUntil = DateTime.UtcNow.AddMilliseconds(800);
+        try { ShelfTransfer.CopyToClipboard(item.Path, item.Text); } catch { }
+        FlashRow(row);
+        ShowOsd("copied", "\uE8C8", null, "Copied", item.Path != null ? $"{item.Name} · Ctrl+V to paste" : "Ctrl+V to paste", null, glyphBrush: Blue, seconds: 1.6, prio: Prio.Low);
+    }
+
+    /// <summary>A picture the shelf saved itself is deleted with it; your own files are never touched.</summary>
+    static void Forget(ShelfItem item)
+    {
+        if (item.Path == null || !ShelfTransfer.IsOwned(item.Path)) return;
+        try { File.Delete(item.Path); } catch { }
+    }
+
     void LeaveDropZone()
     {
         if (_mode != Mode.Drop) return;
@@ -163,14 +179,10 @@ public partial class NotchWindow
     {
         e.Handled = true;
         var added = new List<ShelfItem>();
-        try
-        {
-            if (e.Data.GetData(DataFormats.FileDrop) is string[] files)
-                added.AddRange(files.Where(f => !string.IsNullOrWhiteSpace(f)).Select(f => new ShelfItem(f, null)));
-            else if ((e.Data.GetData(DataFormats.UnicodeText) ?? e.Data.GetData(DataFormats.Text)) is string text && text.Trim().Length > 0)
-                added.Add(new ShelfItem(null, text.Trim().Length > 20000 ? text.Trim()[..20000] : text.Trim()));
-        }
-        catch { }
+        // files as they are; a picture or a file that only lives inside the app is saved as a real file first
+        var (files, text) = ShelfTransfer.Capture(e.Data);
+        added.AddRange(files.Select(f => new ShelfItem(f, null)));
+        if (added.Count == 0 && text != null) added.Add(new ShelfItem(null, text));
         e.Effects = added.Count > 0 ? DragDropEffects.Copy : DragDropEffects.None;
         SetDropArmed(false);
         if (added.Count == 0) { LeaveDropZone(); return; }
@@ -180,7 +192,7 @@ public partial class NotchWindow
             _shelf.RemoveAll(s => s.Path != null && string.Equals(s.Path, item.Path, StringComparison.OrdinalIgnoreCase) || s.Text != null && s.Text == item.Text);
             _shelf.Insert(0, item);
         }
-        while (_shelf.Count > ShelfMax) _shelf.RemoveAt(_shelf.Count - 1);
+        while (_shelf.Count > ShelfMax) { Forget(_shelf[^1]); _shelf.RemoveAt(_shelf.Count - 1); }
         SaveShelf();
         Gulp(added);
     }
@@ -270,6 +282,7 @@ public partial class NotchWindow
             var row = new Grid();
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
             row.ColumnDefinitions.Add(new ColumnDefinition());
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
             var icon = new Border { Width = 22, Height = 22, CornerRadius = new CornerRadius(5), HorizontalAlignment = HorizontalAlignment.Left,
                 Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2E)), Child = item.Path == null ? Glyph("", 11, DimBrush) : null };
@@ -282,18 +295,23 @@ public partial class NotchWindow
             text.Children.Add(new TextBlock { Text = item.Path == null ? "Text" : size >= 0 ? SystemMonitor.Bytes(size) : "Folder", FontSize = 10, Foreground = DimBrush });
             Grid.SetColumn(text, 1);
             row.Children.Add(text);
+            // copy: for Ctrl+V into anything that pastes (cells, documents, chats...)
+            var copy = new Button { Style = (Style)FindResource("CircleButton"), Width = 22, Height = 22, Content = Glyph("\uE8C8", 10, DimBrush), ToolTip = "Copy (then Ctrl+V anywhere)" };
+            Grid.SetColumn(copy, 2);
+            row.Children.Add(copy);
             var remove = new Button { Style = (Style)FindResource("CircleButton"), Width = 22, Height = 22, Content = Glyph("", 9, DimBrush), ToolTip = "Remove from the shelf" };
-            Grid.SetColumn(remove, 2);
-            remove.Click += (_, e) => { e.Handled = true; _shelf.Remove(item); SaveShelf(); RenderShelfOrRecent(); };
+            Grid.SetColumn(remove, 3);
+            remove.Click += (_, e) => { e.Handled = true; Forget(item); _shelf.Remove(item); SaveShelf(); RenderShelfOrRecent(); };
             row.Children.Add(remove);
 
             var btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = 36,
-                ToolTip = item.Path != null ? "Drag out into any app · click to open" : "Drag out into any app · click to copy" };
+                ToolTip = item.Path != null ? "Drag into any app (Excel, Word, a chat, a folder) · click to open" : "Drag into any app · click to copy" };
+            copy.Click += (_, e) => { e.Handled = true; CopyShelfItem(item, btn); };
             btn.Click += (_, _) =>
             {
                 if (_dragOut) return;
                 if (item.Path != null) OpenPath(item.Path);
-                else { _ignoreClipboardUntil = DateTime.UtcNow.AddMilliseconds(600); try { Clipboard.SetText(item.Text!); } catch { } FlashRow(btn); }
+                else CopyShelfItem(item, btn);
             };
             btn.PreviewMouseLeftButtonDown += (_, e) => _fileDown = e.GetPosition(this);
             btn.PreviewMouseMove += (_, e) =>
@@ -306,8 +324,11 @@ public partial class NotchWindow
                 _maybeSwipe = false;
                 try
                 {
-                    var data = item.Path != null ? new DataObject(DataFormats.FileDrop, new[] { item.Path }) : new DataObject(DataFormats.UnicodeText, item.Text ?? "");
-                    DragDrop.DoDragDrop(btn, data, DragDropEffects.Copy | DragDropEffects.Move);
+                    // the data answers each app in the shape it takes: a picture for Excel / Word, the file for a folder
+                    var data = new DataObject(new ShelfTransfer.AdaptiveData(item.Path, item.Text));
+                    // pictures we saved ourselves are copied, never moved away from the shelf
+                    var allowed = item.Path != null && ShelfTransfer.IsOwned(item.Path) ? DragDropEffects.Copy : DragDropEffects.Copy | DragDropEffects.Move;
+                    DragDrop.DoDragDrop(btn, data, allowed);
                 }
                 catch { }
                 finally { _dragOut = false; }

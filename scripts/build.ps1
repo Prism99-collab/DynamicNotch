@@ -36,7 +36,10 @@ if (Test-Path $artifacts) { Remove-Item $artifacts -Recurse -Force }
 
 foreach ($arch in "x64", "arm64") {
   Write-Host "  [$arch] publishing..."
-  dotnet publish $project -c Release -r "win-$arch" -p:PublishSingleFile=true -p:Version=$Version -o (Join-Path $publish "win-$arch") --nologo -v quiet
+  # a normal app folder with the .NET runtime inside: nothing to install on the PC, and nothing unpacked
+  # into a temp folder at every start (which some antivirus tools and locked-down PCs block)
+  dotnet publish $project -c Release -r "win-$arch" --self-contained true -p:PublishReadyToRun=true -p:DebugType=none `
+    -p:Version=$Version -o (Join-Path $publish "win-$arch") --nologo -v quiet
   if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $arch" }
 
   Write-Host "  [$arch] packaging installer..."

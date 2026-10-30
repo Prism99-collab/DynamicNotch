@@ -47,6 +47,7 @@ public partial class NotchWindow
         _callTick.Tick += (_, _) =>
         {
             if (_mode == Mode.Activity && CurrentActivity == LiveActivity.Call) UpdateActivityContent();
+            else if (_secondShown == LiveActivity.Call) { FillSecond(LiveActivity.Call); PlaceSecond(); }
             if (_mode == Mode.Expanded && _page == 0) UpdateCallUi();
         };
         CallMuteBtn.Click += (_, _) =>
@@ -124,6 +125,7 @@ public partial class NotchWindow
         if (path == null) name = packaged ? parts.FirstOrDefault()?.Split('.').Last() ?? "Call" : System.IO.Path.GetFileNameWithoutExtension(key);
 
         bool switched = _call != null;
+        if (!switched) ResetPriority(); // a new call takes the front
         _call = new CallState(key, name, icon, path, switched ? _call!.Started : DateTime.UtcNow);
         _callTick.Start();
         UpdateCallUi();
@@ -139,6 +141,7 @@ public partial class NotchWindow
         var call = _call!;
         _call = null;
         _callTick.Stop();
+        ResetPriority();
         var length = DateTime.UtcNow - call.Started;
         AppLog.Write($"call ended: {call.Name} after {length:hh\\:mm\\:ss}");
         UpdateCallUi();
@@ -192,8 +195,7 @@ public partial class NotchWindow
     void UpdateCallUi()
     {
         bool on = OnCall;
-        CallRow.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        MediaRow.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+        if (!CardFlipping) ApplyCardVisibility();
         if (on && _call is { } call)
         {
             var brush = CallBrush;

@@ -16,7 +16,15 @@
             <Path x:Name="EarL" Width="10" Height="10" VerticalAlignment="Top" Fill="Black"
                   Data="M0,0 L10,0 L10,10 A10,10 0 0 0 0,0 Z" />
 
-            <Border x:Name="Pill" Background="Black" Width="118" Height="6" CornerRadius="0,0,3,3" VerticalAlignment="Top">
+            <Border x:Name="Pill" Width="118" Height="6" CornerRadius="0,0,3,3" VerticalAlignment="Top">
+                <!-- pure black where it meets the bezel, a breath lighter at the bottom for depth -->
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                        <GradientStop Color="#000000" Offset="0" />
+                        <GradientStop Color="#000000" Offset="0.55" />
+                        <GradientStop Color="#0B0B0E" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
                 <Grid x:Name="Stage">
 
                     <!-- ===== Compact music activity ===== -->
@@ -121,7 +129,7 @@
 
                     <!-- ===== Expanded: swipeable pages ===== -->
                     <Grid x:Name="Expanded" Width="440" Height="268" HorizontalAlignment="Center" VerticalAlignment="Top"
-                          Visibility="Collapsed" Opacity="0">
+                          Visibility="Collapsed" Opacity="0" UseLayoutRounding="True">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="34" />
                             <RowDefinition Height="216" />
@@ -138,6 +146,19 @@
                             </StackPanel>
                             <TextBlock x:Name="PageTitle" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource Dim}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <!-- with several things live: pick which one the notch shows -->
+                            <Grid x:Name="LiveSwitch" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                                <Border x:Name="LiveHighlight" Width="30" Height="22" CornerRadius="11" BorderThickness="1"
+                                        HorizontalAlignment="Left" IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5">
+                                    <Border.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform x:Name="LiveHighlightScale" />
+                                            <TranslateTransform x:Name="LiveHighlightShift" />
+                                        </TransformGroup>
+                                    </Border.RenderTransform>
+                                </Border>
+                                <StackPanel x:Name="LiveChips" Orientation="Horizontal" Margin="0,0,-4,0" />
+                            </Grid>
                             <StackPanel x:Name="BatteryPanel" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand">
                                 <TextBlock x:Name="PrivacyText" FontFamily="{StaticResource IconFont}" FontSize="11" Margin="0,0,8,0" VerticalAlignment="Center" />
                                 <TextBlock x:Name="BatteryText" FontSize="12" Foreground="#D9FFFFFF" Margin="0,0,7,0" VerticalAlignment="Center" />
@@ -220,6 +241,12 @@
                                                 </StackPanel>
                                             </Grid>
 
+                                            <!-- a call and music at once: two dots say there's another card (scroll / drag up or down) -->
+                                            <StackPanel x:Name="CardDots" Width="4" Margin="-12,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                        Visibility="Collapsed" IsHitTestVisible="False">
+                                                <Border Width="4" Height="14" CornerRadius="2" Margin="0,0,0,3" />
+                                                <Border Width="4" Height="4" CornerRadius="2" />
+                                            </StackPanel>
                                             <!-- on a call: the call card takes the music's place -->
                                             <Grid x:Name="CallRow" Visibility="Collapsed">
                                                 <Grid.ColumnDefinitions>
@@ -284,7 +311,7 @@
                                                         </StackPanel>
                                                     </Button>
                                                 </StackPanel>
-                                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
+                                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
                                                     <!-- soft bottom edge: a longer list reads as "scroll for more" instead of a cut-off row -->
                                                     <ScrollViewer.OpacityMask>
                                                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
@@ -343,8 +370,8 @@
                                         <Grid Margin="22,0">
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="84" />
-                                                <RowDefinition Height="8" />
-                                                <RowDefinition Height="28" />
+                                                <RowDefinition Height="6" />
+                                                <RowDefinition Height="34" />
                                                 <RowDefinition Height="6" />
                                                 <RowDefinition Height="*" />
                                             </Grid.RowDefinitions>
@@ -379,6 +406,12 @@
                                                 </StackPanel>
                                             </UniformGrid>
                                             <Border Grid.Row="2" CornerRadius="10" Background="#17171A">
+                                                <Grid>
+                                                <!-- the last minute of download (green) and upload (blue), scrolling live -->
+                                                <Grid x:Name="NetGraphHost" IsHitTestVisible="False">
+                                                    <c:LiveGraph x:Name="NetDownGraph" />
+                                                    <c:LiveGraph x:Name="NetUpGraph" />
+                                                </Grid>
                                                 <Grid Margin="12,0">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition />
@@ -398,8 +431,9 @@
                                                         <TextBlock x:Name="UptimeText" FontSize="11.5" Margin="6,0,0,0" />
                                                     </StackPanel>
                                                 </Grid>
+                                                </Grid>
                                             </Border>
-                                            <Grid Grid.Row="4" Margin="0,2,0,8">
+                                            <Grid x:Name="SysCards" Grid.Row="4" Margin="0,0,0,8">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition />
                                                     <ColumnDefinition Width="10" />
@@ -426,17 +460,87 @@
                                                     </StackPanel>
                                                 </Border>
                                                 <!-- battery health -->
-                                                <Border Grid.Column="2" CornerRadius="14" Background="#17171A" Padding="13,8,13,8">
-                                                    <StackPanel VerticalAlignment="Center">
-                                                        <Grid>
-                                                            <TextBlock Text="Battery health" FontSize="12" FontWeight="SemiBold" />
-                                                            <TextBlock x:Name="HealthText" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
-                                                        </Grid>
-                                                        <TextBlock x:Name="DrawText" FontSize="10.5" Foreground="{StaticResource Dim}" Margin="0,2,0,0" />
-                                                        <TextBlock x:Name="CapacityText" FontSize="11" Margin="0,5,0,0" />
-                                                    </StackPanel>
+                                                <Border Grid.Column="2" CornerRadius="14" Background="#17171A">
+                                                    <Grid x:Name="PowerCardHost">
+                                                        <!-- watts going in (charging) or out, the last minute -->
+                                                        <c:LiveGraph x:Name="PowerGraph" Height="34" VerticalAlignment="Bottom" />
+                                                        <StackPanel VerticalAlignment="Center" Margin="13,8,13,8">
+                                                            <Grid>
+                                                                <TextBlock Text="Battery health" FontSize="12" FontWeight="SemiBold" />
+                                                                <TextBlock x:Name="HealthText" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                                            </Grid>
+                                                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                                <TextBlock x:Name="ChargeBolt" Text="&#xE945;" FontFamily="{StaticResource IconFont}" FontSize="10" Foreground="#30D158"
+                                                                           VerticalAlignment="Center" Margin="0,0,4,0" Visibility="Collapsed" />
+                                                                <TextBlock x:Name="DrawText" FontSize="10.5" Foreground="{StaticResource Dim}" />
+                                                            </StackPanel>
+                                                            <TextBlock x:Name="CapacityText" FontSize="11" Margin="0,5,0,0" />
+                                                        </StackPanel>
+                                                    </Grid>
                                                 </Border>
                                             </Grid>
+                                            <!-- a download in progress: name, live speed, real progress (the browser's own total) -->
+                                            <Border x:Name="DlCard" Grid.Row="4" Margin="0,0,0,8" CornerRadius="14" Background="#1A1A1E" BorderBrush="#260A84FF" BorderThickness="1"
+                                                    Visibility="Collapsed" Opacity="0">
+                                                <Border.RenderTransform>
+                                                    <TranslateTransform x:Name="DlCardShift" />
+                                                </Border.RenderTransform>
+                                                <Grid x:Name="DlHost">
+                                                    <c:LiveGraph x:Name="DlGraph" Height="40" VerticalAlignment="Bottom" />
+                                                    <Grid Margin="12,9,13,10">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="36" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="*" />
+                                                            <RowDefinition Height="Auto" />
+                                                        </Grid.RowDefinitions>
+                                                        <Border x:Name="DlIcon" Width="34" Height="34" CornerRadius="8" Background="#262629" VerticalAlignment="Center">
+                                                            <TextBlock x:Name="DlGlyph" Text="&#xE896;" FontFamily="{StaticResource IconFont}" FontSize="15" Foreground="#0A84FF"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,8,0">
+                                                            <TextBlock x:Name="DlName" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock x:Name="DlDetail" FontSize="10.5" Foreground="{StaticResource Dim}" Margin="0,2,0,0"
+                                                                       TextTrimming="CharacterEllipsis" Typography.NumeralAlignment="Tabular" />
+                                                        </StackPanel>
+                                                        <TextBlock x:Name="DlPercent" Grid.Column="2" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                                   FontFamily="Segoe UI Variable Display, Segoe UI" Typography.NumeralAlignment="Tabular" />
+                                                        <StackPanel x:Name="DlActions" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
+                                                            <Button x:Name="DlOpen" Style="{StaticResource Capsule}" Height="28" Padding="12,0" Content="Open" />
+                                                            <Button x:Name="DlFolder" Style="{StaticResource CircleButton}" Width="28" Height="28" Margin="6,0,0,0" ToolTip="Show in folder">
+                                                                <TextBlock Text="&#xE838;" FontFamily="{StaticResource IconFont}" FontSize="12" />
+                                                            </Button>
+                                                        </StackPanel>
+                                                        <!-- progress: the real share when the size is known, a travelling light while it isn't -->
+                                                        <Grid x:Name="DlTrack" Grid.Row="1" Grid.ColumnSpan="3" Height="5" Margin="0,8,0,0" ClipToBounds="True">
+                                                            <Border CornerRadius="2.5" Background="#22FFFFFF" />
+                                                            <Border x:Name="DlFill" CornerRadius="2.5" HorizontalAlignment="Left" Width="0">
+                                                                <Border.Background>
+                                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                                        <GradientStop Color="#0A84FF" Offset="0" />
+                                                                        <GradientStop Color="#64D2FF" Offset="1" />
+                                                                    </LinearGradientBrush>
+                                                                </Border.Background>
+                                                            </Border>
+                                                            <Border x:Name="DlSheen" Width="70" HorizontalAlignment="Left" CornerRadius="2.5">
+                                                                <Border.Background>
+                                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                                        <GradientStop Color="#00FFFFFF" Offset="0" />
+                                                                        <GradientStop Color="#A0FFFFFF" Offset="0.5" />
+                                                                        <GradientStop Color="#00FFFFFF" Offset="1" />
+                                                                    </LinearGradientBrush>
+                                                                </Border.Background>
+                                                                <Border.RenderTransform>
+                                                                    <TranslateTransform x:Name="DlSheenShift" />
+                                                                </Border.RenderTransform>
+                                                            </Border>
+                                                        </Grid>
+                                                    </Grid>
+                                                </Grid>
+                                            </Border>
                                         </Grid>
                                     </Grid>
 
@@ -599,6 +703,20 @@
                             </Canvas>
                         </Grid>
 
+                        <!-- "+N": everything live in one list, when the chips don't fit -->
+                        <Border x:Name="LiveMenu" Grid.Row="1" Grid.RowSpan="2" Width="270" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                Margin="0,2,0,0" Padding="6" CornerRadius="14" Background="#F51C1C1F" BorderBrush="#2AFFFFFF" BorderThickness="1"
+                                Visibility="Collapsed" Opacity="0" Panel.ZIndex="10" RenderTransformOrigin="0.5,0">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="LiveMenuScale" />
+                            </Border.RenderTransform>
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="18" ShadowDepth="4" Direction="270" Opacity="0.6" Color="Black" />
+                            </Border.Effect>
+                            <ScrollViewer MaxHeight="196" VerticalScrollBarVisibility="Auto" PanningMode="VerticalOnly">
+                                <StackPanel x:Name="LiveMenuList" />
+                            </ScrollViewer>
+                        </Border>
                         <StackPanel x:Name="Dots" Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,2" />
                     </Grid>
 
@@ -612,7 +730,7 @@
                     <!-- slim over a window but something's live: a thin line glowing in the music's / activity's colour -->
                     <Border x:Name="SlimGlow" Height="2.5" CornerRadius="1.25" VerticalAlignment="Bottom" Margin="12,0,12,1"
                             IsHitTestVisible="False" Opacity="0" />
-                    <Border x:Name="Rim" BorderThickness="1,0,1,1.2" CornerRadius="0,0,3,3" IsHitTestVisible="False" BorderBrush="Transparent" />
+                    <Border x:Name="Rim" BorderThickness="1,0,1,1" CornerRadius="0,0,3,3" IsHitTestVisible="False" BorderBrush="Transparent" />
                 </Grid>
             </Border>
 
@@ -636,6 +754,8 @@
                     <TextBlock x:Name="SecondGlyph" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center" />
                     <TextBlock x:Name="SecondText" FontSize="12" FontWeight="SemiBold" Margin="6,0,0,0" VerticalAlignment="Center"
                                FontFamily="Segoe UI Variable Display, Segoe UI" Typography.NumeralAlignment="Tabular" />
+                    <TextBlock x:Name="SecondMore" FontSize="10" FontWeight="SemiBold" Foreground="#8CFFFFFF" Margin="5,0,0,0" VerticalAlignment="Center"
+                               Visibility="Collapsed" />
                 </StackPanel>
             </Grid>
         </Border>
