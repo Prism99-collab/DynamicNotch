@@ -119,6 +119,7 @@ public partial class NotchWindow : Window
         WireAwareness();
         WireShelf();
         WireCall();
+        WireTips();
     }
 
     // ───────────────────────────── window plumbing ─────────────────────────────
@@ -341,6 +342,7 @@ public partial class NotchWindow : Window
     void SetMode(Mode m)
     {
         bool modeChanged = m != _mode;
+        if (modeChanged) HideTip();
         _mode = m;
         if (m != Mode.Osd) _osd = null;
         if (m == Mode.Expanded) _osdQueue.Clear(); // you're looking at the notch already

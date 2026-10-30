@@ -661,5 +661,20 @@
         <!-- drag catcher: invisible but hit-testable, switched on only while something is dragged toward the notch -->
         <Border x:Name="DropCatcher" Width="540" Height="110" HorizontalAlignment="Center" VerticalAlignment="Top"
                 Background="#01000000" Visibility="Collapsed" />
+        <!-- hover hints, drawn in the notch so they sit in front and match it -->
+        <Border x:Name="Tip" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False" Visibility="Collapsed" Opacity="0"
+                Background="#F2232326" BorderBrush="#30FFFFFF" BorderThickness="1" CornerRadius="10" Padding="10,6,10,7"
+                RenderTransformOrigin="0.5,0">
+            <Border.RenderTransform>
+                <TransformGroup>
+                    <ScaleTransform x:Name="TipScale" />
+                    <TranslateTransform x:Name="TipShift" />
+                </TransformGroup>
+            </Border.RenderTransform>
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="14" ShadowDepth="3" Direction="270" Opacity="0.55" Color="Black" />
+            </Border.Effect>
+            <TextBlock x:Name="TipText" MaxWidth="280" TextWrapping="Wrap" FontSize="11.5" Foreground="#EBFFFFFF" LineHeight="16" />
+        </Border>
     </Grid>
 </Window>
