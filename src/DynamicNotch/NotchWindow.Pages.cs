@@ -118,6 +118,7 @@ public partial class NotchWindow
     {
         page = Math.Clamp(page, 0, PageNames.Length - 1);
         bool changed = page != _page;
+        if (changed) HideTip();
         _page = page;
         _pageX.Configure(SpringStyle.Page);
         _pageX.Active = true;
