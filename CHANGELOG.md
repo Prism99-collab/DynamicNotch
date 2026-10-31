@@ -3,6 +3,24 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Lock: a gold button in the control center (also in Settings and the tray menu). Locked, the notch keeps showing
+  music, calls, alerts and the FPS pill but reacts to nothing: no opening at the top edge, no file drops, no
+  clicks, no touch gestures. A click on its tray icon (or Win+Alt+N) unlocks it. It stays locked across restarts.
+- "Drop files on the notch" switch in Settings.
+- The open notch takes the colour of the app you're on: a deep glow of it fades in behind the panel, the rim lights
+  up in it and the sliders wear it. A call, download, timer, Focus or a colourful album cover still lead with their
+  own colour.
+- Quick toggles have their own colours (Wi-Fi blue, Bluetooth indigo, Focus purple), dimmer when on but not connected.
+- Sliders come alive under the pointer: a soft knob springs in, the track thickens while dragging; the brightness
+  icons glow with the level.
+
+### Fixed
+- Dragging a desktop icon near the top of the screen turned the notch into a drop zone: it now wakes only when the
+  dragged thing is on the notch itself.
+
 ## [1.3.0] — 2026-10-31
 
 ### Added

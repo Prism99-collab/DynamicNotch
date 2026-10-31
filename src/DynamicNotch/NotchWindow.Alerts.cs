@@ -393,7 +393,8 @@ public partial class NotchWindow
         Color? c = _mode switch
         {
             Mode.Osd => _osdAccent,
-            Mode.Media or Mode.Expanded when _media.HasSession && _media.Art != null && _media.Accent != Colors.White => _media.Accent,
+            Mode.Expanded => ExpandedRimColor(), // the panel's glow has an edge in the same colour
+            Mode.Media when _media.HasSession && _media.Art != null && _media.Accent != Colors.White => _media.Accent,
             Mode.Activity when CurrentActivity == LiveActivity.Call => ((SolidColorBrush)CallBrush).Color,
             Mode.Activity when CurrentActivity == LiveActivity.Focus => ((SolidColorBrush)FocusPurple).Color,
             _ => null,
@@ -401,7 +402,7 @@ public partial class NotchWindow
         // a colour: bright along the bottom, fading up the sides into the screen's edge.
         // nothing live: a faint glass bevel so the black shape still reads crisp on a dark wallpaper.
         Color k = c ?? Colors.White;
-        double strength = c != null ? (_mode == Mode.Expanded ? 0.42 : 0.62) : _mode switch
+        double strength = c != null ? (_mode == Mode.Expanded ? 0.58 : 0.62) : _mode switch
         {
             Mode.Slim => 0,
             Mode.Expanded => 0.13,

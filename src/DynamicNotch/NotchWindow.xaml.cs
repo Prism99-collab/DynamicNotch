@@ -128,6 +128,8 @@ public partial class NotchWindow : Window
         Safe(nameof(WireTouch), WireTouch);
         Safe(nameof(WireGame), WireGame);
         Safe(nameof(WireMixer), WireMixer);
+        Safe(nameof(WireLock), WireLock);
+        Safe(nameof(WireColors), WireColors);
     }
 
     static void Safe(string what, Action action)
@@ -271,7 +273,8 @@ public partial class NotchWindow : Window
                 return new IntPtr(MA_NOACTIVATE);
             case WM_HOTKEY when wParam.ToInt32() == HotkeyId:
                 handled = true;
-                if (_mode == Mode.Expanded) Collapse(); else Expand(byHotkey: true);
+                if (_settings.Locked) { SetLocked(false); Expand(byHotkey: true); } // the shortcut is deliberate: it unlocks
+                else if (_mode == Mode.Expanded) Collapse(); else Expand(byHotkey: true);
                 break;
             case WM_CLIPBOARDUPDATE:
                 Dispatcher.InvokeAsync(OnClipboardChanged, DispatcherPriority.Background);
@@ -295,7 +298,7 @@ public partial class NotchWindow : Window
     /// or while something is being dragged toward it. Otherwise everything under it keeps working.
     /// </summary>
     void RefreshClickThrough() =>
-        SetClickThrough(!(_mode is Mode.Expanded or Mode.Drop || (_mode == Mode.Osd && _osd?.OnClick != null) || _dropArmed
+        SetClickThrough(_settings.Locked && _mode != Mode.Expanded || !(_mode is Mode.Expanded or Mode.Drop || (_mode == Mode.Osd && _osd?.OnClick != null) || _dropArmed
             || (_touchMode && IsBase(_mode) && !_hidden))); // with a finger the notch itself takes the tap (only its own pixels)
 
     void SetClickThrough(bool on)
@@ -376,6 +379,7 @@ public partial class NotchWindow : Window
         UpdateSecond();
         UpdateSlimGlow(); // the live activity may have changed while staying slim
         RenderSwitch();
+        UpdatePanelTint();
     }
 
     void SetMode(Mode m)
@@ -615,6 +619,7 @@ public partial class NotchWindow : Window
         _leave = 0;
         _expandedAt = DateTime.UtcNow;
         if (_hidden) Fade(Shell, 1, 150);
+        SampleAmbient(); // the colour of the app you're on, before the panel covers any of it
         RefreshExpanded();
         SetMode(Mode.Expanded);
         PlayEntrance();
@@ -661,7 +666,7 @@ public partial class NotchWindow : Window
         if (_mode != Mode.Expanded)
         {
             bool atEdge = false;
-            if (!_hidden && _settings.HoverToOpen && _mode != Mode.Osd && !_touchMode) // a finger has its own gestures
+            if (!_hidden && _settings.HoverToOpen && _mode != Mode.Osd && !_touchMode && !_settings.Locked) // a finger has its own gestures
             {
                 double half = (Math.Max(_sw.Target / 2, 70) + 6) * _scale;
                 double cx = _winLeft + _winW / 2.0;

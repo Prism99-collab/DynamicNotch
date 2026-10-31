@@ -169,6 +169,33 @@
                                 <StackPanel x:Name="LiveChips" Orientation="Horizontal" Margin="0,0,-4,0" />
                             </Grid>
                             <StackPanel x:Name="BatteryPanel" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand">
+                                <!-- lock: the notch stays, but stops reacting (unlock from its tray icon) -->
+                                <Button x:Name="LockBtn" Width="22" Height="22" Margin="0,0,10,0" Cursor="Hand"
+                                        ToolTip="Lock the notch: it keeps showing things but won't react. Unlock from its tray icon.">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Grid>
+                                                <Ellipse x:Name="LockBg">
+                                                    <Ellipse.Fill>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                            <GradientStop Color="#FFE15A" Offset="0" />
+                                                            <GradientStop Color="#FF9F0A" Offset="1" />
+                                                        </LinearGradientBrush>
+                                                    </Ellipse.Fill>
+                                                    <Ellipse.Effect>
+                                                        <DropShadowEffect Color="#FF9F0A" BlurRadius="10" ShadowDepth="0" Opacity="0.55" />
+                                                    </Ellipse.Effect>
+                                                </Ellipse>
+                                                <TextBlock Text="&#xE72E;" FontFamily="{StaticResource IconFont}" FontSize="10.5" Foreground="#1C1C1E"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Grid>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="LockBg" Property="Opacity" Value="0.85" /></Trigger>
+                                                <Trigger Property="IsPressed" Value="True"><Setter TargetName="LockBg" Property="Opacity" Value="0.65" /></Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
                                 <TextBlock x:Name="PrivacyText" FontFamily="{StaticResource IconFont}" FontSize="11" Margin="0,0,8,0" VerticalAlignment="Center" />
                                 <TextBlock x:Name="BatteryText" FontSize="12" Foreground="#D9FFFFFF" Margin="0,0,7,0" VerticalAlignment="Center" />
                                 <c:BatteryIcon x:Name="Battery" VerticalAlignment="Center" />
@@ -372,7 +399,7 @@
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="30" />
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="&#xE7F4;" FontFamily="{StaticResource IconFont}" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    <TextBlock x:Name="ExtBriGlyph" Text="&#xE7F4;" FontFamily="{StaticResource IconFont}" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                     <c:PillSlider x:Name="ExtBriSlider" Grid.Column="1" Height="24" TrackHeight="6" Margin="8,0" />
                                                     <TextBlock x:Name="ExtBriText" Grid.Column="2" FontSize="10.5" Foreground="{StaticResource Dim}"
                                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -699,7 +726,7 @@
                                                 <RowDefinition Height="*" />
                                                 <RowDefinition Height="22" />
                                             </Grid.RowDefinitions>
-                                            <UniformGrid x:Name="SettingsGrid" Columns="2" Rows="7" />
+                                            <UniformGrid x:Name="SettingsGrid" Columns="2" Rows="8" />
                                             <TextBlock Grid.Row="1" FontSize="10.5" Foreground="#66FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                        Text="Win+Alt+N opens the notch · drag sideways or swipe the touchpad to change page" />
                                         </Grid>

@@ -22,6 +22,10 @@ public sealed class Settings
     public bool SlimOverWindows { get; set; } = true;
     public bool StartWithWindows { get; set; } = true;
     public bool KeepRunning { get; set; } = true;
+    /// <summary>Dragging a file onto the notch keeps it on the shelf.</summary>
+    public bool ShelfDrop { get; set; } = true;
+    /// <summary>The notch shows things but reacts to nothing (unlocked from the tray icon).</summary>
+    public bool Locked { get; set; }
     /// <summary>The first-start hello was shown (a new install says where the notch is and how to open it).</summary>
     public bool Welcomed { get; set; }
 

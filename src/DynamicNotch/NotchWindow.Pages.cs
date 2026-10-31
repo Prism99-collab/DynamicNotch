@@ -144,7 +144,7 @@ public partial class NotchWindow
             double w = i == _page ? 16 : 5;
             if (animate) _dots[i].BeginAnimation(WidthProperty, new DoubleAnimation(w, TimeSpan.FromMilliseconds(260)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
             else _dots[i].Width = w;
-            _dots[i].Background = i == _page ? Brushes.White : DimBrush;
+            _dots[i].Background = i == _page ? (_accent == Colors.White ? Brushes.White : Frozen(_accent)) : DimBrush;
         }
     }
 
@@ -688,6 +688,8 @@ public partial class NotchWindow
         Add("Slim over windows", () => _settings.SlimOverWindows, v => _settings.SlimOverWindows = v);
         Add("Battery mode", () => _settings.EcoOnBattery, v => _settings.EcoOnBattery = v);
         Add("Always keep running", () => _settings.KeepRunning, v => { _settings.KeepRunning = v; KeepAlive.Sync(_settings); });
+        Add("Drop files on the notch", () => _settings.ShelfDrop, v => _settings.ShelfDrop = v);
+        Add("Lock the notch", () => _settings.Locked, v => { _settings.Locked = !v; SetLocked(v); });
         Add("Start with Windows", () => _settings.StartWithWindows, v => { _settings.StartWithWindows = v; KeepAlive.Sync(_settings); });
 
         void Add(string label, Func<bool> get, Action<bool> set)

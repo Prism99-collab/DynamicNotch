@@ -127,7 +127,7 @@ public partial class NotchWindow
         Grid.SetColumn(name, 1);
         grid.Children.Add(name);
 
-        var slider = new PillSlider { Height = 20, TrackHeight = 6, VerticalAlignment = VerticalAlignment.Center };
+        var slider = new PillSlider { Height = 20, TrackHeight = 6, VerticalAlignment = VerticalAlignment.Center, FillBrush = AccentFill() };
         Grid.SetColumn(slider, 2);
         grid.Children.Add(slider);
 
