@@ -3,7 +3,7 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.4.0] — 2026-10-31
 
 ### Added
 - Cyberpunk theme (the yellow button beside the lock, Settings or Preferences): cut 45° shape with a yellow frame,
