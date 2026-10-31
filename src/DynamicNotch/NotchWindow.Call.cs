@@ -125,7 +125,7 @@ public partial class NotchWindow
         if (path == null) name = packaged ? parts.FirstOrDefault()?.Split('.').Last() ?? "Call" : System.IO.Path.GetFileNameWithoutExtension(key);
 
         bool switched = _call != null;
-        if (!switched) ResetPriority(); // a new call takes the front
+        if (!switched) { ResetPriority(); StopRinging(); } // a new call takes the front; the ringing is over
         _call = new CallState(key, name, icon, path, switched ? _call!.Started : DateTime.UtcNow);
         _callTick.Start();
         UpdateCallUi();

@@ -42,6 +42,7 @@ public sealed class FpsService : IDisposable
     {
         lock (_gate)
         {
+            if (_session != 0 && _pid == pid) return true; // already counting this game: keep its frames
             _pid = pid;
             Volatile.Write(ref _head, 0);
             if (_session != 0) return true;
@@ -135,7 +136,7 @@ public sealed class FpsService : IDisposable
         if (_trace == ulong.MaxValue) { _trace = 0; CloseSession(); return false; }
         ulong handle = _trace;
         _thread = new Thread(() => { try { ProcessTrace(new[] { handle }, 1, IntPtr.Zero, IntPtr.Zero); } catch { } })
-            { IsBackground = true, Name = "fps trace", Priority = ThreadPriority.BelowNormal };
+            { IsBackground = true, Name = "fps trace", Priority = ThreadPriority.AboveNormal };
         _thread.Start();
         AppLog.Write($"fps: counting frames ({(_kernel ? "graphics kernel, every API" : "DirectX only")})");
         return true;

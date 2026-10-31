@@ -81,6 +81,7 @@ public partial class NotchWindow
 
     void RefreshExpanded()
     {
+        CyberSkinSoon();
         RefreshClockAndProgress();
         RefreshBattery();
         RefreshMedia();
@@ -104,6 +105,7 @@ public partial class NotchWindow
 
     void RefreshClockAndProgress()
     {
+        CyberSkinSoon();
         var now = DateTime.Now;
         ClockText.Text = now.ToShortTimeString();
         DateText.Text = now.ToString("ddd d MMM");

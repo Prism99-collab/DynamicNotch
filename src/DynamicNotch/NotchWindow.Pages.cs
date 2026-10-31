@@ -17,7 +17,7 @@ namespace DynamicNotch;
 /// <summary>Swipeable pages: Home, System, Tools, Clipboard &amp; Files, Smart and Settings.</summary>
 public partial class NotchWindow
 {
-    static readonly string[] PageNames = { "", "System", "Tools", "Clipboard & Files", "Smart", "Settings" };
+    static readonly string[] PageNames = { "", "System", "Tools", "Clipboard & Files", "Colors", "Settings" };
     const double PageWidth = 440;
 
     int _page;
@@ -66,6 +66,7 @@ public partial class NotchWindow
             Dots.Children.Add(hit);
         }
         UpdateDots(animate: false);
+        ApplyPageVisibility(); // pages switched off in Preferences
 
         // dragging with the mouse
         Pager.PreviewMouseLeftButtonDown += OnPagerDown;
@@ -117,17 +118,18 @@ public partial class NotchWindow
     void GoToPage(int page, double velocity = 0, bool instant = false)
     {
         page = Math.Clamp(page, 0, PageNames.Length - 1);
+        if (PageHidden(page)) page = PageHidden(_page) ? 0 : _page; // switched off in Preferences
         bool changed = page != _page;
         if (changed) HideTip();
         _page = page;
         _pageX.Configure(SpringStyle.Page);
         _pageX.Active = true;
-        if (instant) { _pageX.Snap(-page * PageWidth); PagesShift.X = _pageX.Value; }
+        if (instant) { _pageX.Snap(-PagePos(page) * PageWidth); PagesShift.X = _pageX.Value; }
         else
         {
             _pageX.Value = PagesShift.X;
             _pageX.Velocity = Math.Clamp(velocity, -5000, 5000);
-            _pageX.Target = -page * PageWidth;
+            _pageX.Target = -PagePos(page) * PageWidth;
             StartAnimating();
         }
         UpdateDots(animate: true);
@@ -137,32 +139,34 @@ public partial class NotchWindow
 
     void UpdateDots(bool animate)
     {
-        PageTitle.Text = PageNames[_page];
+        PageTitle.Text = Loc.T(PageNames[_page]);
         RenderSwitch();
+        RenderDeviceRings();
         for (int i = 0; i < _dots.Count; i++)
         {
             double w = i == _page ? 16 : 5;
             if (animate) _dots[i].BeginAnimation(WidthProperty, new DoubleAnimation(w, TimeSpan.FromMilliseconds(260)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
             else _dots[i].Width = w;
-            _dots[i].Background = i == _page ? (_accent == Colors.White ? Brushes.White : Frozen(_accent)) : DimBrush;
+            _dots[i].Background = i == _page ? (_cyber && CustomAccent == null ? CyYellowBrush : _accent == Colors.White ? Brushes.White : Frozen(_accent)) : DimBrush;
         }
     }
 
     void OnPageShown(int page)
     {
         if (_mode != Mode.Expanded) return;
+        CyberPage();
         if (page == 1) { OnSystemShown(); _ = SampleSystemAsync(); _sysTimer.Start(); } else _sysTimer.Stop();
         UpdateCallUi(); // the call card's voice bars run only on Home
         if (page == 0) RefreshClockAndProgress();
         if (page == 2) UpdateTimerUi();
         if (page == 3) { RenderClipboard(); _shelfTab = _shelf.Count > 0; RenderShelfOrRecent(); } // the shelf first when something is kept
-        if (page == 4) SyncSmartPage();
-        if (page == 5) SyncSettingsPage();
+        if (page == 4) OnColorsShown();
+        if (page == 5) { SyncSettingsPage(); SyncSmartPage(); }
     }
 
     void OnPagerDown(object sender, MouseButtonEventArgs e)
     {
-        if (FindParent<PillSlider>(e.OriginalSource as DependencyObject) != null) return;
+        if (FindParent<PillSlider>(e.OriginalSource as DependencyObject) != null || FindParent<ColorWheel>(e.OriginalSource as DependencyObject) != null) return;
         _maybeSwipe = true;
         _downPos = e.GetPosition(Pager);
         _downAt = DateTime.UtcNow;
@@ -176,13 +180,13 @@ public partial class NotchWindow
         double dx = p.X - _downPos.X, dy = p.Y - _downPos.Y;
         if (!_swiping)
         {
-            if (Mouse.Captured is PillSlider) { _maybeSwipe = false; return; }
+            if (Mouse.Captured is PillSlider or ColorWheel) { _maybeSwipe = false; return; }
             if (TouchSwipeUpToClose(dx, dy)) { e.Handled = true; return; }
             if (Math.Abs(dx) < 8 || Math.Abs(dx) < Math.Abs(dy) * 1.2) return;
             _swiping = true;
             Pager.CaptureMouse(); // steals capture from any button, so it won't "click"
             _pageX.Active = false; // the finger drives the strip now
-            _swipeBase = PagesShift.X + _page * PageWidth; // grab mid-flight without a jump
+            _swipeBase = PagesShift.X + PagePos(_page) * PageWidth; // grab mid-flight without a jump
             _lastMoveX = p.X;
             _lastMoveAt = DateTime.UtcNow;
             _swipeVelocity = 0;
@@ -197,8 +201,8 @@ public partial class NotchWindow
             _lastMoveAt = now;
         }
         dx += _swipeBase;
-        double x = -_page * PageWidth + dx;
-        double min = -(PageNames.Length - 1) * PageWidth;
+        double x = -PagePos(_page) * PageWidth + dx;
+        double min = -(VisiblePageCount - 1) * PageWidth;
         if (x > 0) x *= 0.3;                       // rubber band at the ends
         else if (x < min) x = min + (x - min) * 0.3;
         PagesShift.X = x;
@@ -222,10 +226,10 @@ public partial class NotchWindow
         _swiping = false;
         if (Pager.IsMouseCaptured) Pager.ReleaseMouseCapture();
         // project where the flick would coast to, then pick the nearest page
-        double projected = -_page * PageWidth + dx + velocity * 0.18;
-        int target = (int)Math.Round(-projected / PageWidth);
-        target = Math.Clamp(target, _page - 1, _page + 1);
-        GoToPage(target, velocity);
+        int pos = PagePos(_page);
+        double projected = -pos * PageWidth + dx + velocity * 0.18;
+        int target = Math.Clamp((int)Math.Round(-projected / PageWidth), Math.Max(0, pos - 1), Math.Min(VisiblePageCount - 1, pos + 1));
+        GoToPage(PageAtPos(target), velocity);
     }
 
     void OnHorizontalWheel(short delta)
@@ -233,7 +237,7 @@ public partial class NotchWindow
         _hwheel += delta;
         if ((DateTime.UtcNow - _lastWheelPage).TotalMilliseconds < 420) { _hwheel = 0; return; }
         if (Math.Abs(_hwheel) < 90) return;
-        GoToPage(_page + (_hwheel > 0 ? 1 : -1));
+        GoToPage(StepPage(_hwheel > 0 ? 1 : -1));
         _hwheel = 0;
         _lastWheelPage = DateTime.UtcNow;
     }
@@ -245,7 +249,7 @@ public partial class NotchWindow
         bool overChrome = e.GetPosition(Expanded).Y < 34 || e.GetPosition(Expanded).Y > 34 + 216;
         if (Keyboard.Modifiers != ModifierKeys.Shift && !overChrome) return;
         if ((DateTime.UtcNow - _lastWheelPage).TotalMilliseconds < 300) { e.Handled = true; return; }
-        GoToPage(_page + (e.Delta < 0 ? 1 : -1));
+        GoToPage(StepPage(e.Delta < 0 ? 1 : -1));
         _lastWheelPage = DateTime.UtcNow;
         e.Handled = true;
     }
@@ -675,27 +679,33 @@ public partial class NotchWindow
 
     void BuildSettings()
     {
+        // Display: how it looks
+        var grid = SettingsGrid;
         Add("Minimal when idle", () => _settings.MinimalWhenIdle, v => _settings.MinimalWhenIdle = v);
+        Add("Slim over windows", () => _settings.SlimOverWindows, v => _settings.SlimOverWindows = v);
         Add("Music activity", () => _settings.ShowMediaActivity, v => _settings.ShowMediaActivity = v);
+        Add("Music visualizer", () => _settings.AnimatedVisualizer, v => _settings.AnimatedVisualizer = v);
+        Add("Hide in full screen", () => _settings.HideInFullscreen, v => _settings.HideInFullscreen = v);
+        Add("FPS in games", () => _settings.GameStats && FpsService.AccountCanTrace(), SetFpsInGames);
+        Add("Cyberpunk theme", () => _settings.Cyberpunk, v => { _settings.Cyberpunk = !v; SetCyber(v); });
+        Add("Battery mode", () => _settings.EcoOnBattery, v => _settings.EcoOnBattery = v);
+        // Behaviour: how it reacts, what it tells you
+        grid = BehaviourGrid;
+        Add("Open at top edge", () => _settings.HoverToOpen, v => _settings.HoverToOpen = v);
+        Add("Drop files on the notch", () => _settings.ShelfDrop, v => _settings.ShelfDrop = v);
         Add("Notification alerts", () => _settings.NotificationAlerts, v => _settings.NotificationAlerts = v);
         Add("System alerts", () => _settings.SystemAlerts, v => _settings.SystemAlerts = v);
         Add("App launch alerts", () => _settings.AppLaunchAlerts, v => _settings.AppLaunchAlerts = v);
         Add("“Copied” alerts", () => _settings.ClipboardAlerts, v => _settings.ClipboardAlerts = v);
-        Add("Music visualizer", () => _settings.AnimatedVisualizer, v => _settings.AnimatedVisualizer = v);
-        Add("Open at top edge", () => _settings.HoverToOpen, v => _settings.HoverToOpen = v);
-        Add("Hide in full screen", () => _settings.HideInFullscreen, v => _settings.HideInFullscreen = v);
-        Add("FPS in games", () => _settings.GameStats && FpsService.AccountCanTrace(), SetFpsInGames);
-        Add("Slim over windows", () => _settings.SlimOverWindows, v => _settings.SlimOverWindows = v);
-        Add("Battery mode", () => _settings.EcoOnBattery, v => _settings.EcoOnBattery = v);
-        Add("Always keep running", () => _settings.KeepRunning, v => { _settings.KeepRunning = v; KeepAlive.Sync(_settings); });
-        Add("Drop files on the notch", () => _settings.ShelfDrop, v => _settings.ShelfDrop = v);
         Add("Lock the notch", () => _settings.Locked, v => { _settings.Locked = !v; SetLocked(v); });
+        Add("Always keep running", () => _settings.KeepRunning, v => { _settings.KeepRunning = v; KeepAlive.Sync(_settings); });
         Add("Start with Windows", () => _settings.StartWithWindows, v => { _settings.StartWithWindows = v; KeepAlive.Sync(_settings); });
+        BuildSettingsTabs(); // Smart is the third tab (its switches are built with the Smart page code)
 
         void Add(string label, Func<bool> get, Action<bool> set)
         {
             var cell = new Grid { Margin = new Thickness(4, 0, 10, 0) };
-            cell.Children.Add(new TextBlock { Text = label, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 40, 0) });
+            cell.Children.Add(Localized(new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 40, 0) }, label));
             var sw = new ToggleButton { Style = (Style)FindResource("Switch"), IsChecked = get(), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
             sw.Click += (_, _) =>
             {
@@ -705,7 +715,7 @@ public partial class NotchWindow
             };
             cell.Children.Add(sw);
             _settingSwitches.Add((sw, get));
-            SettingsGrid.Children.Add(cell);
+            grid.Children.Add(cell);
         }
     }
 

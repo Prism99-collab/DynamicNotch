@@ -82,6 +82,7 @@ public partial class NotchWindow : Window
         _focus = new FocusService(Dispatcher);
         _privacy = new PrivacyService(Dispatcher);
         _files = new FilesService(Dispatcher);
+        _devices = new DeviceBatteryService(Dispatcher);
         _notifications = new NotificationService(Dispatcher);
 
         foreach (var p in new FrameworkElement[] { CompactMedia, CompactActivity, Osd, Expanded, DropPanel, GamePanel })
@@ -129,7 +130,11 @@ public partial class NotchWindow : Window
         Safe(nameof(WireGame), WireGame);
         Safe(nameof(WireMixer), WireMixer);
         Safe(nameof(WireLock), WireLock);
+        Safe(nameof(WireCyber), WireCyber);
+        Safe(nameof(ApplyCustomColors), ApplyCustomColors); // your colours from the Colors page
         Safe(nameof(WireColors), WireColors);
+        Safe(nameof(WireDevices), WireDevices);
+        Safe(nameof(WireRinging), WireRinging);
     }
 
     static void Safe(string what, Action action)
@@ -316,6 +321,7 @@ public partial class NotchWindow : Window
     {
         _poll.Stop();
         StopGameTracing(); // a frame-count trace must not outlive the notch
+        _devices.Dispose();
         _notificationSound.Dispose();
         if (_hwnd != IntPtr.Zero)
         {
@@ -385,9 +391,10 @@ public partial class NotchWindow : Window
     void SetMode(Mode m)
     {
         bool modeChanged = m != _mode;
+        var from = _mode;
         if (modeChanged) { HideTip(); HideLiveMenu(); }
         if (m != Mode.Game) SetSmallWindow(false); // anything else gets the full window back before it starts to grow
-        else if (modeChanged) After(600, () => { if (_mode == Mode.Game) SetSmallWindow(true); }); // once the pill has settled
+        else if (modeChanged) After(350, () => { if (_mode == Mode.Game) SetSmallWindow(true); }); // once the pill has settled
         _mode = m;
         if (m != Mode.Osd) _osd = null;
         if (m == Mode.Expanded) _osdQueue.Clear(); // you're looking at the notch already
@@ -418,6 +425,7 @@ public partial class NotchWindow : Window
         UpdateSlimGlow();
         UpdateCallUi();
         if (!IsBase(m)) SetDodged(false); // pop-ups and the open notch never hide from the cursor
+        if (modeChanged) CyberMoment(from, m);
     }
 
     // ───────────────────────────── spring-driven shape ─────────────────────────────
@@ -443,7 +451,8 @@ public partial class NotchWindow : Window
             case Mode.Osd: w = _osdSize.Width; h = _osdSize.Height; r = _osdSize.Height / 2; break;
             case Mode.Media: w = MediaSize.Width; h = MediaSize.Height; r = MediaRadius; break;
             case Mode.Activity: w = ActivitySize.Width; h = ActivitySize.Height; r = MediaRadius; break;
-            case Mode.Game: w = GameSize.Width; h = GameSize.Height; r = GameSize.Height / 2; break;
+            // the cyber skin's FPS tag is a touch tighter (just the number, small cuts, no flares)
+            case Mode.Game: w = _cyber ? 46 : GameSize.Width; h = _cyber ? 16 : GameSize.Height; r = h / 2; break;
             case Mode.Slim: w = SlimSize.Width; h = SlimSize.Height; r = SlimRadius; break;
             default: w = IdleSize.Width; h = IdleSize.Height; r = IdleRadius; break;
         }
@@ -593,8 +602,9 @@ public partial class NotchWindow : Window
     void ApplyRadius()
     {
         double r = Math.Max(0, Radius);
-        Pill.CornerRadius = new CornerRadius(0, 0, r, r);
-        Rim.CornerRadius = new CornerRadius(0, 0, r, r);
+        double cr = _cyber ? 0 : r; // the cyber skin cuts its corners instead (see CyberShape)
+        Pill.CornerRadius = new CornerRadius(0, 0, cr, cr);
+        Rim.CornerRadius = new CornerRadius(0, 0, cr, cr);
         UpdateClip();
     }
 
@@ -603,6 +613,7 @@ public partial class NotchWindow : Window
         double w = Pill.ActualWidth, h = Pill.ActualHeight;
         if (w <= 0 || h <= 0) return;
         double r = Math.Min(Math.Max(0, Radius), Math.Min(w, h) / 2);
+        if (_cyber) { CyberShape(w, h, r); return; }
         // rect extended above the top edge so only the bottom corners are rounded; reused, not reallocated every frame
         _clip ??= new RectangleGeometry();
         _clip.Rect = new Rect(0, -r, w, h + r);
@@ -618,8 +629,10 @@ public partial class NotchWindow : Window
         _entered = false;
         _leave = 0;
         _expandedAt = DateTime.UtcNow;
+        ShowOnScreen(true);
         if (_hidden) Fade(Shell, 1, 150);
         SampleAmbient(); // the colour of the app you're on, before the panel covers any of it
+        _devices.Refresh(); // a fresh headset reading for the rings
         RefreshExpanded();
         SetMode(Mode.Expanded);
         PlayEntrance();
@@ -666,7 +679,8 @@ public partial class NotchWindow : Window
         if (_mode != Mode.Expanded)
         {
             bool atEdge = false;
-            if (!_hidden && _settings.HoverToOpen && _mode != Mode.Osd && !_touchMode && !_settings.Locked) // a finger has its own gestures
+            // a finger has its own gestures; locked or in a game, the notch doesn't react at all
+            if (!_hidden && _settings.HoverToOpen && _mode is not (Mode.Osd or Mode.Game) && !_touchMode && !_settings.Locked && !InGame)
             {
                 double half = (Math.Max(_sw.Target / 2, 70) + 6) * _scale;
                 double cx = _winLeft + _winW / 2.0;
@@ -680,6 +694,7 @@ public partial class NotchWindow : Window
             {
                 _peek = atEdge;
                 ApplyShape();
+                IslandsPeek(atEdge);
             }
             // count only the time actually spent at the edge (not the gap since the last check)
             if (atEdge && wasAtEdge)
@@ -754,7 +769,7 @@ public partial class NotchWindow : Window
             _overWindow = over;
             RefreshBase();
         }
-        KeepOnTop();
+        if (!_hidden) KeepOnTop();
     }
 
     void SetHidden(bool hidden)
@@ -765,7 +780,22 @@ public partial class NotchWindow : Window
         UpdateSecond();
         if (_mode == Mode.Expanded) return; // fades when it closes
         if (hidden && _mode == Mode.Osd) { _osdTimer.Stop(); SetMode(BaseMode); }
-        Fade(Shell, hidden ? 0 : 1, hidden ? 160 : 260);
+        if (!hidden) ShowOnScreen(true);
+        var fade = new System.Windows.Media.Animation.DoubleAnimation(hidden ? 0 : 1, TimeSpan.FromMilliseconds(hidden ? 160 : 260));
+        // hidden over a full-screen app: once faded, the window leaves the screen entirely, so nothing is drawn on
+        // top of a game (an overlay, even an invisible one, makes Windows composite every frame of it)
+        if (hidden) fade.Completed += (_, _) => { if (_hidden && _mode != Mode.Expanded) ShowOnScreen(false); };
+        Shell.BeginAnimation(OpacityProperty, fade);
+    }
+
+    bool _offScreen;
+
+    void ShowOnScreen(bool on)
+    {
+        if (_hwnd == IntPtr.Zero || on != _offScreen) return;
+        _offScreen = !on;
+        ShowWindow(_hwnd, on ? 4 /* SW_SHOWNOACTIVATE */ : 0 /* SW_HIDE */);
+        if (on) KeepOnTop();
     }
 
     // ───────────────────────────── startup ─────────────────────────────

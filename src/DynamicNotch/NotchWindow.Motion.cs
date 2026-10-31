@@ -88,6 +88,7 @@ public partial class NotchWindow
         _sh.Velocity += 90;
         StartAnimating();
         FlashRim();
+        IslandsBounce();
     }
 
     /// <summary>The rim lights up for a moment with the pop-up's colour, then settles back.</summary>
@@ -174,6 +175,7 @@ public partial class NotchWindow
     /// <summary>An alert with a colour casts a faint glow of it just below the notch; it fades with the alert.</summary>
     void UpdateAura(Color? c)
     {
+        if (_cyber && c is { } cc) c = CyMap(cc);
         _auraLive = false;
         // (not with a finger: the notch takes taps then, and the glow would catch the ones just below it)
         if (c == null && !_hidden && !Eco && !_touchMode && _mode is Mode.Media or Mode.Activity)
@@ -392,14 +394,30 @@ public partial class NotchWindow
                 SecondShift.X = SecondTargetX();
             };
             SecondShift.BeginAnimation(TranslateTransform.XProperty, slide);
+            IslandNeck(SecondNeck, 30, splitting: true);
             var pop = new DoubleAnimation(0.55, 1, TimeSpan.FromMilliseconds(520)) { EasingFunction = new SpringEase { Damping = 0.6 } };
             SecondScale.BeginAnimation(ScaleTransform.ScaleXProperty, pop);
             SecondScale.BeginAnimation(ScaleTransform.ScaleYProperty, pop);
             Fade(SecondBubble, 1, 200);
         }
+        else if (second == LiveActivity.None && wasShown && !(_mode is Mode.Media or Mode.Activity) || _hidden && wasShown && second == LiveActivity.None)
+        {
+            // the notch is opening, showing an alert or stepping aside: the island is simply absorbed, quickly,
+            // instead of a slow merge playing against the notch's own morph
+            _secondSliding = false;
+            SecondNeck.BeginAnimation(HeightProperty, null);
+            SecondNeck.Height = 0;
+            var quick = new DoubleAnimation(0.85, TimeSpan.FromMilliseconds(120));
+            SecondScale.BeginAnimation(ScaleTransform.ScaleXProperty, quick);
+            SecondScale.BeginAnimation(ScaleTransform.ScaleYProperty, quick);
+            var gone = new DoubleAnimation(0, TimeSpan.FromMilliseconds(110));
+            gone.Completed += (_, _) => { if (_secondShown == LiveActivity.None) SecondBubble.Visibility = Visibility.Collapsed; };
+            SecondBubble.BeginAnimation(OpacityProperty, gone);
+        }
         else if (second == LiveActivity.None && wasShown)
         {
-            // merge back into the pill
+            // the activity ended: it merges back into the pill, the neck reaching out first
+            IslandNeck(SecondNeck, 30, splitting: false);
             double into = -(_sw.Target / 2 - SecondBubble.ActualWidth / 2);
             SecondShift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(into, TimeSpan.FromMilliseconds(320)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } });
             var shrink = new DoubleAnimation(0.6, TimeSpan.FromMilliseconds(300));
@@ -420,7 +438,7 @@ public partial class NotchWindow
     void PlaceSecond()
     {
         if (_secondShown == LiveActivity.None || _secondSliding) return;
-        SecondShift.X = SecondTargetX();
+        IslandFollow(SecondShift, SecondTargetX());
     }
 
     void FillSecond(LiveActivity a)
@@ -448,7 +466,10 @@ public partial class NotchWindow
             case LiveActivity.Download:
                 SecondGlyph.Text = "";
                 SecondGlyph.Foreground = SecondText.Foreground = Blue;
-                SecondText.Text = _files.BytesPerSecond > 1024 ? $"{Services.SystemMonitor.Bytes(_files.BytesPerSecond)}/s" : Services.SystemMonitor.Bytes(_files.ActiveBytes);
+                var share = _files.Items.FirstOrDefault()?.Progress;
+                SecondProgress(share);
+                SecondText.Text = share is { } sh ? $"{sh * 100:0}%"
+                    : _files.BytesPerSecond > 1024 ? $"{Services.SystemMonitor.Bytes(_files.BytesPerSecond)}/s" : Services.SystemMonitor.Bytes(_files.ActiveBytes);
                 rim = ((SolidColorBrush)Blue).Color;
                 break;
             case LiveActivity.Call when _call is { } call:
@@ -470,10 +491,14 @@ public partial class NotchWindow
                 SecondText.Text = "";
                 SecondText.Margin = new Thickness(0);
                 rim = _media.Accent;
-                SecondRim.BorderBrush = Frozen(Color.FromArgb(0x80, rim.R, rim.G, rim.B));
+                IslandRim(SecondRim, rim);
+                IslandAura(SecondAura, rim);
+                SecondProgress(null);
                 return;
         }
         SecondText.Margin = new Thickness(6, 0, 0, 0);
-        SecondRim.BorderBrush = Frozen(Color.FromArgb(0x70, rim.R, rim.G, rim.B));
+        IslandRim(SecondRim, rim);
+        IslandAura(SecondAura, rim);
+        if (a != LiveActivity.Download) SecondProgress(null);
     }
 }

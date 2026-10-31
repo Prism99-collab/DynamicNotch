@@ -46,7 +46,7 @@
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,1">
                             <TextBlock x:Name="GameFps" FontSize="11" FontWeight="SemiBold" Foreground="#D9FFFFFF" VerticalAlignment="Center"
                                        FontFamily="Segoe UI Variable Display, Segoe UI" Typography.NumeralAlignment="Tabular" Text="–" />
-                            <TextBlock Text="fps" FontSize="8.5" Foreground="#73FFFFFF" VerticalAlignment="Center" Margin="2,1,0,0" />
+                            <TextBlock x:Name="GameFpsUnit" Text="fps" FontSize="8.5" Foreground="#73FFFFFF" VerticalAlignment="Center" Margin="2,1,0,0" />
                         </StackPanel>
                     </Grid>
 
@@ -152,6 +152,8 @@
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock x:Name="ClockText" FontSize="13" FontWeight="SemiBold" />
                                 <TextBlock x:Name="DateText" FontSize="12" Foreground="{StaticResource Dim}" Margin="7,0,0,0" VerticalAlignment="Bottom" />
+                                <!-- mouse / headset batteries: tiny rings (Home only) -->
+                                <StackPanel x:Name="DeviceRings" Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center" Visibility="Collapsed" />
                             </StackPanel>
                             <TextBlock x:Name="PageTitle" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource Dim}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -169,6 +171,23 @@
                                 <StackPanel x:Name="LiveChips" Orientation="Horizontal" Margin="0,0,-4,0" />
                             </Grid>
                             <StackPanel x:Name="BatteryPanel" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand">
+                                <!-- cyberpunk theme: on / off -->
+                                <Button x:Name="CyberBtn" Width="22" Height="22" Margin="0,0,8,0" Cursor="Hand" Background="#FEE801" BorderBrush="#9A9F17" Foreground="#00060E">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Grid x:Name="CyberBg" Background="Transparent">
+                                                <Path Stretch="Fill" Data="M0,0 L15,0 L22,7 L22,22 L7,22 L0,15 Z" Fill="{TemplateBinding Background}"
+                                                      Stroke="{TemplateBinding BorderBrush}" StrokeThickness="1.2" StrokeLineJoin="Miter" />
+                                                <TextBlock Text="&#xE945;" FontFamily="{StaticResource IconFont}" FontSize="10.5" Foreground="{TemplateBinding Foreground}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Grid>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="CyberBg" Property="Opacity" Value="0.85" /></Trigger>
+                                                <Trigger Property="IsPressed" Value="True"><Setter TargetName="CyberBg" Property="Opacity" Value="0.65" /></Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
                                 <!-- lock: the notch stays, but stops reacting (unlock from its tray icon) -->
                                 <Button x:Name="LockBtn" Width="22" Height="22" Margin="0,0,10,0" Cursor="Hand"
                                         ToolTip="Lock the notch: it keeps showing things but won't react. Unlock from its tray icon.">
@@ -702,32 +721,34 @@
                                         </Grid>
                                     </Grid>
 
-                                    <!-- ================= PAGE 5 · SMART ================= -->
-                                    <Grid Width="440" Height="216">
-                                        <Grid Margin="22,0">
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="*" />
-                                                <RowDefinition Height="38" />
-                                            </Grid.RowDefinitions>
-                                            <UniformGrid x:Name="SmartGrid" Columns="2" Rows="3" />
-                                            <Border Grid.Row="1" CornerRadius="12" Background="#17171A" Margin="0,2,0,6" Padding="12,0,6,0">
-                                                <Grid>
-                                                    <TextBlock Text="Break reminder every" FontSize="11.5" Foreground="{StaticResource Dim}" VerticalAlignment="Center" />
-                                                    <StackPanel x:Name="BreakChips" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                                                </Grid>
-                                            </Border>
-                                        </Grid>
-                                    </Grid>
+                                    <!-- ================= PAGE 5 · COLORS (built the first time it's shown: NotchWindow.Studio) ================= -->
+                                    <Grid x:Name="ColorsPage" Width="440" Height="216" />
 
-                                    <!-- ================= PAGE 6 · NOTCH SETTINGS ================= -->
+                                    <!-- ================= PAGE 6 · SETTINGS: Display · Behaviour · Smart, one page ================= -->
                                     <Grid Width="440" Height="216">
                                         <Grid Margin="22,0">
                                             <Grid.RowDefinitions>
+                                                <RowDefinition Height="30" />
                                                 <RowDefinition Height="*" />
-                                                <RowDefinition Height="22" />
+                                                <RowDefinition Height="14" />
                                             </Grid.RowDefinitions>
-                                            <UniformGrid x:Name="SettingsGrid" Columns="2" Rows="8" />
-                                            <TextBlock Grid.Row="1" FontSize="10.5" Foreground="#66FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            <StackPanel x:Name="SettingsTabs" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <UniformGrid x:Name="SettingsGrid" Grid.Row="1" Columns="2" Rows="4" />
+                                            <UniformGrid x:Name="BehaviourGrid" Grid.Row="1" Columns="2" Rows="5" Visibility="Collapsed" />
+                                            <Grid x:Name="SmartPanel" Grid.Row="1" Visibility="Collapsed">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="*" />
+                                                    <RowDefinition Height="36" />
+                                                </Grid.RowDefinitions>
+                                                <UniformGrid x:Name="SmartGrid" Columns="2" Rows="3" />
+                                                <Border Grid.Row="1" CornerRadius="12" Background="#17171A" Margin="0,2,0,4" Padding="12,0,6,0">
+                                                    <Grid>
+                                                        <TextBlock x:Name="BreakLabel" Text="Break reminder every" FontSize="11.5" Foreground="{StaticResource Dim}" VerticalAlignment="Center" />
+                                                        <StackPanel x:Name="BreakChips" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Border>
+                                            </Grid>
+                                            <TextBlock x:Name="SettingsHint" Grid.Row="2" FontSize="9" Foreground="#59FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                        Text="Win+Alt+N opens the notch · drag sideways or swipe the touchpad to change page" />
                                         </Grid>
                                     </Grid>
@@ -781,10 +802,25 @@
                 </TransformGroup>
             </Border.RenderTransform>
             <Grid>
-                <Border x:Name="SecondRim" BorderThickness="1,0,1,1.2" CornerRadius="0,0,15,15" Margin="-10,0" BorderBrush="Transparent" />
+                <!-- a soft glow of its colour beneath it -->
+                <Border x:Name="SecondAura" VerticalAlignment="Bottom" Height="26" Margin="-26,0,-26,-24" IsHitTestVisible="False" Opacity="0.4" />
+                <!-- ears: it hangs from the top edge like the notch itself -->
+                <Path Width="7" Height="7" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-17,0,0,0" Fill="Black"
+                      Data="M0,0 L7,0 L7,7 A7,7 0 0 0 0,0 Z" />
+                <Path Width="7" Height="7" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,-17,0" Fill="Black"
+                      Data="M7,0 L0,0 L0,7 A7,7 0 0 1 7,0 Z" />
+                <!-- the neck: black between it and the notch while it splits off (or merges back), pinching thin -->
+                <Border x:Name="SecondNeck" Background="Black" HorizontalAlignment="Right" VerticalAlignment="Top" Width="27" Height="0"
+                        Margin="0,0,-33,0" CornerRadius="0,0,8,8" IsHitTestVisible="False" />
+                <Border x:Name="SecondRim" BorderThickness="1,0,1,1" CornerRadius="0,0,15,15" Margin="-10,0" BorderBrush="Transparent" />
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,1">
                     <Border x:Name="SecondArt" Width="18" Height="18" CornerRadius="9" Visibility="Collapsed" />
-                    <TextBlock x:Name="SecondGlyph" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center" />
+                    <Grid>
+                        <!-- a download's real progress, around its arrow -->
+                        <Path x:Name="SecondRing" Width="19" Height="19" Stroke="#0A84FF" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                        <TextBlock x:Name="SecondGlyph" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                    </Grid>
                     <TextBlock x:Name="SecondText" FontSize="12" FontWeight="SemiBold" Margin="6,0,0,0" VerticalAlignment="Center"
                                FontFamily="Segoe UI Variable Display, Segoe UI" Typography.NumeralAlignment="Tabular" />
                     <TextBlock x:Name="SecondMore" FontSize="10" FontWeight="SemiBold" Foreground="#8CFFFFFF" Margin="5,0,0,0" VerticalAlignment="Center"
@@ -794,7 +830,7 @@
         </Border>
 
         <!-- Mic / camera in use: a small companion bubble next to the notch -->
-        <Border x:Name="PrivacyBubble" Background="Black" Height="22" CornerRadius="0,0,11,11" Padding="9,0"
+        <Border x:Name="PrivacyBubble" Background="Black" Height="26" CornerRadius="0,0,13,13" Padding="10,0"
                 HorizontalAlignment="Center" VerticalAlignment="Top" Visibility="Collapsed" Opacity="0" RenderTransformOrigin="0.5,0">
             <Border.RenderTransform>
                 <TransformGroup>
@@ -802,6 +838,15 @@
                     <TranslateTransform x:Name="PrivacyShift" />
                 </TransformGroup>
             </Border.RenderTransform>
+            <Grid>
+            <Border x:Name="PrivacyAura" VerticalAlignment="Bottom" Height="24" Margin="-22,0,-22,-22" IsHitTestVisible="False" Opacity="0.45" />
+            <Path Width="6" Height="6" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-16,0,0,0" Fill="Black"
+                  Data="M0,0 L6,0 L6,6 A6,6 0 0 0 0,0 Z" />
+            <Path Width="6" Height="6" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,-16,0" Fill="Black"
+                  Data="M6,0 L0,0 L0,6 A6,6 0 0 1 6,0 Z" />
+            <Border x:Name="PrivacyNeck" Background="Black" HorizontalAlignment="Left" VerticalAlignment="Top" Width="24" Height="0"
+                    Margin="-30,0,0,0" CornerRadius="0,0,7,7" IsHitTestVisible="False" />
+            <Border x:Name="PrivacyRim" BorderThickness="1,0,1,1" CornerRadius="0,0,13,13" Margin="-10,0" BorderBrush="Transparent" />
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,1">
                 <Grid x:Name="MicDot" Margin="0,0,0,0">
                     <TextBlock Text="&#xE720;" FontFamily="{StaticResource IconFont}" FontSize="11" Foreground="#FF9F0A" VerticalAlignment="Center" />
@@ -810,12 +855,13 @@
                     <TextBlock Text="&#xE714;" FontFamily="{StaticResource IconFont}" FontSize="11" Foreground="#30D158" VerticalAlignment="Center" />
                 </Grid>
             </StackPanel>
+            </Grid>
         </Border>
         <!-- drag catcher: invisible but hit-testable, switched on only while something is dragged toward the notch -->
         <Border x:Name="DropCatcher" Width="540" Height="110" HorizontalAlignment="Center" VerticalAlignment="Top"
                 Background="#01000000" Visibility="Collapsed" />
         <!-- hover hints, drawn in the notch so they sit in front and match it -->
-        <Border x:Name="Tip" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False" Visibility="Collapsed" Opacity="0"
+        <Border x:Name="Tip" Panel.ZIndex="100" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False" Visibility="Collapsed" Opacity="0"
                 Background="#F2232326" BorderBrush="#30FFFFFF" BorderThickness="1" CornerRadius="10" Padding="10,6,10,7"
                 RenderTransformOrigin="0.5,0">
             <Border.RenderTransform>

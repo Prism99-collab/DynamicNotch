@@ -24,9 +24,13 @@ public partial class NotchWindow
     {
         e.Handled = true; // never the white Windows tooltip
         if (e.Source is not FrameworkElement el || _mode != Mode.Expanded || !el.IsMouseOver) return;
-        string? text = ToolTipService.GetToolTip(el)?.ToString();
-        if (string.IsNullOrWhiteSpace(text)) return;
+        ShowTip(el, ToolTipService.GetToolTip(el)?.ToString());
+    }
 
+    /// <summary>Shows a hint for <paramref name="el"/> right away (it hides when the pointer leaves it).</summary>
+    void ShowTip(FrameworkElement el, string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text) || _mode != Mode.Expanded) return;
         if (_tipOwner != el)
         {
             if (_tipOwner != null) _tipOwner.MouseLeave -= OnTipOwnerLeave;
