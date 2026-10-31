@@ -118,9 +118,11 @@ public partial class NotchWindow
         PageTitle.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
         if (!show)
         {
+            bool wasShown = LiveSwitch.Visibility == Visibility.Visible;
             LiveSwitch.BeginAnimation(OpacityProperty, null);
             LiveSwitch.Visibility = Visibility.Collapsed;
             _switchKey = "";
+            if (wasShown) RenderDeviceRings();
             HideLiveMenu();
             return;
         }
@@ -128,9 +130,10 @@ public partial class NotchWindow
         var front = FrontItem(items);
         // too many to fit: the first few, always including the one in front, then "+N"
         var visible = items;
-        if (items.Count > MaxChips)
+        int maxChips = _devices.Devices.Count > 0 ? 3 : MaxChips; // the battery rings take part of the header
+        if (items.Count > maxChips)
         {
-            visible = items.Take(MaxChips - 1).ToList();
+            visible = items.Take(maxChips - 1).ToList();
             if (front != null && !visible.Contains(front)) { visible[^1] = front; visible = visible.OrderBy(items.IndexOf).ToList(); }
         }
         int hidden = items.Count - visible.Count;
@@ -152,7 +155,7 @@ public partial class NotchWindow
             LiveSwitch.Opacity = 0;
             Fade(LiveSwitch, 1, 200);
         }
-        if (appearing) PopChipsIn();
+        if (appearing) { PopChipsIn(); RenderDeviceRings(); } // the switcher takes the middle of the header
         if (front != null) MoveHighlight(front, animate: LiveSwitch.Opacity > 0.05);
         if (_liveMenuOpen)
         {

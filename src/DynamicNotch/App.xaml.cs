@@ -55,6 +55,7 @@ public partial class App : Application
 
         try { Directory.CreateDirectory(Settings.Folder); } catch { }
         _settings = Settings.Load();
+        Loc.Set(_settings.Language);
         // WPF caps every animation at 60 fps unless told otherwise: let them run at the screen's real refresh
         // rate (144 / 180 / 240 Hz...). Animations that pick their own rate (visualizer, glow) keep theirs.
         System.Windows.Media.Animation.Timeline.DesiredFrameRateProperty.OverrideMetadata(
@@ -81,40 +82,28 @@ public partial class App : Application
     void BuildTray()
     {
         Forms.Application.EnableVisualStyles();
+        // the tray menu stays short: open, Preferences (everything else lives there), lock, exit
         var menu = new Forms.ContextMenuStrip { ShowImageMargin = false, ShowCheckMargin = true };
         menu.Items.Add(Controls.DarkMenu.Header("Dynamic Notch"));
-        menu.Items.Add("Open control center    Win+Alt+N", null, (_, _) => { if (_window?.IsLocked == true) _window.SetLocked(false); _window?.Expand(byHotkey: true); });
-        var lockItem = new Forms.ToolStripMenuItem("Lock the notch (shows things, won't react)") { CheckOnClick = true };
+        var open = menu.Items.Add("", null, (_, _) => { if (_window?.IsLocked == true) _window.SetLocked(false); _window?.Expand(byHotkey: true); });
+        var prefs = (Forms.ToolStripMenuItem)menu.Items.Add("", null, (_, _) => { if (_window != null) PreferencesWindow.ShowFor(_window); });
+        prefs.Font = new Drawing.Font("Segoe UI Variable Text", 9.5f, Drawing.FontStyle.Bold);
+        var lockItem = new Forms.ToolStripMenuItem("") { CheckOnClick = true };
         lockItem.Click += (_, _) => _window?.SetLocked(lockItem.Checked);
         _checks.Add((lockItem, () => _window?.IsLocked == true));
         menu.Items.Add(lockItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
-        AddCheck(menu, "Minimal when nothing is happening", () => _settings.MinimalWhenIdle, v => _settings.MinimalWhenIdle = v);
-        AddCheck(menu, "Notification alerts", () => _settings.NotificationAlerts, v => _settings.NotificationAlerts = v);
-        AddCheck(menu, "System alerts", () => _settings.SystemAlerts, v => _settings.SystemAlerts = v);
-        AddCheck(menu, "App launch alerts", () => _settings.AppLaunchAlerts, v => _settings.AppLaunchAlerts = v);
-        AddCheck(menu, "\"Copied\" alerts", () => _settings.ClipboardAlerts, v => _settings.ClipboardAlerts = v);
-        AddCheck(menu, "Show music activity", () => _settings.ShowMediaActivity, v => _settings.ShowMediaActivity = v);
-        AddCheck(menu, "Animated music visualizer", () => _settings.AnimatedVisualizer, v => _settings.AnimatedVisualizer = v);
-        AddCheck(menu, "Open by touching the top edge", () => _settings.HoverToOpen, v => _settings.HoverToOpen = v);
-        AddCheck(menu, "Slim notch over browser tabs / windows", () => _settings.SlimOverWindows, v => _settings.SlimOverWindows = v);
-        AddCheck(menu, "Hide in full-screen apps", () => _settings.HideInFullscreen, v => _settings.HideInFullscreen = v);
-        AddCheck(menu, "FPS in games", () => _settings.GameStats, v => _settings.GameStats = v);
-        AddCheck(menu, "Battery mode when unplugged", () => _settings.EcoOnBattery, v => _settings.EcoOnBattery = v);
-        AddCheck(menu, "Start with Windows", () => _settings.StartWithWindows, v =>
-        {
-            _settings.StartWithWindows = v;
-            KeepAlive.Sync(_settings);
-        });
-        AddCheck(menu, "Always keep running (restart after lock / crash)", () => _settings.KeepRunning, v =>
-        {
-            _settings.KeepRunning = v;
-            KeepAlive.Sync(_settings);
-        });
-        menu.Opening += (_, _) => { foreach (var (item, get) in _checks) item.Checked = get(); };
-        menu.Items.Add(new Forms.ToolStripSeparator());
-        var exit = menu.Items.Add("Exit", null, (_, _) => ExitApp());
+        var exit = menu.Items.Add("", null, (_, _) => ExitApp());
         exit.Tag = "danger";
+        void Texts()
+        {
+            open.Text = Loc.T("Open control center") + "    Win+Alt+N";
+            prefs.Text = Loc.T("Preferences…");
+            lockItem.Text = Loc.T("Lock the notch (shows things, won't react)");
+            exit.Text = Loc.T("Exit");
+        }
+        Texts();
+        menu.Opening += (_, _) => { Texts(); foreach (var (item, get) in _checks) item.Checked = get(); };
         Controls.DarkMenu.Apply(menu);
 
         _tray = new Forms.NotifyIcon
@@ -135,23 +124,64 @@ public partial class App : Application
             void ShowLock() { if (_tray != null) _tray.Text = _window.IsLocked ? "Dynamic Notch (locked, click to unlock)" : "Dynamic Notch"; }
             _window.LockChanged += ShowLock;
             ShowLock();
+            // the tray icon (and the windows' icon) in the theme
+            _window.CyberChanged += cyber => { if (_tray != null) _tray.Icon = CreateTrayIcon(cyber); };
+            if (_settings.Cyberpunk) _tray.Icon = CreateTrayIcon(true);
         }
     }
 
-    void AddCheck(Forms.ContextMenuStrip menu, string text, Func<bool> get, Action<bool> set)
+    /// <summary>The notch's own icon, for its windows (Preferences).</summary>
+    public static System.Windows.Media.ImageSource? WindowIcon { get; private set; }
+
+    /// <summary>Starts a fresh copy and closes this one (after a reset of the preferences).</summary>
+    public void Restart()
     {
-        var item = new Forms.ToolStripMenuItem(text) { Checked = get(), CheckOnClick = true };
-        _checks.Add((item, get));
-        item.Click += (_, _) =>
+        try
         {
-            set(item.Checked);
-            _settings.Save();
-            _window?.OnSettingsChanged();
-        };
-        menu.Items.Add(item);
+            if (Environment.ProcessPath is { } exe)
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, KeepAlive.RestartArg) { UseShellExecute = false });
+        }
+        catch { }
+        if (_tray != null) { _tray.Visible = false; _tray.Dispose(); }
+        _window?.Shutdown();
+        Shutdown();
     }
 
-    static Drawing.Icon CreateTrayIcon()
+    static Drawing.Icon CreateTrayIcon(bool cyber = false)
+    {
+        var icon = cyber ? DrawCyberTrayIcon() : DrawTrayIcon();
+        try
+        {
+            WindowIcon = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty,
+                System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+        }
+        catch { }
+        return icon;
+    }
+
+    /// <summary>The cyberpunk notch: a cut black plate with a yellow frame and a cyan trace.</summary>
+    static Drawing.Icon DrawCyberTrayIcon()
+    {
+        const int s = 64;
+        using var bmp = new Drawing.Bitmap(s, s);
+        using (var g = Drawing.Graphics.FromImage(bmp))
+        {
+            g.SmoothingMode = Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.Clear(Drawing.Color.Transparent);
+            var pts = new[] { new Drawing.PointF(3, 18), new(61, 18), new(61, 37), new(52, 46), new(11, 46), new(3, 38) };
+            using var black = new Drawing.SolidBrush(Drawing.Color.FromArgb(0, 6, 14));
+            g.FillPolygon(black, pts);
+            using var yellow = new Drawing.Pen(Drawing.Color.FromArgb(0xFE, 0xE8, 0x01), 4) { LineJoin = Drawing.Drawing2D.LineJoin.Miter };
+            g.DrawPolygon(yellow, pts);
+            using var cyan = new Drawing.SolidBrush(Drawing.Color.FromArgb(0x54, 0xC1, 0xE6));
+            g.FillRectangle(cyan, 12, 30, 22, 4);
+            using var dot = new Drawing.SolidBrush(Drawing.Color.FromArgb(0xFE, 0xE8, 0x01));
+            g.FillRectangle(dot, 44, 28, 7, 7);
+        }
+        return Drawing.Icon.FromHandle(bmp.GetHicon());
+    }
+
+    static Drawing.Icon DrawTrayIcon()
     {
         const int s = 64;
         using var bmp = new Drawing.Bitmap(s, s);

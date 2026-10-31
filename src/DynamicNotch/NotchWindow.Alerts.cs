@@ -139,6 +139,7 @@ public partial class NotchWindow
         _notifications.Received += t =>
         {
             if (!_settings.NotificationAlerts) return;
+            if (TryRingFromToast(t)) return; // "Incoming call": shown as ringing, not as a message
             if (_focus.IsOn) { _focus.Hold(t.App); return; } // kept for the end-of-focus summary
             if (_inMeeting || _hidden || _mode == Mode.Expanded) return;
             // a burst of messages rings once, not ten times in a row
@@ -220,6 +221,7 @@ public partial class NotchWindow
 
     void UpdateActivityContent()
     {
+        CyberSkinSoon();
         if (_secondShown != LiveActivity.None) FillSecond(_secondShown);
         if (CurrentActivity == LiveActivity.Call) { FillCallPill(); return; }
         ResetCallPill();
@@ -320,7 +322,10 @@ public partial class NotchWindow
             else { OsdBar.BeginAnimation(PillSlider.ValueProperty, null); OsdBar.Value = to; }
         }
         OsdTextPanel.Visibility = isLevel ? Visibility.Collapsed : Visibility.Visible;
+        string titleBefore = OsdTitle.Text;
         OsdTitle.Text = r.Title ?? "";
+        if (OsdTitle.Text != titleBefore) CyberDecode(OsdTitle);
+        CyberSkinSoon(); // the pop-up's colours and art in the theme
         OsdSub.Text = r.Subtitle ?? "";
         OsdSub.Visibility = string.IsNullOrEmpty(r.Subtitle) ? Visibility.Collapsed : Visibility.Visible;
         OsdRight.Text = r.Right ?? "";
@@ -401,6 +406,7 @@ public partial class NotchWindow
         };
         // a colour: bright along the bottom, fading up the sides into the screen's edge.
         // nothing live: a faint glass bevel so the black shape still reads crisp on a dark wallpaper.
+        if (c == null && _mode != Mode.Slim && CustomEdge is { } edge) c = edge; // your edge colour, all the time
         Color k = c ?? Colors.White;
         double strength = c != null ? (_mode == Mode.Expanded ? 0.58 : 0.62) : _mode switch
         {
@@ -426,6 +432,7 @@ public partial class NotchWindow
         double px = Math.Max(1, Math.Round(_scale)) / Math.Max(1, _scale);
         Rim.BorderThickness = new Thickness(px, 0, px, px);
         if (_mode != Mode.Drop) UpdateAura(_mode == Mode.Osd ? _osdAccent : null); // the drop zone sets its own
+        CyberTint();
     }
 
     // ───────────────────────────── focus ─────────────────────────────
@@ -671,6 +678,7 @@ public partial class NotchWindow
         foreach (var k in _flashSeen.Where(kv => (now - kv.Value).TotalMinutes > 5).Select(kv => kv.Key).ToList()) _flashSeen.Remove(k);
 
         string? path = ProcessPath(hwnd);
+        if (await TryRingFromFlash(hwnd, path)) return; // a calling app ringing, not just "needs your attention"
         var (app, icon) = await DescribeAppAsync(path);
         if (_lastToast.App is { Length: > 0 } && (now - _lastToast.At).TotalSeconds < 5 &&
             (app.Contains(_lastToast.App, StringComparison.OrdinalIgnoreCase) || _lastToast.App.Contains(app, StringComparison.OrdinalIgnoreCase))) return;
@@ -774,15 +782,21 @@ public partial class NotchWindow
     void UpdatePrivacyBubble()
     {
         bool show = (_privacy.MicInUse || _privacy.CamInUse) && _mode is not (Mode.Expanded or Mode.Game) && !_hidden;
+        // the same height as what it sits beside: smaller next to the slim bar over a window
+        double h = _mode == Mode.Slim ? 20 : 26;
+        if (PrivacyBubble.Height != h) { PrivacyBubble.Height = h; PrivacyBubble.CornerRadius = PrivacyRim.CornerRadius = new CornerRadius(0, 0, h / 2, h / 2); }
         MicDot.Visibility = _privacy.MicInUse ? Visibility.Visible : Visibility.Collapsed;
         CamDot.Visibility = _privacy.CamInUse ? Visibility.Visible : Visibility.Collapsed;
         CamDot.Margin = new Thickness(_privacy.MicInUse ? 6 : 0, 0, 0, 0);
-        if (show == _privacyShown) return;
+        if (show == _privacyShown) { if (show) StylePrivacyIsland(); return; }
         _privacyShown = show;
+        StylePrivacyIsland();
         if (show)
         {
             PrivacyBubble.Visibility = Visibility.Visible;
-            PlacePrivacyBubble();
+            PrivacyBubble.UpdateLayout();
+            PlacePrivacyBubble(instant: true);
+            IslandNeck(PrivacyNeck, 26, splitting: true);
             var pop = new DoubleAnimation(0.4, 1, TimeSpan.FromMilliseconds(480)) { EasingFunction = new SpringEase { Damping = 0.62 } };
             PrivacyScale.BeginAnimation(ScaleTransform.ScaleXProperty, pop);
             PrivacyScale.BeginAnimation(ScaleTransform.ScaleYProperty, pop);
@@ -796,10 +810,10 @@ public partial class NotchWindow
         }
     }
 
-    void PlacePrivacyBubble()
+    void PlacePrivacyBubble(bool instant = false)
     {
         if (PrivacyBubble.Visibility != Visibility.Visible) return;
         double earW = _mode == Mode.Slim ? 0 : 10;
-        PrivacyShift.X = Pill.ActualWidth / 2 + earW + 6 + PrivacyBubble.ActualWidth / 2;
+        IslandFollow(PrivacyShift, Pill.ActualWidth / 2 + earW + 6 + PrivacyBubble.ActualWidth / 2, instant);
     }
 }

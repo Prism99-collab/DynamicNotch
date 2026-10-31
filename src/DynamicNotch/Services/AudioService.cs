@@ -193,6 +193,57 @@ public sealed class AudioService : IMMNotificationClient
         return paths;
     });
 
+    /// <summary>The apps playing sound right now on the default output (exe paths). Off the UI thread.</summary>
+    public static Task<List<string>> ActiveRenderAppsAsync() => Task.Run(() =>
+    {
+        var paths = new List<string>();
+        try
+        {
+            using var en = new MMDeviceEnumerator();
+            using var dev = en.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            var sessions = dev.AudioSessionManager.Sessions;
+            for (int i = 0; i < sessions.Count; i++)
+            {
+                using var s = sessions[i];
+                try
+                {
+                    if (s.State != AudioSessionState.AudioSessionStateActive || s.IsSystemSoundsSession) continue;
+                    uint pid = s.GetProcessID;
+                    if (pid == 0 || pid == Environment.ProcessId) continue;
+                    if (Interop.Native.ProcessPathById(pid) is { } path && !paths.Contains(path, StringComparer.OrdinalIgnoreCase)) paths.Add(path);
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return paths;
+    });
+
+    /// <summary>How loud an app is right now on the default output (0–1, its loudest session); 0 when silent or absent.</summary>
+    public static Task<float> AppPeakAsync(string path) => Task.Run(() =>
+    {
+        float peak = 0;
+        try
+        {
+            using var en = new MMDeviceEnumerator();
+            using var dev = en.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            var sessions = dev.AudioSessionManager.Sessions;
+            for (int i = 0; i < sessions.Count; i++)
+            {
+                using var s = sessions[i];
+                try
+                {
+                    if (s.State != AudioSessionState.AudioSessionStateActive) continue;
+                    if (!string.Equals(Interop.Native.ProcessPathById(s.GetProcessID), path, StringComparison.OrdinalIgnoreCase)) continue;
+                    peak = Math.Max(peak, s.AudioMeterInformation.MasterPeakValue);
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return peak;
+    });
+
     /// <summary>How loud your microphone hears you right now (0–1); 0 while it's muted.</summary>
     public bool TryGetMicPeak(out float level)
     {

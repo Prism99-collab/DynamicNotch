@@ -26,6 +26,21 @@ public sealed class Settings
     public bool ShelfDrop { get; set; } = true;
     /// <summary>The notch shows things but reacts to nothing (unlocked from the tray icon).</summary>
     public bool Locked { get; set; }
+    /// <summary>The cyberpunk skin (the yellow button in the control center).</summary>
+    public bool Cyberpunk { get; set; }
+    /// <summary>Your colours from the Colors page (#RRGGBB); null = the notch decides.</summary>
+    public string? ColorAccent { get; set; }
+    public string? ColorGlow { get; set; }
+    public string? ColorEdge { get; set; }
+    public string? ColorClock { get; set; }
+    /// <summary>The notch's own body (kept dark, so text stays readable).</summary>
+    public string? ColorPanel { get; set; }
+    /// <summary>The side pills' outline and glow (instead of each activity's own colour).</summary>
+    public string? ColorPills { get; set; }
+    /// <summary>"en", "fr" or "ar".</summary>
+    public string Language { get; set; } = "en";
+    /// <summary>Control-center pages switched off in Preferences (1 System, 2 Tools, 3 Clipboard &amp; Files, 4 Colors).</summary>
+    public List<int> HiddenPages { get; set; } = new();
     /// <summary>The first-start hello was shown (a new install says where the notch is and how to open it).</summary>
     public bool Welcomed { get; set; }
 

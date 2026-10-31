@@ -3,6 +3,35 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Cyberpunk theme (the yellow button beside the lock, Settings or Preferences): cut 45° shape with a yellow frame,
+  cyan traces, hazard stripes and a page tag; the 2077 palette and Bahnschrift everywhere; cut-corner tiles,
+  switches, chips, rows, sliders and segmented gauges; glitch bursts, a scan line on opening, decoding titles and a
+  data pulse along the frame. Side pills get their own cut frames. In games the FPS tag is just the number.
+  Switching it off restores the original look exactly; the tray icon follows the theme.
+- Colors page: a colour wheel and brightness mixer for six things (accent, glow, edge, clock, panel, pills),
+  previewed live on the notch, with Auto, eight presets and Shuffle.
+- Preferences window (right-click the tray icon): General, Appearance, Behaviour, Alerts, Pages, Shortcuts and
+  About, with search, instant saving and Mica on Windows 11. Pages of the control center can be hidden.
+- Languages: English, French and Arabic (right to left) for the notch's pages, Settings, Colors, the tray menu and
+  Preferences.
+- Mouse and headset battery rings beside the date, with low-battery alerts.
+- Incoming-call alert before you answer (Discord, Teams, WhatsApp…).
+
+### Changed
+- Smart and Settings are one page with three tabs (Display, Behaviour, Smart); the tray menu is short (open,
+  Preferences, lock, exit).
+- FPS pill: the frame count keeps running for a minute after Alt-Tab, so going back to the game is instant; the
+  number shows the exact rate (no easing); Store / Xbox games are recognised; games on another monitor and
+  anti-cheat-protected games are detected; launchers and clients never get the pill.
+- Side pills follow the notch instantly and absorb quickly when it opens.
+
+### Fixed
+- Device rings no longer disappear when the activity switcher shows.
+- Lower render cost while a game is full screen (the notch's window is hidden there).
+
 ## [1.3.1] — 2026-10-31
 
 ### Added

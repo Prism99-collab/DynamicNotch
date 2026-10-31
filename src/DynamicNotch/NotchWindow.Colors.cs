@@ -61,7 +61,8 @@ public partial class NotchWindow
         var c = await Task.Run(() => ScreenColor.Sample(area, skip));
         if (version != _ambientVersion) return;
         _hasAmbient = c != null;
-        _accent = c is { } k ? ScreenColor.Glow(k) : Colors.White;
+        _ambientAccent = c is { } k ? ScreenColor.Glow(k) : Colors.White;
+        _accent = CustomAccent ?? _ambientAccent; // your accent, if you picked one
         ApplyAccent();
         _panelTint = null; // repaint even if the colour is the same as last time: it fades in again with the panel
         UpdatePanelTint();
@@ -71,6 +72,7 @@ public partial class NotchWindow
     /// <summary>A gentle gradient for slider fills: a little deeper on the left, the colour itself on the right.</summary>
     Brush AccentFill()
     {
+        if (_cyber && CustomAccent == null) return CyberFill();
         var c = _accent;
         var g = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 0.5) };
         g.GradientStops.Add(new GradientStop(Color.FromRgb((byte)(c.R * 0.72), (byte)(c.G * 0.72), (byte)(c.B * 0.72)), 0));
@@ -97,17 +99,20 @@ public partial class NotchWindow
         LiveActivity.Download => WifiBlue,
         LiveActivity.Timer => ((SolidColorBrush)TimerBrush).Color,
         LiveActivity.Focus => FocusViolet,
-        _ => _hasAmbient ? _accent : ColourfulCover ? _media.Accent : null,
+        _ when CustomGlow is { } glow => glow, // your glow (Colors page)
+        _ when _cyber => CyTeal, // the cyber skin glows teal from the top, whatever app is in front
+        _ => _hasAmbient ? _ambientAccent : ColourfulCover ? _media.Accent : null,
     };
 
     /// <summary>The panel's rim while open: the same colour, so the glow has an edge.</summary>
-    Color? ExpandedRimColor() => PanelTintColor();
+    Color? ExpandedRimColor() => CustomEdge ?? PanelTintColor();
 
     /// <summary>The deep glow behind the open panel, gliding to the new colour.</summary>
     void UpdatePanelTint()
     {
         if (_tintBrush == null) return;
         var c = PanelTintColor();
+        if (_cyber && c is { } pc && pc != CustomGlow) c = CyMap(pc); // live colours in the 2077 palette
         if (c == _panelTint) return;
         bool fresh = _panelTint == null;
         _panelTint = c;

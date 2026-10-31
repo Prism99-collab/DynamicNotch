@@ -20,6 +20,15 @@ public sealed class RingGauge : FrameworkElement
 
     public const double Thickness = 6;
 
+    /// <summary>The cyberpunk skin: a segmented HUD dial instead of a smooth ring.</summary>
+    public static bool Segmented;
+
+    static Pen Dial(Brush b, double r)
+    {
+        double seg = 2 * Math.PI * r / 40 / Thickness; // 40 segments around, in pen-width units
+        return new Pen(b, Thickness) { DashStyle = new DashStyle(new[] { seg * 0.62, seg * 0.38 }, 0), DashCap = PenLineCap.Flat };
+    }
+
     public void AnimateTo(double v)
     {
         v = Math.Clamp(v, 0, 1);
@@ -51,11 +60,11 @@ public sealed class RingGauge : FrameworkElement
         if (size <= Thickness) return;
         double r = (size - Thickness) / 2;
         var c = new Point(ActualWidth / 2, ActualHeight / 2);
-        dc.DrawEllipse(null, TrackPen, c, r, r);
+        dc.DrawEllipse(null, Segmented ? Dial(TrackPen.Brush, r) : TrackPen, c, r, r);
 
         double v = Math.Clamp(Value, 0, 1);
         if (v <= 0.002) return;
-        var pen = new Pen(RingBrush, Thickness) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+        var pen = Segmented ? Dial(RingBrush, r) : new Pen(RingBrush, Thickness) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
         if (v >= 0.999) { dc.DrawEllipse(null, pen, c, r, r); return; }
 
         double a = v * 2 * Math.PI;

@@ -15,7 +15,11 @@ namespace DynamicNotch.Controls;
 public sealed class PillSlider : Grid
 {
     readonly Border _track = new(), _fill = new();
-    readonly Ellipse _knob = new();
+    readonly Rectangle _knob = new();
+    readonly RotateTransform _knobTurn = new();
+
+    /// <summary>The cyberpunk skin: square track and fill, a yellow diamond knob.</summary>
+    public static bool Square;
     readonly ScaleTransform _knobScale = new(0, 0);
     readonly TranslateTransform _knobShift = new();
 
@@ -61,7 +65,7 @@ public sealed class PillSlider : Grid
         _knob.IsHitTestVisible = false;
         _knob.Visibility = Visibility.Collapsed; // out of the render pass entirely until the pointer arrives
         _knob.RenderTransformOrigin = new Point(0.5, 0.5);
-        _knob.RenderTransform = new TransformGroup { Children = { _knobScale, _knobShift } };
+        _knob.RenderTransform = new TransformGroup { Children = { _knobTurn, _knobScale, _knobShift } };
         _knob.Effect = new DropShadowEffect { BlurRadius = 6, ShadowDepth = 1, Direction = 270, Opacity = 0.45, Color = Colors.Black };
 
         Children.Add(_track);
@@ -74,11 +78,26 @@ public sealed class PillSlider : Grid
     {
         double h = TrackHeight + Grow;
         _track.Height = _fill.Height = h;
-        _track.CornerRadius = _fill.CornerRadius = new CornerRadius(h / 2);
-        double k = TrackHeight + 8;
+        _track.CornerRadius = _fill.CornerRadius = new CornerRadius(Square ? 0 : h / 2);
+        double k = Square ? Math.Round((TrackHeight + 8) * 0.78) : TrackHeight + 8;
         _knob.Width = _knob.Height = k;
+        _knob.RadiusX = _knob.RadiusY = Square ? 0 : k / 2;
+        _knobTurn.Angle = Square ? 45 : 0;
         UpdateFill();
     }
+
+    /// <summary>The skin changed (see <see cref="Square"/>).</summary>
+    public void Restyle()
+    {
+        _knob.Fill = Square ? KnobYellow : Brushes.White;
+        _track.Background = Square ? CyTrack : WhiteTrack;
+        ApplyHeights();
+    }
+
+    static readonly Brush KnobYellow = Frozen(new SolidColorBrush(Color.FromRgb(0xFE, 0xE8, 0x01)));
+    static readonly Brush CyTrack = Frozen(new SolidColorBrush(Color.FromArgb(0x40, 0x54, 0xC1, 0xE6)));
+    static readonly Brush WhiteTrack = Frozen(new SolidColorBrush(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF)));
+    static Brush Frozen(Brush b) { b.Freeze(); return b; }
 
     void UpdateFill()
     {
