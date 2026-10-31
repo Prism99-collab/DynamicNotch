@@ -43,7 +43,7 @@ public partial class NotchWindow
             OnCallCheck();
         };
         _callWatch.Start();
-        _audio.MicChanged += () => { if (OnCall) { UpdateCallUi(); if (_mode == Mode.Activity) UpdateActivityContent(); UpdateRim(); UpdateSlimGlow(); } };
+        _audio.MicChanged += () => { if (OnCall) { UpdateCallUi(); if (_mode == Mode.Activity) UpdateActivityContent(); UpdateRim(); UpdateSlimGlow(); UpdatePanelTint(); } };
         _callTick.Tick += (_, _) =>
         {
             if (_mode == Mode.Activity && CurrentActivity == LiveActivity.Call) UpdateActivityContent();

@@ -145,7 +145,7 @@ public partial class NotchWindow
     void OnTouchDown(int x, int y)
     {
         _gestureLive = false;
-        if (_hidden || !IsBase(_mode) || _mode == Mode.Game) return; // never in a game: no accidental opens
+        if (_hidden || !IsBase(_mode) || _mode == Mode.Game || _settings.Locked) return; // never in a game or locked
         double cx = _winLeft + _winW / 2.0;
         double halfW = (Math.Max(_sw.Value, IdleSize.Width) / 2 + 16) * _scale, h = (Math.Max(_sh.Value, 12) + 22) * _scale;
         if (Math.Abs(x - cx) > halfW || y < _mon.Top || y > _mon.Top + h) return;

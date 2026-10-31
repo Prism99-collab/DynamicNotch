@@ -79,27 +79,37 @@ public partial class NotchWindow
         if (left && !_leftWasDown) { _pressAtTime = now; _pressAtPoint = p; }
         _leftWasDown = left;
 
-        if (!left)
+        if (!left || !_settings.ShelfDrop || _settings.Locked)
         {
             if (_dropArmed) SetDropArmed(false);
             if (_mode == Mode.Drop) LeaveDropZone();
             return;
         }
         double cx = _winLeft + _winW / 2.0;
-        bool near = p.Y - _mon.Top < 110 * _scale && Math.Abs(p.X - cx) < 270 * _scale;
-        // dragged away: the cursor left the area and the drag stopped reaching us (holding still over it is fine)
-        if (_mode == Mode.Drop && !near && (now - _lastDragOver).TotalMilliseconds > 350) { LeaveDropZone(); return; }
-        if (_dropArmed || _hidden || _mode == Mode.Expanded) return;
+        // it wakes only when the dragged thing is on the notch itself (a few pixels of slack), never just
+        // because something is being dragged somewhere near the top of the screen (desktop icons, tabs...)
+        double halfW = (Math.Max(_sw.Value, IdleSize.Width) / 2 + 12) * _scale;
+        double bottom = _mon.Top + (Math.Max(_sh.Value, IdleSize.Height) + 10) * _scale;
+        bool onNotch = Math.Abs(p.X - cx) <= halfW && p.Y <= bottom;
+        // once it's a drop zone, it stays while the cursor is over that bigger shape
+        bool overZone = Math.Abs(p.X - cx) <= (DropSize.Width / 2 + 30) * _scale && p.Y - _mon.Top <= (DropSize.Height + 30) * _scale;
+        // dragged away: the cursor left the zone and the drag stopped reaching us (holding still over it is fine)
+        if (_mode == Mode.Drop && !overZone && (now - _lastDragOver).TotalMilliseconds > 350) { LeaveDropZone(); return; }
+        if (_dropArmed && !onNotch && _mode != Mode.Drop) { SetDropArmed(false); return; } // passed over it and went on
+        if (_dropArmed || _hidden || _mode is Mode.Expanded or Mode.Game) return;
 
         double dx = p.X - _pressAtPoint.X, dy = p.Y - _pressAtPoint.Y;
         bool travelled = dx * dx + dy * dy > 60 * 60 * _scale * _scale;
         bool held = (now - _pressAtTime).TotalMilliseconds > 220;
-        if (travelled && held && near) SetDropArmed(true);
+        if (travelled && held && onNotch) SetDropArmed(true);
     }
 
     void SetDropArmed(bool on)
     {
         _dropArmed = on;
+        // the catcher covers the notch and a few pixels around it, nothing more
+        DropCatcher.Width = Math.Max(_sw.Value, IdleSize.Width) + 24;
+        DropCatcher.Height = Math.Max(_sh.Value, IdleSize.Height) + 10;
         DropCatcher.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         RefreshClickThrough();
     }
@@ -110,7 +120,7 @@ public partial class NotchWindow
 
     void OnShelfDragEnter(object sender, DragEventArgs e)
     {
-        if (!HasShelfData(e.Data)) { e.Effects = DragDropEffects.None; e.Handled = true; return; }
+        if (!HasShelfData(e.Data) || !_settings.ShelfDrop || _settings.Locked) { e.Effects = DragDropEffects.None; e.Handled = true; return; }
         _lastDragOver = DateTime.UtcNow;
         e.Effects = DragDropEffects.Copy;
         e.Handled = true;

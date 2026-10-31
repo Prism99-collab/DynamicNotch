@@ -83,7 +83,11 @@ public partial class App : Application
         Forms.Application.EnableVisualStyles();
         var menu = new Forms.ContextMenuStrip { ShowImageMargin = false, ShowCheckMargin = true };
         menu.Items.Add(Controls.DarkMenu.Header("Dynamic Notch"));
-        menu.Items.Add("Open control center    Win+Alt+N", null, (_, _) => _window?.Expand(byHotkey: true));
+        menu.Items.Add("Open control center    Win+Alt+N", null, (_, _) => { if (_window?.IsLocked == true) _window.SetLocked(false); _window?.Expand(byHotkey: true); });
+        var lockItem = new Forms.ToolStripMenuItem("Lock the notch (shows things, won't react)") { CheckOnClick = true };
+        lockItem.Click += (_, _) => _window?.SetLocked(lockItem.Checked);
+        _checks.Add((lockItem, () => _window?.IsLocked == true));
+        menu.Items.Add(lockItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
         AddCheck(menu, "Minimal when nothing is happening", () => _settings.MinimalWhenIdle, v => _settings.MinimalWhenIdle = v);
         AddCheck(menu, "Notification alerts", () => _settings.NotificationAlerts, v => _settings.NotificationAlerts = v);
@@ -122,8 +126,16 @@ public partial class App : Application
         };
         _tray.MouseClick += (_, e) =>
         {
-            if (e.Button == Forms.MouseButtons.Left) _window?.Expand(byHotkey: true);
+            if (e.Button != Forms.MouseButtons.Left || _window == null) return;
+            if (_window.IsLocked) _window.SetLocked(false); // a click on the tray icon is how a locked notch comes back
+            else _window.Expand(byHotkey: true);
         };
+        if (_window != null)
+        {
+            void ShowLock() { if (_tray != null) _tray.Text = _window.IsLocked ? "Dynamic Notch (locked, click to unlock)" : "Dynamic Notch"; }
+            _window.LockChanged += ShowLock;
+            ShowLock();
+        }
     }
 
     void AddCheck(Forms.ContextMenuStrip menu, string text, Func<bool> get, Action<bool> set)

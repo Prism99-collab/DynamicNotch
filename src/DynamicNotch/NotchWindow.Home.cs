@@ -36,9 +36,9 @@ public partial class NotchWindow
         OutputTab.Click += (_, _) => { _devicesInput = false; _devicesMixer = false; StopMixer(); RenderDevices(); };
         InputTab.Click += (_, _) => { _devicesInput = true; _devicesMixer = false; StopMixer(); RenderDevices(); };
         _audio.DevicesChanged += () => { if (_devicesOpen) RenderDevices(); };
-        BriSlider.ValueChanged += v => { _lastUserChange = DateTime.UtcNow; _bri.Set((int)Math.Round(v * 100)); BriText.Text = $"{(int)Math.Round(v * 100)}"; };
+        BriSlider.ValueChanged += v => { _lastUserChange = DateTime.UtcNow; _bri.Set((int)Math.Round(v * 100)); BriText.Text = $"{(int)Math.Round(v * 100)}"; BrightnessGlyphs(); };
         AppVolSlider.ValueChanged += v => { _audio.SetAppVolume((float)v); AppVolGlyph.Text = GlyphForLevel(v); };
-        ExtBriSlider.ValueChanged +=v => { _lastUserChange = DateTime.UtcNow; _extBri.Set((int)Math.Round(v * 100)); ExtBriText.Text = $"{(int)Math.Round(v * 100)}"; };
+        ExtBriSlider.ValueChanged +=v => { _lastUserChange = DateTime.UtcNow; _extBri.Set((int)Math.Round(v * 100)); ExtBriText.Text = $"{(int)Math.Round(v * 100)}"; BrightnessGlyphs(); };
         _extBri.Changed += RefreshExtBrightness;
 
         WifiTile.Click += async (_, _) => { bool on = WifiTile.IsOn = !WifiTile.IsOn; await _radio.SetWifiAsync(on); await ConfirmToggleAsync(() => _radio.WifiOn, on); };
@@ -206,6 +206,7 @@ public partial class NotchWindow
             : new SolidColorBrush(Color.FromRgb(0xFF, 0x9F, 0x0A));
         PowerTile.Glyph = mode switch { PowerMode.Efficiency => "", PowerMode.Performance => "", _ => "" };
         PowerTile.Label = mode switch { PowerMode.Efficiency => "Efficiency", PowerMode.Performance => "Performance", _ => "Balanced" };
+        ColorTiles();
     }
 
     void RefreshVolume()
@@ -237,6 +238,7 @@ public partial class NotchWindow
         BriRow.ToolTip = ext ? "Laptop screen brightness" : null;
         if (!ext) return;
         if (!ExtBriSlider.IsDragging && !RecentlyTouched) ExtBriSlider.Value = _extBri.Level / 100.0;
+        BrightnessGlyphs();
         ExtBriText.Text = $"{_extBri.Level}";
     }
 
@@ -261,37 +263,8 @@ public partial class NotchWindow
         UpdateRim();
     }
 
-    Color _glowFor = Colors.Transparent;
-
-    /// <summary>The open notch picks up the playing song's colours: a soft glow from behind the cover and a tinted progress bar.</summary>
-    void ApplyMediaColor()
-    {
-        bool tinted = _media.HasSession && _media.Art != null && _media.Accent != Colors.White;
-        var c = _media.Accent;
-        if (tinted && c != _glowFor)
-        {
-            var glow = new RadialGradientBrush
-            {
-                Center = new Point(0.14, 0.32), GradientOrigin = new Point(0.14, 0.32), RadiusX = 0.85, RadiusY = 0.95,
-                GradientStops =
-                {
-                    new GradientStop(Color.FromArgb(0x48, c.R, c.G, c.B), 0),
-                    new GradientStop(Color.FromArgb(0x14, c.R, c.G, c.B), 0.55),
-                    new GradientStop(Color.FromArgb(0, c.R, c.G, c.B), 1),
-                },
-            };
-            glow.Freeze();
-            MediaGlow.Background = glow;
-            ProgressSlider.FillBrush = Frozen(c);
-            _glowFor = c;
-        }
-        else if (!tinted)
-        {
-            ProgressSlider.FillBrush = Brushes.White;
-            _glowFor = Colors.Transparent;
-        }
-        Fade(MediaGlow, tinted ? 1 : 0, 400);
-    }
+    /// <summary>The song changed colour (or went away): the open panel's tint follows.</summary>
+    void ApplyMediaColor() => UpdatePanelTint();
 
     ImageBrush? ArtBrush(ImageSource? img)
     {
