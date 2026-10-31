@@ -3,7 +3,7 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.3.1] — 2026-10-31
 
 ### Added
 - Lock: a gold button in the control center (also in Settings and the tray menu). Locked, the notch keeps showing
@@ -140,6 +140,7 @@ First public release.
 - Starts at sign-in and comes back after lock, sleep or a crash; Exit keeps it off until reopened.
 - Dark tray menu, automatic battery mode, about 1 % of one CPU core when idle.
 
+[1.3.1]: https://github.com/Prism99-collab/DynamicNotch/releases/tag/v1.3.1
 [1.3.0]: https://github.com/Prism99-collab/DynamicNotch/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Prism99-collab/DynamicNotch/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Prism99-collab/DynamicNotch/releases/tag/v1.1.0
