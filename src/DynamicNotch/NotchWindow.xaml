@@ -166,16 +166,21 @@
 
                         <!-- status line -->
                         <Grid Margin="24,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock x:Name="ClockText" FontSize="13" FontWeight="SemiBold" />
                                 <TextBlock x:Name="DateText" FontSize="12" Foreground="{StaticResource Dim}" Margin="7,0,0,0" VerticalAlignment="Bottom" />
                                 <!-- mouse / headset batteries: tiny rings (Home only) -->
-                                <StackPanel x:Name="DeviceRings" Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center" Visibility="Collapsed" />
+                                <StackPanel x:Name="DeviceRings" Orientation="Horizontal" Margin="9,0,0,0" VerticalAlignment="Center" Visibility="Collapsed" />
                             </StackPanel>
-                            <TextBlock x:Name="PageTitle" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource Dim}"
+                            <TextBlock x:Name="PageTitle" Grid.ColumnSpan="3" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource Dim}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                             <!-- with several things live: pick which one the notch shows -->
-                            <Grid x:Name="LiveSwitch" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                            <Grid x:Name="LiveSwitch" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
                                 <Border x:Name="LiveHighlight" Width="30" Height="22" CornerRadius="11" BorderThickness="1"
                                         HorizontalAlignment="Left" IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5">
                                     <Border.RenderTransform>
@@ -187,15 +192,47 @@
                                 </Border>
                                 <StackPanel x:Name="LiveChips" Orientation="Horizontal" Margin="0,0,-4,0" />
                             </Grid>
-                            <StackPanel x:Name="BatteryPanel" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand">
+                            <StackPanel x:Name="BatteryPanel" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand">
+                                <!-- desktop icons, theme, lock: one small plate (NotchWindow.Desktop) -->
+                                <Grid x:Name="QuickCluster" Margin="0,0,9,0" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                                <Grid.RenderTransform><TranslateTransform x:Name="ClusterShift" /></Grid.RenderTransform>
+                                <Border x:Name="ClusterRound" CornerRadius="12" Background="#16FFFFFF" BorderBrush="#22FFFFFF" BorderThickness="1" />
+                                <Path x:Name="ClusterCut" Visibility="Collapsed" Stretch="Fill" StrokeThickness="1" StrokeLineJoin="Miter"
+                                      Data="M0,0 L58,0 L64,6 L64,24 L6,24 L0,18 Z" />
+                                <Path x:Name="ClusterTick" Visibility="Collapsed" StrokeThickness="1.6" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                      Data="M0.8,7 L0.8,0.8 L9,0.8" />
+                                <StackPanel Orientation="Horizontal" Margin="4,3">
+                                <!-- the desktop's icons: shown / hidden (Windows' own setting) -->
+                                <Button x:Name="DesktopBtn" Width="18" Height="18" Margin="0,0,4,0" Cursor="Hand" Visibility="Collapsed"
+                                        FontFamily="{StaticResource IconFont}" FontSize="9" Content="&#xE890;"
+                                        Background="#24FFFFFF" BorderBrush="#40FFFFFF" Foreground="#E6FFFFFF">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Grid x:Name="DeskBg" Background="Transparent">
+                                                <Ellipse x:Name="DeskRound" Fill="{TemplateBinding Background}" Stroke="{TemplateBinding BorderBrush}" StrokeThickness="1" />
+                                                <Path x:Name="DeskCut" Visibility="Collapsed" Stretch="Fill" Data="M0,0 L15,0 L22,7 L22,22 L7,22 L0,15 Z"
+                                                      Fill="{TemplateBinding Background}" Stroke="{TemplateBinding BorderBrush}" StrokeThickness="1.2" StrokeLineJoin="Miter" />
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Grid>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="Tag" Value="cy">
+                                                    <Setter TargetName="DeskRound" Property="Visibility" Value="Collapsed" />
+                                                    <Setter TargetName="DeskCut" Property="Visibility" Value="Visible" />
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="DeskBg" Property="Opacity" Value="0.85" /></Trigger>
+                                                <Trigger Property="IsPressed" Value="True"><Setter TargetName="DeskBg" Property="Opacity" Value="0.65" /></Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
                                 <!-- cyberpunk theme: on / off -->
-                                <Button x:Name="CyberBtn" Width="22" Height="22" Margin="0,0,8,0" Cursor="Hand" Background="#FEE801" BorderBrush="#9A9F17" Foreground="#00060E">
+                                <Button x:Name="CyberBtn" Width="18" Height="18" Margin="0,0,4,0" Cursor="Hand" Background="#FEE801" BorderBrush="#9A9F17" Foreground="#00060E">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
                                             <Grid x:Name="CyberBg" Background="Transparent">
                                                 <Path Stretch="Fill" Data="M0,0 L15,0 L22,7 L22,22 L7,22 L0,15 Z" Fill="{TemplateBinding Background}"
                                                       Stroke="{TemplateBinding BorderBrush}" StrokeThickness="1.2" StrokeLineJoin="Miter" />
-                                                <TextBlock Text="&#xE790;" FontFamily="{StaticResource IconFont}" FontSize="10.5" Foreground="{TemplateBinding Foreground}"
+                                                <TextBlock Text="&#xE790;" FontFamily="{StaticResource IconFont}" FontSize="9" Foreground="{TemplateBinding Foreground}"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Grid>
                                             <ControlTemplate.Triggers>
@@ -206,7 +243,7 @@
                                     </Button.Template>
                                 </Button>
                                 <!-- lock: the notch stays, but stops reacting (unlock from its tray icon) -->
-                                <Button x:Name="LockBtn" Width="22" Height="22" Margin="0,0,10,0" Cursor="Hand"
+                                <Button x:Name="LockBtn" Width="18" Height="18" Cursor="Hand"
                                         ToolTip="Lock the notch · unlock from the tray icon">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
@@ -219,10 +256,10 @@
                                                         </LinearGradientBrush>
                                                     </Ellipse.Fill>
                                                     <Ellipse.Effect>
-                                                        <DropShadowEffect Color="#FF9F0A" BlurRadius="10" ShadowDepth="0" Opacity="0.55" />
+                                                        <DropShadowEffect Color="#FF9F0A" BlurRadius="7" ShadowDepth="0" Opacity="0.5" />
                                                     </Ellipse.Effect>
                                                 </Ellipse>
-                                                <TextBlock Text="&#xE72E;" FontFamily="{StaticResource IconFont}" FontSize="10.5" Foreground="#1C1C1E"
+                                                <TextBlock Text="&#xE72E;" FontFamily="{StaticResource IconFont}" FontSize="9" Foreground="#1C1C1E"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Grid>
                                             <ControlTemplate.Triggers>
@@ -232,6 +269,8 @@
                                         </ControlTemplate>
                                     </Button.Template>
                                 </Button>
+                                </StackPanel>
+                                </Grid>
                                 <TextBlock x:Name="PrivacyText" FontFamily="{StaticResource IconFont}" FontSize="11" Margin="0,0,8,0" VerticalAlignment="Center" />
                                 <TextBlock x:Name="BatteryText" FontSize="12" Foreground="#D9FFFFFF" Margin="0,0,7,0" VerticalAlignment="Center" />
                                 <c:BatteryIcon x:Name="Battery" VerticalAlignment="Center" />

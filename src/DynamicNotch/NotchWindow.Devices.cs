@@ -55,8 +55,10 @@ public partial class NotchWindow
     {
         var devices = _devices.Devices;
         bool show = devices.Count > 0 && _page == 0;
-        bool compact = show && LiveSwitch.Visibility == Visibility.Visible;
-        DateText.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        // minimal: with rings, the clock stands alone (the date is in its hint) and each ring is just a ring, its
+        // level in its fill and colour; the number only shows when it's running low
+        bool compact = show;
+        DateText.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
         if (!show) { DeviceRings.Visibility = Visibility.Collapsed; return; }
         DeviceRings.Visibility = Visibility.Visible;
         // only rebuilt when something on them changes (a ring under the pointer keeps its hint)
@@ -69,7 +71,7 @@ public partial class NotchWindow
 
     FrameworkElement DeviceRing(DeviceBattery d, bool compact = false)
     {
-        const double size = 18, stroke = 1.8;
+        const double size = 17, stroke = 1.7;
         bool live = d.State == BatteryState.Live && d.Level != null;
         double level = Math.Clamp((d.Level ?? 0) / 100.0, 0, 1);
         var color = !live ? Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF)
@@ -126,9 +128,9 @@ public partial class NotchWindow
             VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3, 0, 0, 0),
             FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI"), Typography = { NumeralAlignment = FontNumeralAlignment.Tabular },
         };
-        var item = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, compact ? 6 : 9, 0), Background = Brushes.Transparent };
+        var item = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, compact ? 5 : 9, 0), Background = Brushes.Transparent };
         item.Children.Add(grid);
-        if (!compact) item.Children.Add(pct);
+        if (!compact || (live && level < 0.2 && !d.Charging)) { pct.Foreground = compact ? Frozen(RingRed) : pct.Foreground; item.Children.Add(pct); } // low: say it
         // the hint opens the moment the pointer arrives (no tooltip delay), in front of everything
         item.MouseEnter += (_, _) => ShowTip(item, hint);
         return item;

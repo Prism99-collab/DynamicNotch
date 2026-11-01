@@ -29,6 +29,9 @@ public partial class NotchWindow
         {
             if (_media.Duration > TimeSpan.Zero && _media.CanSeek) await _media.SeekAsync(TimeSpan.FromTicks((long)(_media.Duration.Ticks * v)));
         };
+        // the date, when the header is too full to show it: in the clock's hint
+        ClockText.Background = Brushes.Transparent;
+        ClockText.MouseEnter += (_, _) => { if (DateText.Visibility != Visibility.Visible) ShowTip(ClockText, DateTime.Now.ToString("dddd d MMMM")); };
         // a click on the cover or the title brings the player itself to the front (the app, or the browser tab)
         foreach (var el in new FrameworkElement[] { ArtBox, ArtDisc, TitleText })
         {
@@ -117,6 +120,7 @@ public partial class NotchWindow
         RefreshBrightness();
         RefreshExtBrightness();
         RefreshPrivacyStatus();
+        RefreshDesktopBtn(); // changed from the desktop's own menu since?
         UpdateCallUi();
         _ = _bri.RefreshAsync();
         _ = _bt.RefreshBatteriesAsync(); // a controller's battery is fresh whenever you look
