@@ -323,7 +323,7 @@ public sealed class PreferencesWindow : Window
         new(Sec.Behaviour, "", "Open at top edge", "Push the pointer to the top of the screen to open it", () => _s.HoverToOpen, v => _s.HoverToOpen = v),
         new(Sec.Behaviour, "", "Drop files on the notch", "Keep files on the shelf, drag them out anywhere", () => _s.ShelfDrop, v => _s.ShelfDrop = v),
         new(Sec.Behaviour, "", "Hide in full screen", "Out of the way in videos and full-screen apps", () => _s.HideInFullscreen, v => _s.HideInFullscreen = v),
-        new(Sec.Behaviour, "", "FPS in games", "A tiny frame-rate pill while you play", () => _s.GameStats && FpsService.AccountCanTrace(), v => _notch.PrefSetFps(v)),
+        new(Sec.Behaviour, "", "FPS in games", "A tiny frame-rate pill while you play", () => _s.GameStats, v => _notch.PrefSetFps(v)),
         new(Sec.Behaviour, "", "Lock the notch", "It shows things but reacts to nothing", () => _s.Locked, v => _notch.SetLocked(v)),
 
         new(Sec.Alerts, "", "Notification alerts", "Messages and app notifications", () => _s.NotificationAlerts, v => _s.NotificationAlerts = v),
@@ -732,6 +732,25 @@ public sealed class PreferencesWindow : Window
             Text = Loc.T("Small and quiet: they change once a second, in fixed widths, so nothing moves in the corner of your eye."),
             FontSize = 11.5, Foreground = Dim, Margin = new Thickness(4, 0, 0, 6), TextWrapping = TextWrapping.Wrap,
         });
+
+        Label(Loc.T("Size in games"));
+        var sizes = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+        foreach (var (name, k) in new[] { ("Small", 0.85), ("Normal", 1.0), ("Large", 1.2), ("Extra large", 1.4) })
+        {
+            var b = PillButton(null, Loc.T(name), () => { }, primary: false);
+            b.Margin = new Thickness(0, 0, 8, 8);
+            b.Tag = k;
+            SetPill(b, Math.Abs(_notch.PrefFpsScale - k) < 0.01);
+            double size = k;
+            b.Click += (_, _) =>
+            {
+                _notch.PrefSetFpsScale(size);
+                foreach (var other in sizes.Children.OfType<Button>()) SetPill(other, ReferenceEquals(other, b));
+                Saved();
+            };
+            sizes.Children.Add(b);
+        }
+        _content.Children.Add(sizes);
 
         Label(Loc.T("Their colours"));
         var colours = new StackPanel { Margin = new Thickness(18, 12, 18, 12) };

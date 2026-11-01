@@ -171,7 +171,11 @@ public sealed class FpsService : IDisposable
         int head = _head;
         _times[head & (Ring - 1)] = stamp;
         Volatile.Write(ref _head, head + 1);
+        OnFrame?.Invoke(stamp);
     }
+
+    /// <summary>Every frame's timestamp as it's counted (the elevated helper passes them on to the notch).</summary>
+    public Action<long>? OnFrame;
 
     /// <summary>Enables only the graphics kernel's present events (an event-ID filter, Windows 8.1 and later).</summary>
     bool EnableKernelPresents()

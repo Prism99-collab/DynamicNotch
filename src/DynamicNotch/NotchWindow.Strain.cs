@@ -150,6 +150,15 @@ public partial class NotchWindow
 
     internal string? PrefFpsColor(bool cpu) => cpu ? _settings.FpsCpuColor : _settings.FpsGpuColor;
 
+    internal double PrefFpsScale => _settings.FpsScale;
+
+    internal void PrefSetFpsScale(double k)
+    {
+        _settings.FpsScale = k;
+        _settings.Save();
+        ApplyFpsScale(); // at once, even mid-game
+    }
+
     internal void PrefSetFpsColor(bool cpu, string? hex)
     {
         if (cpu) _settings.FpsCpuColor = hex; else _settings.FpsGpuColor = hex;

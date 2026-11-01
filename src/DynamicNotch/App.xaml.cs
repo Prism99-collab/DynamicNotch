@@ -17,6 +17,13 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // the elevated frame reader for "FPS in games" (Services/FpsBridge): no window, no tray, just the count
+        if (e.Args.Contains("--fps-helper"))
+        {
+            int code = FpsHelper.Run(e.Args);
+            Shutdown(code);
+            return;
+        }
         bool auto = e.Args.Contains(KeepAlive.AutoArg, StringComparer.OrdinalIgnoreCase);
         bool restarted = e.Args.Contains(KeepAlive.RestartArg, StringComparer.OrdinalIgnoreCase);
 
