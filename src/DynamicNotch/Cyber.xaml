@@ -261,7 +261,7 @@
                     </LinearGradientBrush>
                 </Path.Fill>
             </Path>
-            <TextBlock Text="&#xE72E;" FontFamily="{StaticResource IconFont}" FontSize="10.5" Foreground="#00060E"
+            <TextBlock Text="&#xE72E;" FontFamily="{StaticResource IconFont}" FontSize="9" Foreground="#00060E"
                        HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Grid>
         <ControlTemplate.Triggers>

@@ -154,6 +154,7 @@ public partial class NotchWindow
         ApplyPanelColor(); // your panel colour wins over the theme's body
         if (_devicesOpen) StyleDevicesBack(); // the device list open right now follows the switch
         StyleArtDisc(); // the cover: a spinning record in this theme, the square one in the others
+        RefreshDesktopBtn(); // round, or cut like its neighbours
         Controls.BatteryIcon.Health = on; // the battery as the game's segmented health bar
         Battery.Restyle();
         OsdBattery.Restyle();

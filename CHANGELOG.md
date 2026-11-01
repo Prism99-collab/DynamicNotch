@@ -3,6 +3,20 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.5] — 2026-11-01
+
+### Added
+- A small eye button in Home's header shows or hides the desktop icons (Windows' own "Show desktop icons", so it
+  agrees with the desktop's menu and stays after a restart). Lit while the icons are hidden. Works with wallpaper
+  slideshows and wallpaper apps; hidden on PCs without Explorer's desktop.
+
+### Changed
+- Home's header is tidier: the desktop, theme and lock buttons sit small on one plate (cut, cyan-rimmed and twitchy
+  in Cyberpunk), the live chips fit the space between the two sides and never slide under the buttons, and the left
+  side is just the clock and slim battery rings (the date in the clock's hint, a ring's number only when it's low).
+- Song pop-ups get out of the way: none when the song changes in the window you're using (a browser tab, Spotify),
+  shorter over windows, and passing the pointer over one no longer holds it or makes it grow.
+
 ## [1.7.4] — 2026-11-01
 
 ### Added

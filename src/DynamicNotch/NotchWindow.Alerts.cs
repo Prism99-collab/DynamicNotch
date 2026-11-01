@@ -53,7 +53,10 @@ public partial class NotchWindow
         _media.TrackChanged += () =>
         {
             if (!_media.IsPlaying || !_settings.ShowMediaActivity) return;
-            ShowOsd("media", null, null, _media.Title, _media.Artist, null, art: _media.Art, seconds: 2.6, onClick: () => ExpandTo(0));
+            if (PlayerInFront()) return; // you're in the player's own window: you can see the song already
+            // over a window you're working in: brief, so it's gone before you reach for a tab
+            ShowOsd("media", null, null, _media.Title, _media.Artist, null, art: _media.Art, seconds: _overWindow ? 1.6 : 2.4, prio: Prio.Low,
+                onClick: () => ExpandTo(0));
         };
 
         _audio.VolumeChanged += () =>
@@ -493,6 +496,28 @@ public partial class NotchWindow
         if (_hidden) Fade(Shell, 0, 200);
     }
 
+    System.Windows.Threading.DispatcherTimer _osdDwell = null!;
+
+    /// <summary>
+    /// The app playing the music is the window you're using (a song changing in the browser you're browsing in):
+    /// you can already see it, no pop-up. Store apps can't be told apart this way and keep their pop-up.
+    /// </summary>
+    bool PlayerInFront()
+    {
+        string? app = _media.SourceApp;
+        if (string.IsNullOrEmpty(app) || app.Contains('!')) return false;
+        string name = Path.GetFileNameWithoutExtension(app);
+        if (name.Equals("MSEdge", StringComparison.OrdinalIgnoreCase)) name = "msedge";
+        try
+        {
+            GetWindowThreadProcessId(GetForegroundWindow(), out uint pid);
+            if (pid == 0) return false;
+            using var p = System.Diagnostics.Process.GetProcessById((int)pid);
+            return p.ProcessName.Equals(name, StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
+
     void UpdateOsdChrome()
     {
         bool clickable = _mode == Mode.Osd && _osd?.OnClick != null;
@@ -505,16 +530,27 @@ public partial class NotchWindow
         _osdTimer.Tick -= OnOsdTimer;
         _osdTimer.Tick += OnOsdTimer;
 
-        Pill.MouseEnter += (_, _) =>
+        // a pop-up stays while you look at it, but only once the pointer rests on it: passing over it on the way to a
+        // browser tab or a window's title bar doesn't hold it (or make it grow under your click)
+        _osdDwell = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(380) };
+        _osdDwell.Tick += (_, _) =>
         {
-            if (_mode != Mode.Osd || _osd?.OnClick == null) return;
+            _osdDwell.Stop();
+            if (_mode != Mode.Osd || _osd?.OnClick == null || !Pill.IsMouseOver) return;
             _osdHover = true;
-            _osdTimer.Stop(); // stays while you look at it
+            _osdTimer.Stop();
             ApplyShape();
             UpdateOsdChrome();
         };
+        Pill.MouseEnter += (_, _) =>
+        {
+            if (_mode != Mode.Osd || _osd?.OnClick == null) return;
+            _osdDwell.Stop();
+            _osdDwell.Start();
+        };
         Pill.MouseLeave += (_, _) =>
         {
+            _osdDwell.Stop();
             if (_mode != Mode.Osd || !_osdHover) return;
             _osdHover = _pressed = false;
             ApplyShape();

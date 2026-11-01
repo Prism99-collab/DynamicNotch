@@ -26,6 +26,7 @@ public partial class NotchWindow
     {
         _media.PlayersChanged += () => { RenderSwitch(); if (_mode == Mode.Expanded) UpdateCardDots(animate: true); }; // a tab started, stopped, closed, or came to the front
         LiveMenu.MouseLeave += (_, _) => HideLiveMenu();
+        WireChipsFit();
         foreach (var row in new FrameworkElement[] { MediaRow, CallRow })
         {
             row.RenderTransform = new TranslateTransform();
@@ -195,7 +196,7 @@ public partial class NotchWindow
         var front = FrontItem(items);
         // too many to fit: the first few, always including the one in front, then "+N"
         var visible = items;
-        int maxChips = _devices.Devices.Count > 0 ? 3 : MaxChips; // the battery rings take part of the header
+        int maxChips = ChipsThatFit();
         if (items.Count > maxChips)
         {
             visible = items.Take(maxChips - 1).ToList();
@@ -227,6 +228,29 @@ public partial class NotchWindow
             string menuKey = string.Join(",", items.Select(i => i.Key)) + "|" + front?.Key;
             if (menuKey != _menuKey) { _menuKey = menuKey; RenderLiveMenu(items, front); }
         }
+    }
+
+    /// <summary>
+    /// How many chips fit between the clock side and the buttons side of the header, whatever is there (battery
+    /// rings, the button plate, a long date in another language): the chips never slide under anything.
+    /// </summary>
+    int ChipsThatFit()
+    {
+        if (LiveSwitch.Parent is Grid g && g.ColumnDefinitions.Count > 1 && g.ColumnDefinitions[1].ActualWidth > 0)
+            return Math.Clamp((int)((g.ColumnDefinitions[1].ActualWidth - 8 + ChipGap) / (ChipW + ChipGap)), 2, MaxChips);
+        return _devices.Devices.Count > 0 ? 3 : MaxChips; // not laid out yet
+    }
+
+    bool _chipsFitWired;
+
+    /// <summary>The sides of the header changed width (a battery ring came, the language changed): the chips refit.</summary>
+    void WireChipsFit()
+    {
+        if (_chipsFitWired || LiveSwitch.Parent is not Grid g) return;
+        _chipsFitWired = true;
+        foreach (UIElement child in g.Children)
+            if (child is FrameworkElement fe && Grid.GetColumn(fe) != 1 && Grid.GetColumnSpan(fe) == 1)
+                fe.SizeChanged += (_, e) => { if (e.WidthChanged && LiveSwitch.Visibility == Visibility.Visible) RenderSwitch(); };
     }
 
     FrameworkElement ChipIcon(SwitchItem item, double size)
