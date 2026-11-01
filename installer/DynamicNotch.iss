@@ -3,7 +3,7 @@
 ; Per-user install: no administrator prompt, installs to %LOCALAPPDATA%\Programs\Dynamic Notch.
 
 #ifndef AppVersion
-  #define AppVersion "1.7.1"
+  #define AppVersion "1.7.2"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish"

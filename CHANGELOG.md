@@ -3,6 +3,18 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.2] — 2026-11-01
+
+### Fixed
+- Turning on "FPS in games" works at once: one Windows prompt, and the frame rate shows in the next game. No sign-out
+  and no restart of the notch needed any more (before, the switch stayed off until you signed out and back in).
+- The FPS switch shows what you chose, in the notch's settings and in Preferences.
+- Turning FPS off takes effect immediately, even with a game in front.
+
+### Added
+- Preferences → Behaviour → "Size in games": Small, Normal, Large or Extra large for the whole FPS pill (the frame
+  rate and the CPU/GPU extras together). Applies at once, even mid-game.
+
 ## [1.7.1] — 2026-11-01
 
 ### Fixed

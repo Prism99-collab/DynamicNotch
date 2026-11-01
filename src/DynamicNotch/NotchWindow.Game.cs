@@ -19,7 +19,7 @@ public partial class NotchWindow
     GameState? _game;
     double? _gameFps;
     bool _fpsOn;              // frames are being counted for the current game
-    readonly FpsService _fps = new();
+    readonly FrameCounter _fps = new(); // the notch itself, or the helper until the next sign-in (Services/FpsBridge)
     readonly GameService _gameService = new();
     readonly DispatcherTimer _gameTimer = new(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
     // the number itself: 20 times a second, gliding toward the real rate so it reads as one continuous value
@@ -103,6 +103,7 @@ public partial class NotchWindow
         _gameTimer.Tick += (_, _) => OnGameTick();
         _fpsTicker.Tick += (_, _) => OnFpsTick();
         _fpsLinger.Tick += (_, _) => StopLinger();
+        After(5000, EnsureFpsReader); // FPS on, but no reader yet this session: the helper (one prompt)
     }
 
     /// <summary>The minute after leaving a game is over (or another game started): the trace stops.</summary>
@@ -310,21 +311,53 @@ public partial class NotchWindow
     /// </summary>
     async void SetFpsInGames(bool on)
     {
-        if (on && !FpsService.AccountCanTrace())
+        if (!on)
         {
-            // Windows' permission prompt stays up as long as it likes: wait for it off the UI thread
-            if (!await Task.Run(FpsService.RequestAccess))
+            _settings.GameStats = false;
+            _settings.Save();
+            _fps.StopHelper(); // the helper (if any) quits; nothing reads frames any more
+            CheckForeground(); // a game in front leaves game mode at once
+            RefreshBase();
+            SyncSettingsPage();
+            return;
+        }
+        if (!_fps.Ready)
+        {
+            // one Windows prompt: the account joins "Performance Log Users" for good, and a helper reads the frames
+            // right now for this session (no sign-out, no restart). Wait for it off the UI thread.
+            ShowOsd("fps", "\uE7FC", null, Loc.T("Turning FPS on"), Loc.T("Windows asks for your OK once"), null, glyphBrush: Green, seconds: 3, force: true);
+            bool ok = await Task.Run(() => _fps.LaunchHelper(join: true));
+            if (!ok)
             {
-                ShowOsd("fps", "", null, "FPS in games stays off", "Windows needs your OK once to read a game's frames", null, glyphBrush: Orange, seconds: 3.5, force: true);
+                ShowOsd("fps", "\uE7FC", null, Loc.T("FPS in games stays off"),
+                    Loc.T("If you allowed it: sign out and back in once, then it works"), null, glyphBrush: Orange, seconds: 5, force: true);
                 SyncSettingsPage();
                 return;
             }
-            ShowOsd("fps", "", null, "Almost there", "Sign out and back in once, then FPS shows in games", null, glyphBrush: Green, seconds: 4.5, force: true);
+            AppLog.Write("fps: the helper reads frames until the next sign-in");
         }
-        _settings.GameStats = on;
+        _settings.GameStats = true;
         _settings.Save();
-        CheckForeground();
+        ShowOsd("fps", "\uE7FC", null, Loc.T("FPS in games is on"), Loc.T("It shows as soon as a game is in front"), null, glyphBrush: Green, seconds: 3, force: true);
+        CheckForeground(); // a game already in front gets its pill now
         RefreshBase();
+        SyncSettingsPage();
+    }
+
+    bool _fpsHelperAsked;
+
+    /// <summary>
+    /// At start: FPS is on but this sign-in can't read frames yet (it was turned on earlier in this Windows session,
+    /// before the group applied): the helper again, so the pill works without signing out. Once per run; never
+    /// while a game is in front.
+    /// </summary>
+    async void EnsureFpsReader()
+    {
+        if (_fpsHelperAsked || !_settings.GameStats || _fps.Ready || InGame) return;
+        _fpsHelperAsked = true;
+        bool ok = await Task.Run(() => _fps.LaunchHelper(join: true));
+        AppLog.Write(ok ? "fps: helper started for this session" : "fps: no frame reader this session (sign out and back in once)");
+        if (ok) CheckForeground();
     }
 
     /// <summary>

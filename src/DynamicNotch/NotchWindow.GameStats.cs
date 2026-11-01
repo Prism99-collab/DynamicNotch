@@ -113,8 +113,8 @@ public partial class NotchWindow
     {
         if (GamePanel.Children.Count == 0 || GamePanel.Children[0] is not FrameworkElement row) return;
         row.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        double min = _cyber ? 46 : 54;
-        double w = Math.Max(min, Math.Ceiling((row.DesiredSize.Width + 16) / 8) * 8);
+        double min = (_cyber ? 46 : 54) * FpsScale;
+        double w = Math.Max(min, Math.Ceiling((row.DesiredSize.Width + 16 * FpsScale) / 8) * 8);
         if (Math.Abs(w - _gameWidth) < 1) return;
         _gameWidth = w;
         GamePanel.Width = w;
@@ -126,5 +126,22 @@ public partial class NotchWindow
     }
 
     /// <summary>The pill's width in a game (the frame rate alone, or with its extras).</summary>
-    double GamePillWidth => Math.Max(_cyber ? 46 : 54, _gameWidth);
+    double GamePillWidth => Math.Max((_cyber ? 46 : 54) * FpsScale, _gameWidth);
+
+    /// <summary>The pill's height in a game, at the chosen size.</summary>
+    double GamePillHeight => (_cyber ? 16 : 18) * FpsScale;
+
+    double FpsScale => Math.Clamp(_settings.FpsScale, 0.7, 1.6);
+
+    /// <summary>The chosen size: the pill's content scales as one (frame rate, extras, spacing), its shape follows.</summary>
+    void ApplyFpsScale()
+    {
+        if (GamePanel.Children.Count == 0 || GamePanel.Children[0] is not FrameworkElement row) return;
+        double k = FpsScale;
+        row.LayoutTransform = Math.Abs(k - 1) < 0.01 ? Transform.Identity : new ScaleTransform(k, k);
+        GamePanel.Height = GamePillHeight;
+        _gameWidth = 0; // measured again at the new size
+        FitGamePill();
+        if (_mode == Mode.Game) ApplyShape();
+    }
 }

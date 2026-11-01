@@ -50,6 +50,8 @@ public sealed class Settings
     public bool FpsGpuTemp { get; set; }
     public string? FpsCpuColor { get; set; }
     public string? FpsGpuColor { get; set; }
+    /// <summary>The whole FPS pill's size in games (0.85 small, 1 normal, 1.2 large, 1.4 extra large).</summary>
+    public double FpsScale { get; set; } = 1;
     /// <summary>Your colours from the Colors page (#RRGGBB); null = the notch decides.</summary>
     public string? ColorAccent { get; set; }
     public string? ColorGlow { get; set; }

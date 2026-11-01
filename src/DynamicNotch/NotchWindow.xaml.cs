@@ -134,6 +134,7 @@ public partial class NotchWindow : Window
         Safe(nameof(WireStrain), WireStrain);
         Safe(nameof(WireHolo), WireHolo);
         Safe(nameof(WireGlide), WireGlide);
+        Safe(nameof(ApplyFpsScale), ApplyFpsScale);
         Safe(nameof(ApplyCustomColors), ApplyCustomColors); // your colours from the Colors page
         Safe(nameof(WireColors), WireColors);
         Safe(nameof(WireDevices), WireDevices);
@@ -258,7 +259,7 @@ public partial class NotchWindow : Window
         if (small == _smallWindow) return;
         _smallWindow = small;
         Width = small ? Math.Max(SmallWidth, GamePillWidth + 40) : FullWidth; // wide enough for the FPS pill's extras
-        Height = small ? SmallHeight : FullHeight;
+        Height = small ? Math.Max(SmallHeight, GamePillHeight + 18) : FullHeight;
         PositionWindow();
     }
 
@@ -482,7 +483,7 @@ public partial class NotchWindow : Window
             case Mode.Media: w = MediaSize.Width; h = MediaSize.Height; r = MediaRadius; break;
             case Mode.Activity: w = ActivitySize.Width; h = ActivitySize.Height; r = MediaRadius; break;
             // the cyber skin's FPS tag is a touch tighter (just the number, small cuts, no flares)
-            case Mode.Game: w = GamePillWidth; h = _cyber ? 16 : GameSize.Height; r = h / 2; break;
+            case Mode.Game: w = GamePillWidth; h = GamePillHeight; r = h / 2; break;
             case Mode.Slim: w = SlimSize.Width; h = SlimSize.Height; r = SlimRadius; break;
             default: w = IdleSize.Width; h = IdleSize.Height; r = IdleRadius; break;
         }
