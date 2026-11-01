@@ -32,6 +32,23 @@
                           Visibility="Collapsed" Opacity="0">
                         <Border x:Name="CompactArt" Width="20" Height="20" CornerRadius="6" HorizontalAlignment="Left"
                                 VerticalAlignment="Center" Margin="13,0,0,1" Background="#2A2A2E" />
+                        <!-- the cyberpunk theme's: the same record in small, turning with the big one (NotchWindow.Disc) -->
+                        <Grid x:Name="MiniDisc" Width="20" Height="20" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="13,0,0,1"
+                              Visibility="Collapsed" IsHitTestVisible="False">
+                            <Ellipse x:Name="MiniGlow" Width="30" Height="30" Margin="-5" />
+                            <Ellipse x:Name="MiniArt" Width="17" Height="17" RenderTransformOrigin="0.5,0.5" Fill="#FF0A0F14" />
+                            <Ellipse Width="17" Height="17">
+                                <Ellipse.Fill>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#2EFFFFFF" Offset="0" />
+                                        <GradientStop Color="#00FFFFFF" Offset="0.45" />
+                                    </LinearGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            <Ellipse x:Name="MiniRing" Width="20" Height="20" StrokeThickness="1" />
+                            <Ellipse Width="5" Height="5" Fill="#FF05080C" />
+                            <Ellipse x:Name="MiniPin" Width="2" Height="2" />
+                        </Grid>
                         <StackPanel x:Name="Eq" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"
                                     Height="13" Margin="0,0,15,1">
                             <Rectangle Width="3" Height="13" RadiusX="1.5" RadiusY="1.5" Margin="1.2,0" Fill="White" VerticalAlignment="Bottom" />
@@ -250,6 +267,31 @@
                                                     <TextBlock x:Name="ArtPlaceholder" Text="&#xE8D6;" FontFamily="{StaticResource IconFont}" FontSize="22"
                                                                Foreground="#55FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
+                                                <!-- the cyberpunk theme's cover: a spinning disc in a glow, a HUD ring turning the other way (NotchWindow.Disc) -->
+                                                <Grid x:Name="ArtDisc" Width="64" Height="64" Visibility="Collapsed" IsHitTestVisible="False">
+                                                    <Ellipse x:Name="DiscGlow" Width="88" Height="88" Margin="-12" />
+                                                    <Grid x:Name="DiscHud" Width="64" Height="64" RenderTransformOrigin="0.5,0.5">
+                                                        <Ellipse x:Name="DiscRing" StrokeThickness="1.2" StrokeDashArray="5 3" />
+                                                        <Path x:Name="DiscTick" StrokeThickness="2.2" StrokeStartLineCap="Flat" StrokeEndLineCap="Flat" Data="M 52.2,7.95 A 31.4,31.4 0 0 1 61.5,21.26" />
+                                                    </Grid>
+                                                    <Ellipse x:Name="DiscArt" Width="54" Height="54" RenderTransformOrigin="0.5,0.5" Fill="#FF0A0F14" />
+                                                    <Ellipse Width="54" Height="54" Stroke="#30000000" StrokeThickness="1" />
+                                                    <Ellipse Width="44" Height="44" Stroke="#22000000" StrokeThickness="1" />
+                                                    <Ellipse Width="34" Height="34" Stroke="#1C000000" StrokeThickness="1" />
+                                                    <!-- the light stays put while the record turns under it -->
+                                                    <Ellipse Width="54" Height="54">
+                                                        <Ellipse.Fill>
+                                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                                <GradientStop Color="#30FFFFFF" Offset="0" />
+                                                                <GradientStop Color="#00FFFFFF" Offset="0.42" />
+                                                                <GradientStop Color="#00FFFFFF" Offset="0.62" />
+                                                                <GradientStop Color="#16FFFFFF" Offset="1" />
+                                                            </LinearGradientBrush>
+                                                        </Ellipse.Fill>
+                                                    </Ellipse>
+                                                    <Ellipse x:Name="DiscHub" Width="12" Height="12" Fill="#FF05080C" StrokeThickness="1.2" />
+                                                    <Ellipse x:Name="DiscPin" Width="3.5" Height="3.5" />
+                                                </Grid>
                                                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                     <TextBlock x:Name="TitleText" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                                     <TextBlock x:Name="ArtistText" FontSize="12" Foreground="{StaticResource Dim}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
@@ -352,7 +394,14 @@
                                                     <RowDefinition Height="*" />
                                                 </Grid.RowDefinitions>
                                                 <!-- a solid backdrop: nothing of the cards underneath can show through the list -->
-                                                <Border Grid.RowSpan="2" Margin="-8,-4,-8,-2" CornerRadius="14" Background="#F2111114" IsHitTestVisible="False" />
+                                                <Border x:Name="DevicesBack" Grid.RowSpan="2" Margin="-8,-4,-8,-2" CornerRadius="14" Background="#F2111114" IsHitTestVisible="False" />
+                                                <!-- the cyberpunk theme's own: an opaque chamfered plate in the panel's body, a cyan rim, a yellow tick -->
+                                                <Grid x:Name="DevicesBackCy" Grid.RowSpan="2" Margin="-8,-4,-8,-2" IsHitTestVisible="False" Visibility="Collapsed">
+                                                    <Path x:Name="DevicesBackBase" Fill="#FF03080C" />
+                                                    <Path x:Name="DevicesBackBody" />
+                                                    <Path x:Name="DevicesBackRim" StrokeThickness="1" />
+                                                    <Path x:Name="DevicesBackTick" StrokeThickness="2" />
+                                                </Grid>
                                                 <!-- speakers / headphones vs microphones, one list at a time -->
                                                 <StackPanel Orientation="Horizontal" Margin="6,0" VerticalAlignment="Center">
                                                     <Button x:Name="OutputTab" Style="{StaticResource Capsule}" Height="24" Padding="11,0" Margin="0,0,4,0">

@@ -150,6 +150,7 @@ public partial class NotchWindow
         PrevBtn.IsEnabled = PlayBtn.IsEnabled = NextBtn.IsEnabled = has;
         RefreshAppVolume();
         RefreshClockAndProgress();
+        RefreshDisc(); // the cyberpunk record: its art, its glow, turning or still
     }
 
     string? _appVolLogged;
@@ -254,6 +255,7 @@ public partial class NotchWindow
     {
         var brush = ArtBrush(_media.Art);
         FlipArt(CompactArt, _media.Art, () => CompactArt.Background = brush ?? (Brush)new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2E)));
+        RefreshDisc(); // the cyberpunk records, big and small
         PaintBars();
         // the cyber skin answers the music too: a new song or play / pause
         string key = $"{_media.Title}|{_media.IsPlaying}";
@@ -437,6 +439,7 @@ public partial class NotchWindow
         {
             _devicesInput = false; // always opens on speakers / headphones
             _devicesMixer = false;
+            StyleDevicesBack(); // the theme and panel colour of right now
             RenderDevices();
             _audio.RefreshDevices(); // just in case; the list on screen updates if anything changed
             DevicesPanel.Visibility = Visibility.Visible;
@@ -460,6 +463,38 @@ public partial class NotchWindow
     }
 
     bool _devicesInput;
+    bool _devicesBackWired;
+
+    /// <summary>
+    /// The device list's backdrop: in the cyberpunk theme a chamfered plate in the panel's own body (your panel
+    /// colour, or the theme's night blue) over an opaque base, so nothing of the cards underneath shows through,
+    /// with a cyan rim and a yellow tick on the cut corner. Every other theme keeps the plain rounded one.
+    /// </summary>
+    void StyleDevicesBack()
+    {
+        bool cy = _cyber;
+        DevicesBack.Visibility = cy ? Visibility.Collapsed : Visibility.Visible;
+        DevicesBackCy.Visibility = cy ? Visibility.Visible : Visibility.Collapsed;
+        if (!cy) return;
+        if (!_devicesBackWired) { _devicesBackWired = true; DevicesBackCy.SizeChanged += (_, _) => ShapeDevicesBack(); }
+        DevicesBackBody.Fill = Pill.Background is Brush b && b != Brushes.Transparent ? b : _cyberBody;
+        DevicesBackRim.Stroke = Frozen(Color.FromArgb(0x70, CyCyan.R, CyCyan.G, CyCyan.B));
+        DevicesBackTick.Stroke = Frozen(CyYellow);
+        ShapeDevicesBack();
+    }
+
+    void ShapeDevicesBack()
+    {
+        double w = DevicesBackCy.ActualWidth, h = DevicesBackCy.ActualHeight, c = 12;
+        if (w < 3 * c || h < 3 * c) return;
+        // the plate: top-left and bottom-right corners cut at 45°
+        var plate = Geometry.Parse(FormattableString.Invariant($"M{c},0.5 L{w - 0.5},0.5 L{w - 0.5},{h - c} L{w - c},{h - 0.5} L0.5,{h - 0.5} L0.5,{c} Z"));
+        plate.Freeze();
+        DevicesBackBase.Data = DevicesBackBody.Data = DevicesBackRim.Data = plate;
+        var tick = Geometry.Parse(FormattableString.Invariant($"M1.5,{c + 6} L1.5,{c} L{c},1.5 L{c + 22},1.5"));
+        tick.Freeze();
+        DevicesBackTick.Data = tick;
+    }
 
     /// <summary>Fills the device panel from the lists the audio service keeps ready (no waiting on Windows).</summary>
     void RenderDevices()
