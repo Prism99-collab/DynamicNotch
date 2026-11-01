@@ -242,6 +242,7 @@ public partial class NotchWindow
         Add("Charge reminder", "When ~45 min are left", () => _settings.SmartChargeReminder, v => _settings.SmartChargeReminder = v);
         Add("Downloads tidy-up", "Weekly, if it's over 5 GB", () => _settings.SmartDownloads, v => _settings.SmartDownloads = v);
         Add("Break reminder", "After long stretches of work", () => _settings.SmartBreaks, v => { _settings.SmartBreaks = v; _activeSince = null; });
+        Add("PC strain warnings", "CPU, GPU, memory, heat · Preferences", () => _settings.StrainWarnings, v => PrefSetStrain("all", v));
         Add("Meeting mode", "Camera on: pause music, quiet", () => _settings.MeetingMode, v =>
         {
             _settings.MeetingMode = v;

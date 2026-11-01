@@ -30,6 +30,13 @@ public sealed class Settings
     public bool Cyberpunk { get; set; }
     /// <summary>"original", "cyberpunk", "liquid", "crystal" or "abyss".</summary>
     public string Theme { get; set; } = "original";
+    /// <summary>Strain warnings ("Cyberpsychosis risk" in Cyberpunk) and what they watch.</summary>
+    public bool StrainWarnings { get; set; } = true;
+    public bool StrainCpu { get; set; } = true;
+    public bool StrainGpu { get; set; } = true;
+    public bool StrainRam { get; set; } = true;
+    public bool StrainGpuTemp { get; set; } = true;
+    public bool StrainCpuTemp { get; set; }
     /// <summary>Your colours from the Colors page (#RRGGBB); null = the notch decides.</summary>
     public string? ColorAccent { get; set; }
     public string? ColorGlow { get; set; }

@@ -8,10 +8,10 @@ using System.Windows.Media.Imaging;
 namespace DynamicNotch;
 
 /// <summary>
-/// Cyberpunk only: a faded picture behind each page of the control center, yours to choose. The notch looks in
-/// %APPDATA%\DynamicNotch\Backgrounds for page1.*, page2.* … page6.* (png, jpg, bmp, webp); a page without one
-/// stays clean. The pictures are never part of the app itself: replace a file and it shows the next time the theme
-/// comes on.
+/// Cyberpunk only: a faded picture behind each page of the control center. The app ships with a set for the first
+/// five pages; yours win: the notch looks in %APPDATA%\DynamicNotch\Backgrounds for page1.*, page2.* … page6.*
+/// (png, jpg, bmp, webp) first. Replace or add a file and it shows the next time the theme comes on; a page with
+/// neither stays clean.
 /// They sit on their own strip behind the pages and slide with them (the same transform), drawn once and reused
 /// while they move. Each is decoded at the size it's shown (not the photo's full size), barely there (14 %),
 /// fading out toward the edges, with the theme's scanlines over it. Off in every other theme, and released when
@@ -82,13 +82,23 @@ public partial class NotchWindow
     {
         try
         {
-            if (!Directory.Exists(BackgroundsFolder)) return null;
-            var file = Directory.EnumerateFiles(BackgroundsFolder, $"page{page}.*")
-                .FirstOrDefault(f => ArtExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
-            if (file == null) return null;
+            // yours first (Backgrounds folder), else the one the app ships with, else none
+            string? file = Directory.Exists(BackgroundsFolder)
+                ? Directory.EnumerateFiles(BackgroundsFolder, $"page{page}.*").FirstOrDefault(f => ArtExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                : null;
+            Stream? bundled = null;
+            if (file == null)
+            {
+                var asm = typeof(NotchWindow).Assembly;
+                string? name = asm.GetManifestResourceNames().FirstOrDefault(n => n.StartsWith($"DynamicNotch.Backgrounds.page{page}.", StringComparison.OrdinalIgnoreCase));
+                if (name == null) return null;
+                bundled = asm.GetManifestResourceStream(name);
+                if (bundled == null) return null;
+            }
+            using var _ = bundled;
             var bmp = new BitmapImage();
             bmp.BeginInit();
-            bmp.UriSource = new Uri(file);
+            if (file != null) bmp.UriSource = new Uri(file); else bmp.StreamSource = bundled;
             bmp.CacheOption = BitmapCacheOption.OnLoad;          // read now, don't keep the file open
             bmp.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
             bmp.DecodePixelWidth = (int)(PageWidth * 2);

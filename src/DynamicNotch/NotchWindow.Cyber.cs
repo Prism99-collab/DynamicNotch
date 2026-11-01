@@ -90,6 +90,7 @@ public partial class NotchWindow
                 }
                 Expand(byHotkey: true);
                 if (open == "flip") After(1500, () => SetCyber(!_settings.Cyberpunk)); // the switch, live
+                if (open == "close") After(2000, Collapse); // the closing animation, live
                 if (open == "cycle") for (int i = 1; i <= 10; i++) After(1400 * i, NextTheme); // every theme, twice round
                 if (open.StartsWith('p') && int.TryParse(open[1..], out int pg)) GoToPage(pg, instant: true);
             });
@@ -138,6 +139,11 @@ public partial class NotchWindow
         Recolor("Tile", ref _tileBefore, on ? Color.FromRgb(0x0A, 0x1A, 0x24) : null);
         ApplyClockColor();
         ApplyPanelColor(); // your panel colour wins over the theme's body
+        Controls.BatteryIcon.Health = on; // the battery as the game's segmented health bar
+        Battery.Restyle();
+        OsdBattery.Restyle();
+        CyberRamCells(0);
+        CyberQuickhack(null, default); // the activity pill's bar comes back with its next update
         GameFps.Foreground = on ? Frozen(Color.FromArgb(0xE6, CyYellow.R, CyYellow.G, CyYellow.B)) : _gameFpsBefore;
         GameFpsUnit.Foreground = on ? Frozen(Color.FromArgb(0x8C, CyCyan.R, CyCyan.G, CyCyan.B)) : Frozen(Color.FromArgb(0x73, 0xFF, 0xFF, 0xFF));
 
@@ -297,6 +303,7 @@ public partial class NotchWindow
 
         _cyLines.Width = w;
         _cyLines.Height = h;
+        CrtPlace(w, h); // a closing CRT's line and dot ride the shrinking shape's centre
         _cyScan.Width = w;
         Canvas.SetLeft(_cyTicks, 5);
         Canvas.SetTop(_cyTicks, Math.Max(6, h * 0.22));
@@ -368,6 +375,7 @@ public partial class NotchWindow
         if (to == Mode.Game || from == Mode.Game || to == Mode.Slim && from == Mode.Idle) return;
         if (to == Mode.Expanded) { CyberArtShow(); CyberGlitch(strong: false); CyberScan(); CyberDecode(PageTitle); }
         else if (to == Mode.Osd) CyberGlitch(strong: false);
+        else if (from == Mode.Expanded && CyberCrtOff()) { } // closing: the CRT switches off (NotchWindow.CyberFx)
         else if (from == Mode.Expanded || from == Mode.Osd) CyberGlitch(strong: false, light: true);
     }
 
@@ -377,15 +385,17 @@ public partial class NotchWindow
     /// Signal glitch: slices of yellow and cyan flash across it, a cyan ghost of the frame splits off and snaps back,
     /// the whole shape jolts sideways in hard steps and the content flickers. ~200 ms.
     /// </summary>
-    void CyberGlitch(bool strong, bool light = false)
+    void CyberGlitch(bool strong, bool light = false, Color? tint = null)
     {
         if (Eco && !strong) return;
+        _cyGhost.Stroke = tint is { } gt ? Frozen(gt) : CyCyanBrush;
         double w = Math.Max(1, Pill.ActualWidth), h = Math.Max(1, Pill.ActualHeight);
         int bars = light ? 2 : strong ? _cyBars.Length : 3;
         for (int i = 0; i < _cyBars.Length; i++)
         {
             var b = _cyBars[i];
             if (i >= bars) { b.BeginAnimation(OpacityProperty, null); b.Opacity = 0; continue; }
+            b.Fill = tint is { } bt ? Frozen(bt) : i % 2 == 0 ? CyYellowBrush : CyCyanBrush;
             b.Width = w * (0.12 + _cyRand.NextDouble() * (strong ? 0.5 : 0.3));
             b.Height = 1 + _cyRand.Next(strong ? 4 : 2);
             Canvas.SetLeft(b, _cyRand.NextDouble() * (w - b.Width));
