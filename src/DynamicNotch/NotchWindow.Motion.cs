@@ -342,7 +342,8 @@ public partial class NotchWindow
         if (_timerRunning) list.Add(LiveActivity.Timer);
         if (_focus.IsOn) list.Add(LiveActivity.Focus);
         if (_files.ActiveDownloads > 0) list.Add(LiveActivity.Download);
-        if (_settings.ShowMediaActivity && _media.IsPlaying) list.Add(LiveActivity.Media);
+        // music counts while it plays, and while paused if you picked it (Home's card, the switcher): it stays yours
+        if (_settings.ShowMediaActivity && (_media.IsPlaying || (MediaChosen && _media.HasSession))) list.Add(LiveActivity.Media);
         ApplyPin(list); // what you picked on Home goes first
         return list;
     }

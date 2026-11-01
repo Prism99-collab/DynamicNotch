@@ -3,6 +3,23 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.3] — 2026-11-01
+
+### Added
+- Cyberpunk theme: album covers are spinning records. On Home's music card the cover turns slowly while the music
+  plays, in a soft glow of the album's own colour, inside a cyan HUD ring that turns the other way; the closed
+  notch's little cover is the same record in small, turning with it. They stop where they are on pause, and rest
+  when off screen (a full-screen video, a game) or in power-saving mode. Works for every player: Spotify, browser
+  tabs, film apps; a player without a cover shows a blank record.
+- Cyberpunk theme: the sound-device list has its own backdrop, a solid chamfered plate in your panel colour with
+  a cyan rim.
+
+### Fixed
+- Swiping Home's card between a call and the music (or between players): the lit icon at the top, the dots and the
+  closed notch always follow the card you're looking at. Before, the icon could stay on the call, especially with
+  the music paused.
+- A paused player you picked stays in front until you pick something else or close it.
+
 ## [1.7.2] — 2026-11-01
 
 ### Fixed

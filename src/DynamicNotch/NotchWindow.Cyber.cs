@@ -101,6 +101,9 @@ public partial class NotchWindow
                 Expand(byHotkey: true);
                 if (open == "flip") After(1500, () => SetCyber(!_settings.Cyberpunk)); // the switch, live
                 if (open == "close") After(2000, Collapse); // the closing animation, live
+                if (open == "devices") After(800, () => ShowDevices(true)); // the sound-device list over the cards
+                if (open.StartsWith("music")) After(800, () => FlipCard(true, pin: true)); // the music card, even during a call
+                if (open == "music-close") After(2500, Collapse); // then the closed notch, the music in front
                 if (open == "cycle") for (int i = 1; i <= 10; i++) After(1400 * i, NextTheme); // every theme, twice round
                 if (open.StartsWith('p') && int.TryParse(open[1..], out int pg)) GoToPage(pg, instant: true);
             });
@@ -149,6 +152,8 @@ public partial class NotchWindow
         Recolor("Tile", ref _tileBefore, on ? Color.FromRgb(0x0A, 0x1A, 0x24) : null);
         ApplyClockColor();
         ApplyPanelColor(); // your panel colour wins over the theme's body
+        if (_devicesOpen) StyleDevicesBack(); // the device list open right now follows the switch
+        StyleArtDisc(); // the cover: a spinning record in this theme, the square one in the others
         Controls.BatteryIcon.Health = on; // the battery as the game's segmented health bar
         Battery.Restyle();
         OsdBattery.Restyle();

@@ -831,6 +831,7 @@ public partial class NotchWindow : Window
         _offScreen = !on;
         ShowWindow(_hwnd, on ? 4 /* SW_SHOWNOACTIVATE */ : 0 /* SW_HIDE */);
         if (on) KeepOnTop();
+        SpinDisc(); // the record rests while nobody can see it
     }
 
     // ───────────────────────────── startup ─────────────────────────────

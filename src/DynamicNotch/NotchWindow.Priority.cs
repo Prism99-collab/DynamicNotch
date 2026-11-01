@@ -39,12 +39,28 @@ public partial class NotchWindow
     /// <summary>Your pick goes first; a pick that's no longer live is forgotten, so the next call takes the front again.</summary>
     void ApplyPin(List<LiveActivity> list)
     {
-        if (_pinned == LiveActivity.None) return;
-        int i = list.IndexOf(_pinned);
+        // during a call, the card you flipped to counts as your pick too
+        var pin = _pinned != LiveActivity.None ? _pinned : OnCall && _cardMedia ? LiveActivity.Media : LiveActivity.None;
+        if (pin == LiveActivity.None) return;
+        int i = list.IndexOf(pin);
         if (i < 0) { _pinned = LiveActivity.None; return; }
         if (i == 0) return;
         list.RemoveAt(i);
-        list.Insert(0, _pinned);
+        list.Insert(0, pin);
+    }
+
+    /// <summary>You put the music in front (picked it, or flipped Home's card to it during a call).</summary>
+    bool MediaChosen => _pinned == LiveActivity.Media || (OnCall && _cardMedia);
+
+    /// <summary>Home's card shows the call (not the music) right now.</summary>
+    bool CallCardShown => OnCall && !(_cardMedia && _media.HasSession);
+
+    /// <summary>Where the card in front sits in the deck: the call, the player in front, or else the first player.</summary>
+    int FrontCardIndex(List<SwitchItem> deck)
+    {
+        if (CallCardShown) return deck.FindIndex(i => i.Kind == LiveActivity.Call);
+        int at = deck.FindIndex(i => i.Kind == LiveActivity.Media && ReferenceEquals(i.Player, _media.Current));
+        return at >= 0 ? at : deck.FindIndex(i => i.Kind == LiveActivity.Media);
     }
 
     /// <summary>A call starting or ending resets the choice: the call takes the front, the card shows it.</summary>
@@ -68,11 +84,8 @@ public partial class NotchWindow
     {
         var deck = CardDeck();
         if (deck.Count < 2) return;
-        bool callShown = OnCall && !(_cardMedia && _media.HasSession);
-        int at = callShown
-            ? deck.FindIndex(i => i.Kind == LiveActivity.Call)
-            : deck.FindIndex(i => i.Kind == LiveActivity.Media && ReferenceEquals(i.Player, _media.Current));
-        if (at < 0) at = 0;
+        bool callShown = CallCardShown;
+        int at = Math.Max(0, FrontCardIndex(deck));
         var next = deck[(at + dir + deck.Count) % deck.Count];
         bool toMedia = next.Kind == LiveActivity.Media;
         if (toMedia && next.Player != null) _media.Select(next.Player);
@@ -154,6 +167,8 @@ public partial class NotchWindow
     SwitchItem? FrontItem(List<SwitchItem> items)
     {
         var a = CurrentActivity;
+        // the call and the music: the lit chip is always the card Home shows
+        if (OnCall && a is LiveActivity.Call or LiveActivity.Media) a = CallCardShown ? LiveActivity.Call : LiveActivity.Media;
         if (a == LiveActivity.Media)
             return items.FirstOrDefault(i => i.Kind == LiveActivity.Media && ReferenceEquals(i.Player, _media.Current))
                 ?? items.FirstOrDefault(i => i.Kind == LiveActivity.Media);
@@ -450,9 +465,13 @@ public partial class NotchWindow
     /// <summary>The card in front slides away and the other rises in on a spring.</summary>
     void FlipCard(bool media, bool pin = false, bool up = true)
     {
-        if (pin) { _pinned = media ? LiveActivity.Media : LiveActivity.Call; RefreshBase(); RenderSwitch(); }
-        if (media == _cardMedia) return;
+        // the card's state first, then everything that reads it (the lit chip, the dots, the notch itself):
+        // the other way round the chip lit the card you were leaving
+        bool changed = media != _cardMedia;
         _cardMedia = media;
+        if (pin) _pinned = media ? LiveActivity.Media : LiveActivity.Call;
+        if (pin || changed) RefreshBase(); // which also moves the lit chip
+        if (!changed) return;
         _lastCardFlip = DateTime.UtcNow;
         if (!OnCall) return;
         FrameworkElement show = media ? MediaRow : CallRow, hide = media ? CallRow : MediaRow;
@@ -500,7 +519,7 @@ public partial class NotchWindow
     /// <summary>Which card Home shows: the call (unless you flipped to the music), otherwise the music.</summary>
     void ApplyCardVisibility()
     {
-        bool call = OnCall && !(_cardMedia && _media.HasSession);
+        bool call = CallCardShown;
         ShowCard(CallRow, call);
         ShowCard(MediaRow, !call);
         UpdateCardDots(animate: false);
@@ -539,11 +558,7 @@ public partial class NotchWindow
         int n = Math.Min(6, deck.Count);
         while (CardDots.Children.Count < n) CardDots.Children.Add(new Border { Width = 4, Height = 4, CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 0, 0, 3) });
         while (CardDots.Children.Count > n) CardDots.Children.RemoveAt(CardDots.Children.Count - 1);
-        bool callShown = OnCall && !(_cardMedia && _media.HasSession);
-        int front = callShown
-            ? deck.FindIndex(i => i.Kind == LiveActivity.Call)
-            : deck.FindIndex(i => i.Kind == LiveActivity.Media && ReferenceEquals(i.Player, _media.Current));
-        front = Math.Clamp(front < 0 ? 0 : front, 0, n - 1);
+        int front = Math.Clamp(Math.Max(0, FrontCardIndex(deck)), 0, n - 1);
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
         for (int i = 0; i < n; i++)
         {
