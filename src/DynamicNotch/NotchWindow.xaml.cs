@@ -131,6 +131,8 @@ public partial class NotchWindow : Window
         Safe(nameof(WireMixer), WireMixer);
         Safe(nameof(WireLock), WireLock);
         Safe(nameof(WireCyber), WireCyber);
+        Safe(nameof(WireStrain), WireStrain);
+        Safe(nameof(WireHolo), WireHolo);
         Safe(nameof(ApplyCustomColors), ApplyCustomColors); // your colours from the Colors page
         Safe(nameof(WireColors), WireColors);
         Safe(nameof(WireDevices), WireDevices);

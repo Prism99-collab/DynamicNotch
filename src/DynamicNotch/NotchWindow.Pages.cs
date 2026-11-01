@@ -281,6 +281,7 @@ public partial class NotchWindow
         RamRing.AnimateTo(s.Memory);
         RamText.Text = $"{s.Memory * 100:0}%";
         RamLabel.Text = $"{s.MemUsed / 1073741824.0:0.0} / {s.MemTotal / 1073741824.0:0} GB";
+        CyberRamCells(s.Memory); // Cyberpunk: the memory as RAM cells
 
         DiskRing.AnimateTo(s.Disk);
         DiskText.Text = $"{s.Disk * 100:0}%";
@@ -477,7 +478,7 @@ public partial class NotchWindow
         var left = _timerRunning ? _timerEnd - DateTime.UtcNow : _timerLeft;
         if (left < TimeSpan.Zero) left = TimeSpan.Zero;
         var accent = TimerBrush;
-        TimerText.Text = FormatTimer(left);
+        SetDigits(TimerText, FormatTimer(left));
         TimerText.Foreground = _timerRunning ? accent : Brushes.White;
         // the ring drains as time runs out
         TimerRing.RingBrush = accent;
@@ -647,7 +648,7 @@ public partial class NotchWindow
             text.Children.Add(new TextBlock { Text = $"{Ago(file.LastWriteTime)} · {SystemMonitor.Bytes(file.Length)}", FontSize = 10, Foreground = DimBrush });
             Grid.SetColumn(text, 1);
             row.Children.Add(text);
-            var btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = 36, ToolTip = "Click to open · drag down into any app · right-click to show in folder" };
+            var btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = 36, ToolTip = "Click to open · drag into any app" };
             string path = file.FullName;
             btn.Click += (_, _) => { if (!_dragOut) Launch(path); };
             btn.MouseRightButtonUp += (_, e) => { e.Handled = true; Launch("explorer.exe", $"/select,\"{path}\""); };

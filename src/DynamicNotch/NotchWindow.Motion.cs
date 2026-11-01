@@ -360,7 +360,7 @@ public partial class NotchWindow
     void UpdateSecond()
     {
         var second = _mode is Mode.Media or Mode.Activity && !_hidden ? SecondActivity : LiveActivity.None;
-        if (second != LiveActivity.None) FillSecond(second);
+        if (second != LiveActivity.None) { FillSecond(second); SizeSecond(); }
         int more = second != LiveActivity.None ? Activities().Count - 2 : 0;
         SecondMore.Text = more > 0 ? $"+{more}" : "";
         SecondMore.Visibility = more > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -394,7 +394,7 @@ public partial class NotchWindow
                 SecondShift.X = SecondTargetX();
             };
             SecondShift.BeginAnimation(TranslateTransform.XProperty, slide);
-            IslandNeck(SecondNeck, 30, splitting: true);
+            IslandNeck(SecondNeck, SecondBubble.Height, splitting: true);
             var pop = new DoubleAnimation(0.55, 1, TimeSpan.FromMilliseconds(520)) { EasingFunction = new SpringEase { Damping = 0.6 } };
             SecondScale.BeginAnimation(ScaleTransform.ScaleXProperty, pop);
             SecondScale.BeginAnimation(ScaleTransform.ScaleYProperty, pop);
@@ -417,7 +417,7 @@ public partial class NotchWindow
         else if (second == LiveActivity.None && wasShown)
         {
             // the activity ended: it merges back into the pill, the neck reaching out first
-            IslandNeck(SecondNeck, 30, splitting: false);
+            IslandNeck(SecondNeck, SecondBubble.Height, splitting: false);
             double into = -(_sw.Target / 2 - SecondBubble.ActualWidth / 2);
             SecondShift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(into, TimeSpan.FromMilliseconds(320)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } });
             var shrink = new DoubleAnimation(0.6, TimeSpan.FromMilliseconds(300));
@@ -435,6 +435,18 @@ public partial class NotchWindow
     double SecondTargetX() => -(Pill.ActualWidth / 2 + 10 + 9 + SecondBubble.ActualWidth / 2);
 
     /// <summary>Keeps the second island beside the pill while the pill breathes, resizes, or the island's text changes.</summary>
+    /// <summary>
+    /// The activity pill's height follows what it shows: a bead for an icon or a cover (22), a touch taller with a
+    /// number or a word beside it (24). Always clearly smaller than the notch.
+    /// </summary>
+    void SizeSecond()
+    {
+        double h = string.IsNullOrEmpty(SecondText.Text) ? 22 : 24;
+        if (SecondBubble.Height == h) return;
+        SecondBubble.Height = h;
+        SecondBubble.CornerRadius = SecondRim.CornerRadius = new CornerRadius(0, 0, h / 2, h / 2);
+    }
+
     void PlaceSecond()
     {
         if (_secondShown == LiveActivity.None || _secondSliding) return;

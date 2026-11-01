@@ -125,6 +125,7 @@ public partial class NotchWindow
         if (path == null) name = packaged ? parts.FirstOrDefault()?.Split('.').Last() ?? "Call" : System.IO.Path.GetFileNameWithoutExtension(key);
 
         bool switched = _call != null;
+        bool answered = !switched && Ringing;
         if (!switched) { ResetPriority(); StopRinging(); } // a new call takes the front; the ringing is over
         _call = new CallState(key, name, icon, path, switched ? _call!.Started : DateTime.UtcNow);
         _callTick.Start();
@@ -132,8 +133,9 @@ public partial class NotchWindow
         RefreshBase();
         if (switched) return;
         AppLog.Write($"call started: {name}");
-        ShowOsd("call", icon == null ? "" : null, null, "On a call", name, null, art: icon, glyphBrush: Green,
+        ShowOsd("call", icon == null ? "" : null, null, _cyber && answered ? Loc.T("LINK ESTABLISHED") : "On a call", name, null, art: icon, glyphBrush: Green,
             seconds: 2.6, motion: Motion.Pulse, onClick: () => ExpandTo(0));
+        if (_cyber && answered) CyberGlitch(strong: false);
     }
 
     void EndCall()
@@ -180,7 +182,7 @@ public partial class NotchWindow
         CallBars.Visibility = Visibility.Visible;
         foreach (var r in CallBars.Children.OfType<Rectangle>()) r.Fill = brush;
         ActText.Foreground = brush;
-        ActText.Text = FormatTimer(DateTime.UtcNow - call.Started);
+        SetDigits(ActText, FormatTimer(DateTime.UtcNow - call.Started));
     }
 
     /// <summary>Back to the plain activity look (timer, download, focus).</summary>

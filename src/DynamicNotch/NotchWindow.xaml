@@ -190,7 +190,7 @@
                                 </Button>
                                 <!-- lock: the notch stays, but stops reacting (unlock from its tray icon) -->
                                 <Button x:Name="LockBtn" Width="22" Height="22" Margin="0,0,10,0" Cursor="Hand"
-                                        ToolTip="Lock the notch: it keeps showing things but won't react. Unlock from its tray icon.">
+                                        ToolTip="Lock the notch · unlock from the tray icon">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
                                             <Grid>
@@ -338,10 +338,10 @@
                                             </Grid>
 
                                             <UniformGrid x:Name="TogglesRow" Grid.Row="2" Columns="6">
-                                                <c:QuickToggle x:Name="WifiTile" Glyph="&#xE701;" Label="Wi-Fi" ToolTip="Wi-Fi (right-click for settings)" />
-                                                <c:QuickToggle x:Name="BtTile" Glyph="&#xE702;" Label="Bluetooth" ToolTip="Bluetooth (right-click for settings)" />
+                                                <c:QuickToggle x:Name="WifiTile" Glyph="&#xE701;" Label="Wi-Fi" ToolTip="Wi-Fi · right-click for settings" />
+                                                <c:QuickToggle x:Name="BtTile" Glyph="&#xE702;" Label="Bluetooth" ToolTip="Bluetooth · right-click for settings" />
                                                 <c:QuickToggle x:Name="AirTile" Glyph="&#xE709;" Label="Airplane" OnBrush="#FF9F0A" />
-                                                <c:QuickToggle x:Name="FocusTile" Glyph="&#xE708;" Label="Focus" OnBrush="#5E5CE6" ToolTip="Focus / Do not disturb" />
+                                                <c:QuickToggle x:Name="FocusTile" Glyph="&#xE708;" Label="Focus" OnBrush="#5E5CE6" ToolTip="Focus · do not disturb" />
                                                 <c:QuickToggle x:Name="MicTile" Glyph="&#xE720;" Label="Mic on" OnBrush="#FF453A" />
                                                 <c:QuickToggle x:Name="PowerTile" Glyph="&#xEC49;" Label="Balanced" ToolTip="Power mode" />
                                             </UniformGrid>
@@ -412,7 +412,7 @@
                                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Grid>
                                                 <!-- external monitor (DDC/CI); only shown when one answers -->
-                                                <Grid x:Name="ExtBriRow" Height="30" Margin="0,2,0,0" Visibility="Collapsed" ToolTip="External monitor brightness">
+                                                <Grid x:Name="ExtBriRow" Height="30" Margin="0,2,0,0" Visibility="Collapsed" ToolTip="Monitor brightness">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="30" />
                                                         <ColumnDefinition Width="*" />
@@ -620,11 +620,11 @@
                                                     </StackPanel>
                                                     <!-- completed focus rounds (4 make a set) -->
                                                     <StackPanel x:Name="RoundDots" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                                                Background="Transparent" ToolTip="Focus rounds done (a long break after 4)" />
+                                                                Background="Transparent" ToolTip="Focus rounds · long break after 4" />
 
                                                     <!-- the ring: click to start / pause, scroll to change the minutes -->
                                                     <Grid x:Name="TimerFace" Grid.Row="1" Width="98" Height="98" Background="Transparent" Cursor="Hand" Margin="0,3,0,3"
-                                                          ToolTip="Click to start / pause · scroll to change the minutes">
+                                                          ToolTip="Click: start / pause · scroll: minutes">
                                                         <c:RingGauge x:Name="TimerRing" RingBrush="#FF9F0A" />
                                                         <StackPanel VerticalAlignment="Center">
                                                             <TextBlock x:Name="TimerText" Text="25:00" FontSize="25" FontWeight="Light" HorizontalAlignment="Center"
@@ -663,9 +663,9 @@
                                             <UniformGrid x:Name="ActionsGrid" Grid.Column="2" Columns="3" Rows="3" Margin="0,0,0,4">
                                                 <c:QuickToggle Style="{StaticResource ActionTile}" Tag="snip" Glyph="&#xE924;" Label="Snip" TintBrush="#0A84FF" ToolTip="Screenshot (Win+Shift+S)" />
                                                 <c:QuickToggle x:Name="AwakeTile" Style="{StaticResource ActionTile}" Tag="awake" Glyph="&#xE7B3;" Label="Keep awake" TintBrush="#64D2FF" OnBrush="#64D2FF"
-                                                               ToolTip="Keep the screen on and the PC awake while you work" />
+                                                               ToolTip="Keep the PC awake" />
                                                 <c:QuickToggle Style="{StaticResource ActionTile}" Tag="clipboard" Glyph="&#xF0E3;" Label="Clip history" TintBrush="#BF5AF2"
-                                                               ToolTip="Windows clipboard history (Win+V) · right-click: the notch's own clipboard" />
+                                                               ToolTip="Clipboard history (Win+V)" />
                                                 <c:QuickToggle Style="{StaticResource ActionTile}" Tag="explorer" Glyph="&#xEC50;" Label="Files" TintBrush="#FFD60A" ToolTip="File Explorer · right-click: Downloads" />
                                                 <c:QuickToggle Style="{StaticResource ActionTile}" Tag="terminal" Glyph="&#xE756;" Label="Terminal" TintBrush="#E5E5EA" />
                                                 <c:QuickToggle Style="{StaticResource ActionTile}" Tag="taskmgr" Glyph="&#xE9D9;" Label="Task Manager" TintBrush="#30D158" />
@@ -704,7 +704,7 @@
                                                 </Grid.RowDefinitions>
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                     <Button x:Name="ShelfTab" Style="{StaticResource Capsule}" Content="Shelf" Height="22" Padding="10,0" FontSize="10.5" Margin="0,0,3,0"
-                                                            ToolTip="Files you dropped on the notch · drag them out into any app" />
+                                                            ToolTip="Your shelf · drag files out into any app" />
                                                     <Button x:Name="RecentTab" Style="{StaticResource Capsule}" Content="Recent" Height="22" Padding="10,0" FontSize="10.5" />
                                                 </StackPanel>
                                                 <Button x:Name="OpenDownloads" Style="{StaticResource CircleButton}" Width="24" Height="24" HorizontalAlignment="Right" ToolTip="Open Downloads">
@@ -740,7 +740,7 @@
                                                     <RowDefinition Height="*" />
                                                     <RowDefinition Height="36" />
                                                 </Grid.RowDefinitions>
-                                                <UniformGrid x:Name="SmartGrid" Columns="2" Rows="3" />
+                                                <UniformGrid x:Name="SmartGrid" Columns="2" Rows="4" />
                                                 <Border Grid.Row="1" CornerRadius="12" Background="#17171A" Margin="0,2,0,4" Padding="12,0,6,0">
                                                     <Grid>
                                                         <TextBlock x:Name="BreakLabel" Text="Break reminder every" FontSize="11.5" Foreground="{StaticResource Dim}" VerticalAlignment="Center" />
@@ -793,7 +793,7 @@
         </StackPanel>
 
         <!-- A second live activity splits off into its own little island on the left -->
-        <Border x:Name="SecondBubble" Background="Black" Height="30" MinWidth="30" CornerRadius="0,0,15,15" Padding="10,0"
+        <Border x:Name="SecondBubble" Background="Black" Height="22" MinWidth="24" CornerRadius="0,0,11,11" Padding="7,0"
                 HorizontalAlignment="Center" VerticalAlignment="Top" Visibility="Collapsed" Opacity="0" RenderTransformOrigin="0.5,0">
             <Border.RenderTransform>
                 <TransformGroup>
@@ -805,23 +805,23 @@
                 <!-- a soft glow of its colour beneath it -->
                 <Border x:Name="SecondAura" VerticalAlignment="Bottom" Height="26" Margin="-26,0,-26,-24" IsHitTestVisible="False" Opacity="0.4" />
                 <!-- ears: it hangs from the top edge like the notch itself -->
-                <Path Width="7" Height="7" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-17,0,0,0" Fill="Black"
+                <Path Width="7" Height="7" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-14,0,0,0" Fill="Black"
                       Data="M0,0 L7,0 L7,7 A7,7 0 0 0 0,0 Z" />
-                <Path Width="7" Height="7" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,-17,0" Fill="Black"
+                <Path Width="7" Height="7" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,-14,0" Fill="Black"
                       Data="M7,0 L0,0 L0,7 A7,7 0 0 1 7,0 Z" />
                 <!-- the neck: black between it and the notch while it splits off (or merges back), pinching thin -->
                 <Border x:Name="SecondNeck" Background="Black" HorizontalAlignment="Right" VerticalAlignment="Top" Width="27" Height="0"
-                        Margin="0,0,-33,0" CornerRadius="0,0,8,8" IsHitTestVisible="False" />
-                <Border x:Name="SecondRim" BorderThickness="1,0,1,1" CornerRadius="0,0,15,15" Margin="-10,0" BorderBrush="Transparent" />
+                        Margin="0,0,-30,0" CornerRadius="0,0,8,8" IsHitTestVisible="False" />
+                <Border x:Name="SecondRim" BorderThickness="1,0,1,1" CornerRadius="0,0,11,11" Margin="-7,0" BorderBrush="Transparent" />
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,1">
-                    <Border x:Name="SecondArt" Width="18" Height="18" CornerRadius="9" Visibility="Collapsed" />
+                    <Border x:Name="SecondArt" Width="16" Height="16" CornerRadius="8" Visibility="Collapsed" />
                     <Grid>
                         <!-- a download's real progress, around its arrow -->
-                        <Path x:Name="SecondRing" Width="19" Height="19" Stroke="#0A84FF" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                        <Path x:Name="SecondRing" Width="17" Height="17" Stroke="#0A84FF" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                               HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
-                        <TextBlock x:Name="SecondGlyph" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                        <TextBlock x:Name="SecondGlyph" FontFamily="{StaticResource IconFont}" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center" />
                     </Grid>
-                    <TextBlock x:Name="SecondText" FontSize="12" FontWeight="SemiBold" Margin="6,0,0,0" VerticalAlignment="Center"
+                    <TextBlock x:Name="SecondText" FontSize="11.5" FontWeight="SemiBold" Margin="5,0,0,0" VerticalAlignment="Center"
                                FontFamily="Segoe UI Variable Display, Segoe UI" Typography.NumeralAlignment="Tabular" />
                     <TextBlock x:Name="SecondMore" FontSize="10" FontWeight="SemiBold" Foreground="#8CFFFFFF" Margin="5,0,0,0" VerticalAlignment="Center"
                                Visibility="Collapsed" />
@@ -830,7 +830,7 @@
         </Border>
 
         <!-- Mic / camera in use: a small companion bubble next to the notch -->
-        <Border x:Name="PrivacyBubble" Background="Black" Height="26" CornerRadius="0,0,13,13" Padding="10,0"
+        <Border x:Name="PrivacyBubble" Background="Black" Height="22" CornerRadius="0,0,11,11" Padding="7,0"
                 HorizontalAlignment="Center" VerticalAlignment="Top" Visibility="Collapsed" Opacity="0" RenderTransformOrigin="0.5,0">
             <Border.RenderTransform>
                 <TransformGroup>
@@ -840,13 +840,13 @@
             </Border.RenderTransform>
             <Grid>
             <Border x:Name="PrivacyAura" VerticalAlignment="Bottom" Height="24" Margin="-22,0,-22,-22" IsHitTestVisible="False" Opacity="0.45" />
-            <Path Width="6" Height="6" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-16,0,0,0" Fill="Black"
+            <Path Width="6" Height="6" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-13,0,0,0" Fill="Black"
                   Data="M0,0 L6,0 L6,6 A6,6 0 0 0 0,0 Z" />
-            <Path Width="6" Height="6" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,-16,0" Fill="Black"
+            <Path Width="6" Height="6" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,-13,0" Fill="Black"
                   Data="M6,0 L0,0 L0,6 A6,6 0 0 1 6,0 Z" />
             <Border x:Name="PrivacyNeck" Background="Black" HorizontalAlignment="Left" VerticalAlignment="Top" Width="24" Height="0"
-                    Margin="-30,0,0,0" CornerRadius="0,0,7,7" IsHitTestVisible="False" />
-            <Border x:Name="PrivacyRim" BorderThickness="1,0,1,1" CornerRadius="0,0,13,13" Margin="-10,0" BorderBrush="Transparent" />
+                    Margin="-27,0,0,0" CornerRadius="0,0,7,7" IsHitTestVisible="False" />
+            <Border x:Name="PrivacyRim" BorderThickness="1,0,1,1" CornerRadius="0,0,11,11" Margin="-7,0" BorderBrush="Transparent" />
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,1">
                 <Grid x:Name="MicDot" Margin="0,0,0,0">
                     <TextBlock Text="&#xE720;" FontFamily="{StaticResource IconFont}" FontSize="11" Foreground="#FF9F0A" VerticalAlignment="Center" />

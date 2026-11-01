@@ -223,6 +223,7 @@ public partial class NotchWindow
     {
         CyberSkinSoon();
         if (_secondShown != LiveActivity.None) FillSecond(_secondShown);
+        CyberQuickhack(null, default); // set again below for what has a progress (Cyberpunk)
         if (CurrentActivity == LiveActivity.Call) { FillCallPill(); return; }
         ResetCallPill();
         switch (CurrentActivity)
@@ -232,7 +233,8 @@ public partial class NotchWindow
                 if (left < TimeSpan.Zero) left = TimeSpan.Zero;
                 ActGlyph.Text = "";
                 ActGlyph.Foreground = ActText.Foreground = TimerBrush;
-                ActText.Text = FormatTimer(left);
+                SetDigits(ActText, FormatTimer(left));
+                CyberQuickhack(_timerTotal.TotalSeconds > 0 ? left.TotalSeconds / _timerTotal.TotalSeconds : null, CyYellow);
                 break;
             case LiveActivity.Focus:
                 ActGlyph.Text = "";
@@ -248,6 +250,7 @@ public partial class NotchWindow
                 ActText.Text = _files.BytesPerSecond > 1024
                     ? $"{count}{SystemMonitor.Bytes(_files.BytesPerSecond)}/s"
                     : $"{count}{SystemMonitor.Bytes(_files.ActiveBytes)}";
+                CyberQuickhack(_files.Items.FirstOrDefault()?.Progress, CyCyan);
                 break;
         }
     }
@@ -323,7 +326,7 @@ public partial class NotchWindow
         }
         OsdTextPanel.Visibility = isLevel ? Visibility.Collapsed : Visibility.Visible;
         string titleBefore = OsdTitle.Text;
-        OsdTitle.Text = r.Title ?? "";
+        OsdTitle.Text = _cyber && r.Kind == "ring" ? Loc.T("INCOMING CALL") : r.Title ?? "";
         bool freshAlert = OsdTitle.Text != titleBefore;
         if (freshAlert) CyberDecode(OsdTitle, cursor: true);
         CyberSkinSoon(); // the pop-up's colours and art in the theme
@@ -337,6 +340,7 @@ public partial class NotchWindow
         Osd.Width = w;
         Osd.Height = h;
         _osdSize = new Size(w, h);
+        CyberHolo(r.Kind == "ring"); // Cyberpunk: a ringing call is a holocall
 
         // a different pop-up replacing this one: slide the new content in instead of a hard swap
         if (previous != null && !sameKind)
@@ -786,7 +790,7 @@ public partial class NotchWindow
     {
         bool show = (_privacy.MicInUse || _privacy.CamInUse) && _mode is not (Mode.Expanded or Mode.Game) && !_hidden;
         // the same height as what it sits beside: smaller next to the slim bar over a window
-        double h = _mode == Mode.Slim ? 20 : 26;
+        double h = _mode == Mode.Slim ? 18 : 22; // a bead beside the notch, always clearly smaller than it
         if (PrivacyBubble.Height != h) { PrivacyBubble.Height = h; PrivacyBubble.CornerRadius = PrivacyRim.CornerRadius = new CornerRadius(0, 0, h / 2, h / 2); }
         MicDot.Visibility = _privacy.MicInUse ? Visibility.Visible : Visibility.Collapsed;
         CamDot.Visibility = _privacy.CamInUse ? Visibility.Visible : Visibility.Collapsed;
@@ -799,7 +803,7 @@ public partial class NotchWindow
             PrivacyBubble.Visibility = Visibility.Visible;
             PrivacyBubble.UpdateLayout();
             PlacePrivacyBubble(instant: true);
-            IslandNeck(PrivacyNeck, 26, splitting: true);
+            IslandNeck(PrivacyNeck, PrivacyBubble.Height, splitting: true);
             var pop = new DoubleAnimation(0.4, 1, TimeSpan.FromMilliseconds(480)) { EasingFunction = new SpringEase { Damping = 0.62 } };
             PrivacyScale.BeginAnimation(ScaleTransform.ScaleXProperty, pop);
             PrivacyScale.BeginAnimation(ScaleTransform.ScaleYProperty, pop);

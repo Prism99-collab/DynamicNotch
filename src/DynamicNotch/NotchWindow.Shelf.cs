@@ -315,7 +315,7 @@ public partial class NotchWindow
             row.Children.Add(remove);
 
             var btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = 36,
-                ToolTip = item.Path != null ? "Drag into any app (Excel, Word, a chat, a folder) · click to open" : "Drag into any app · click to copy" };
+                ToolTip = item.Path != null ? "Drag into any app · click to open" : "Drag into any app · click to copy" };
             copy.Click += (_, e) => { e.Handled = true; CopyShelfItem(item, btn); };
             btn.Click += (_, _) =>
             {

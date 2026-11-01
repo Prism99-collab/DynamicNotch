@@ -105,7 +105,7 @@ public partial class NotchWindow
         if (!_cyber) return;
         double w = pl.Bubble.ActualWidth, h = pl.Bubble.ActualHeight;
         if (w <= 0 || h <= 0) return;
-        double c = Math.Min(8, h * 0.32);
+        double c = Math.Min(5, h * 0.2); // in proportion: on something this small, big cuts make it look chunky
         pl.Fill.Data = Poly(true, new(0, -1), new(w, -1), new(w, h - c), new(w - c, h), new(c, h), new(0, h - c));
         pl.Frame.Data = Poly(false, new(0, 0), new(0, h - c), new(c, h), new(w - c, h), new(w, h - c), new(w, 0));
     }

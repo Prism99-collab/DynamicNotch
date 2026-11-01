@@ -107,7 +107,7 @@ public partial class NotchWindow
     {
         CyberSkinSoon();
         var now = DateTime.Now;
-        ClockText.Text = now.ToShortTimeString();
+        SetDigits(ClockText, now.ToShortTimeString()); // Cyberpunk: changed digits decode in
         DateText.Text = now.ToString("ddd d MMM");
         // the progress bar lives on Home; don't redraw it while another page is showing
         if (_mode == Mode.Expanded && _page != 0) return;
@@ -130,7 +130,7 @@ public partial class NotchWindow
     void RefreshBattery()
     {
         BatteryText.Visibility = Battery.Visibility = _power.HasBattery ? Visibility.Visible : Visibility.Collapsed;
-        BatteryText.Text = $"{_power.Percent}%";
+        SetDigits(BatteryText, $"{_power.Percent}%");
         Battery.Set(_power.Percent / 100.0, _power.PluggedIn, _power.Saver);
     }
 
@@ -188,7 +188,7 @@ public partial class NotchWindow
         // the connected device, battery first so it survives the label's trimming: "50% · Xbox Wireless…"
         var bt = _radio.BluetoothOn ? _bt.Primary : null;
         BtTile.Label = !_radio.BluetoothOn ? "BT off" : bt == null ? "Bluetooth" : bt.Battery is { } b ? $"{b}% · {bt.Name}" : bt.Name;
-        BtTile.ToolTip = bt == null ? "Bluetooth (right-click for settings)"
+        BtTile.ToolTip = bt == null ? "Bluetooth · right-click for settings"
             : $"{bt.Name}{(bt.Battery is { } level ? $" · {level}% battery" : "")} (right-click for settings)";
 
         AirTile.IsOn = _radio.AirplaneOn;

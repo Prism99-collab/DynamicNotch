@@ -7,23 +7,34 @@ namespace DynamicNotch;
 
 /// <summary>
 /// Hover hints drawn inside the notch. Windows' own tooltips are white and open in a separate window that the
-/// always-on-top notch covers, so they are cancelled and shown here instead: dark glass, in front, gliding in.
+/// always-on-top notch covers, so they are cancelled and shown here instead: dark glass (or the theme's), in front,
+/// gliding in after a short pause, and gone again after a few seconds so they never sit in the way.
+/// Windows raises "tooltip opening" on the element itself (it doesn't travel up to the window), so it's caught for
+/// every element by a class handler, and only for this window's elements.
 /// </summary>
 public partial class NotchWindow
 {
     FrameworkElement? _tipOwner;
+    static bool _tipHandler;
+    readonly System.Windows.Threading.DispatcherTimer _tipLife = new() { Interval = TimeSpan.FromSeconds(3.5) };
 
     void WireTips()
     {
-        AddHandler(FrameworkElement.ToolTipOpeningEvent, new ToolTipEventHandler(OnTipOpening), true);
+        if (!_tipHandler)
+        {
+            _tipHandler = true;
+            EventManager.RegisterClassHandler(typeof(FrameworkElement), FrameworkElement.ToolTipOpeningEvent,
+                new ToolTipEventHandler((s, e) => { if (s is FrameworkElement el && Window.GetWindow(el) == this) OnTipOpening(el, e); }), true);
+        }
         PreviewMouseDown += (_, _) => HideTip();
         PreviewMouseWheel += (_, _) => HideTip();
+        _tipLife.Tick += (_, _) => HideTip();
     }
 
-    void OnTipOpening(object sender, ToolTipEventArgs e)
+    void OnTipOpening(FrameworkElement el, ToolTipEventArgs e)
     {
         e.Handled = true; // never the white Windows tooltip
-        if (e.Source is not FrameworkElement el || _mode != Mode.Expanded || !el.IsMouseOver) return;
+        if (_mode != Mode.Expanded || !el.IsMouseOver) return;
         ShowTip(el, ToolTipService.GetToolTip(el)?.ToString());
     }
 
@@ -40,6 +51,8 @@ public partial class NotchWindow
 
         TipText.Text = text;
         Tip.Visibility = Visibility.Visible;
+        _tipLife.Stop();
+        _tipLife.Start(); // it leaves by itself after a few seconds
         Tip.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         Size tip = Tip.DesiredSize;
 
@@ -65,6 +78,7 @@ public partial class NotchWindow
 
     void HideTip()
     {
+        _tipLife.Stop();
         if (_tipOwner != null) { _tipOwner.MouseLeave -= OnTipOwnerLeave; _tipOwner = null; }
         if (Tip == null || Tip.Visibility != Visibility.Visible) return;
         var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(110));

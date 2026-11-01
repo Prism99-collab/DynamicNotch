@@ -336,6 +336,7 @@ public sealed class PreferencesWindow : Window
         new(Sec.Alerts, "", "Downloads tidy-up", "Weekly, if it's over 5 GB", () => _s.SmartDownloads, v => _s.SmartDownloads = v, "Smart"),
         new(Sec.Alerts, "", "Break reminder", "After long stretches of work", () => _s.SmartBreaks, v => _notch.PrefSetBreaks(v), "Smart"),
         new(Sec.Alerts, "", "Meeting mode", "Camera on: pause music, quiet", () => _s.MeetingMode, v => _notch.PrefSetMeeting(v), "Smart"),
+        new(Sec.Alerts, "\uE7BA", "PC strain warnings", "CPU, GPU, memory and heat watched; warns when one stays high", () => _notch.PrefStrainOn("all"), v => _notch.PrefSetStrain("all", v), "Strain"),
 
         new(Sec.Pages, "", "System", "CPU, memory, storage, network and battery", () => !_s.HiddenPages.Contains(1), v => _notch.PrefSetPage(1, v)),
         new(Sec.Pages, "", "Tools", "Timer, snip, terminal, calculator and more", () => !_s.HiddenPages.Contains(2), v => _notch.PrefSetPage(2, v)),
@@ -717,6 +718,23 @@ public sealed class PreferencesWindow : Window
         Card(Rows().Where(r => r.Sec == Sec.Alerts && r.Group == null));
         Label(Loc.T("Smart helpers"));
         Card(Rows().Where(r => r.Sec == Sec.Alerts && r.Group == "Smart"));
+
+        // strain warnings ("Cyberpsychosis risk" in Cyberpunk): the master switch and what it watches
+        Label(Loc.T(_s.Theme == "cyberpunk" ? "Cyberpsychosis watch" : "PC strain warnings"));
+        var strain = new List<Row>
+        {
+            new(Sec.Alerts, "\uE7BA", "PC strain warnings", "A warning when something stays over its line for 20 s (never in games)",
+                () => _notch.PrefStrainOn("all"), v => _notch.PrefSetStrain("all", v)),
+        };
+        foreach (var (key, name, line) in NotchWindow.PrefStrainTargets)
+        {
+            bool available = key != "cputemp" || StrainService.CpuTempAvailable;
+            string glyph = key switch { "cpu" => "\uE950", "gpu" => "\uE7F4", "ram" => "\uE964", _ => "\uE9CA" };
+            strain.Add(new(Sec.Alerts, glyph, name,
+                available ? string.Format(Loc.T("Warn at {0} and over"), line) : Loc.T("This PC doesn't report it"),
+                () => _notch.PrefStrainOn(key), v => { if (available) _notch.PrefSetStrain(key, v); }));
+        }
+        Card(strain);
 
         var row = new Grid { Margin = new Thickness(18, 14, 18, 14) };
         row.Children.Add(new TextBlock { Text = Loc.T("Break reminder every"), VerticalAlignment = VerticalAlignment.Center });

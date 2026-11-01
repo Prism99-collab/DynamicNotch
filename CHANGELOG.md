@@ -3,6 +3,27 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] — 2026-11-01
+
+### Added
+- Holocall: in Cyberpunk an incoming call rings as a holocall: the caller's picture in a HUD frame, INCOMING CALL
+  decoding in, a live signal line; answered, LINK ESTABLISHED.
+- Ringing is caught more reliably: besides call notifications (any app, browsers included) and a call app
+  flashing, a call app ringing out loud in the background (Discord, Teams, WhatsApp, Zoom…) is heard too.
+- Strain warnings (Cyberpunk: "Cyberpsychosis risk"): a warning when CPU, GPU, memory, GPU or CPU temperature stays
+  over its line for 20 s, never in games; choose what's watched in Preferences → Alerts. A click opens Task Manager.
+- Cyberpunk: the notch switches off like a CRT when it closes (a bright line, then a dot); changed digits decode in
+  (clock, timer, call length, battery); downloads and the timer show the game's segmented quickhack bar; locking is
+  BLACK ICE ENGAGED, unlocking BREACH SUCCESSFUL; the battery is a segmented health bar; RAM cells under the
+  memory gauge.
+- Cyberpunk ships with default page backgrounds (your own pictures in the Backgrounds folder still win).
+
+### Changed
+- Side pills are slimmer and adapt to what they show (a small bead for an icon or a cover, a touch taller with
+  text), always clearly smaller than the notch; Cyberpunk cuts are in proportion.
+- Hover hints: every hint in the notch is the notch's own (in front, in the theme's style), shorter, and fades by
+  itself after a few seconds. Windows' white tooltips no longer appear behind the notch.
+
 ## [1.5.0] — 2026-11-01
 
 ### Added
