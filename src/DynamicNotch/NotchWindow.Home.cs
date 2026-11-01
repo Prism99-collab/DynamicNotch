@@ -27,8 +27,14 @@ public partial class NotchWindow
         PrevBtn.Click += async (_, _) => await _media.PreviousAsync();
         ProgressSlider.ValueCommitted += async v =>
         {
-            if (_media.Duration > TimeSpan.Zero) await _media.SeekAsync(TimeSpan.FromTicks((long)(_media.Duration.Ticks * v)));
+            if (_media.Duration > TimeSpan.Zero && _media.CanSeek) await _media.SeekAsync(TimeSpan.FromTicks((long)(_media.Duration.Ticks * v)));
         };
+        // a click on the cover or the title brings the player itself to the front (the app, or the browser tab)
+        foreach (var el in new FrameworkElement[] { ArtBox, ArtDisc, TitleText })
+        {
+            el.Cursor = Cursors.Hand;
+            el.MouseLeftButtonUp += (_, e) => { if (_media.HasSession) { e.Handled = true; OpenPlayer(); } };
+        }
 
         VolSlider.ValueChanged += v => { _lastUserChange = DateTime.UtcNow; _audio.SetVolume((float)v); VolGlyph.Text = VolumeGlyph(); };
         MuteBtn.Click += (_, _) => { _lastUserChange = DateTime.UtcNow; _audio.ToggleMute(); RefreshVolume(); };
@@ -56,6 +62,27 @@ public partial class NotchWindow
         MicTile.MouseRightButtonUp += (_, e) => OpenUri("ms-settings:privacy-microphone", e);
         PowerTile.MouseRightButtonUp += (_, e) => OpenUri("ms-settings:powersleep", e);
         BatteryPanel.MouseLeftButtonUp += (_, e) => OpenUri("ms-settings:batterysaver", e);
+    }
+
+    /// <summary>
+    /// The player in front, in front of you: a browser tab through the extension, a Store app by its id, any other
+    /// app by its window (Spotify, a browser, VLC...). Then the notch steps aside.
+    /// </summary>
+    void OpenPlayer()
+    {
+        if (_media.FocusTab()) { Collapse(); return; }
+        string? app = _media.SourceApp;
+        if (string.IsNullOrEmpty(app)) return;
+        if (app.Contains('!')) { OpenApp(app); return; } // a Store app ("SpotifyAB.SpotifyMusic_…!Spotify")
+        string name = System.IO.Path.GetFileNameWithoutExtension(app);
+        if (name.Equals("MSEdge", StringComparison.OrdinalIgnoreCase)) name = "msedge";
+        try
+        {
+            foreach (var p in Process.GetProcessesByName(name))
+                using (p)
+                    if (p.MainWindowHandle != IntPtr.Zero) { FocusWindow(p.MainWindowHandle); Collapse(); return; }
+        }
+        catch (Exception ex) { AppLog.Write("open player: " + ex.Message); }
     }
 
     /// <summary>Windows refused to switch a radio (hardware switch, driver, policy): flip the tile back with a small shiver.</summary>
@@ -118,9 +145,13 @@ public partial class NotchWindow
             return;
         }
         ProgressRow.Visibility = Visibility.Visible;
+        ProgressSlider.IsInteractive = _media.CanSeek; // a player that can't seek: the bar only shows
         if (ProgressSlider.IsDragging) return;
         var pos = _media.Position;
-        ProgressSlider.Value = pos.TotalSeconds / _media.Duration.TotalSeconds;
+        double total = _media.Duration.TotalSeconds;
+        // the bar glides to where the song will be at the next tick (no 1-second steps); a jump snaps
+        if (_media.IsPlaying) ProgressSlider.Glide((pos.TotalSeconds + _media.Rate) / total, 1.0);
+        else ProgressSlider.Glide(pos.TotalSeconds / total, 0);
         ElapsedText.Text = Format(pos);
         RemainText.Text = "-" + Format(_media.Duration - pos);
     }
@@ -143,11 +174,16 @@ public partial class NotchWindow
             ArtBox.Background = brush ?? (Brush)new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x21));
             ArtPlaceholder.Visibility = brush == null ? Visibility.Visible : Visibility.Collapsed;
         });
-        TitleText.Text = has && _media.Title.Length > 0 ? _media.Title : "Nothing playing";
-        ArtistText.Text = has ? _media.Artist : "Play something in Spotify, YouTube…";
+        // a player without a title still says what it is ("Brave", "youtube.com"); an empty artist names the app
+        string app = _media.Current?.AppName ?? "";
+        TitleText.Text = !has ? Loc.T("Nothing playing") : _media.Title.Length > 0 ? _media.Title : app.Length > 0 ? app : Loc.T("Playing");
+        ArtistText.Text = !has ? Loc.T("Play something in Spotify, YouTube…") : _media.Artist.Length > 0 ? _media.Artist : _media.Title.Length > 0 ? app : "";
+        TitleText.ToolTip = has && _media.Title.Length > 0 ? _media.Title : null; // a long title, in full
         PlayIcon.Visibility = _media.IsPlaying ? Visibility.Collapsed : Visibility.Visible;
         PauseIcon.Visibility = _media.IsPlaying ? Visibility.Visible : Visibility.Collapsed;
-        PrevBtn.IsEnabled = PlayBtn.IsEnabled = NextBtn.IsEnabled = has;
+        PlayBtn.IsEnabled = has;
+        NextBtn.IsEnabled = has && _media.CanNext;      // only what the player can really do
+        PrevBtn.IsEnabled = has && _media.CanPrevious;
         RefreshAppVolume();
         RefreshClockAndProgress();
         RefreshDisc(); // the cyberpunk record: its art, its glow, turning or still

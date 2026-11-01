@@ -580,6 +580,22 @@ public sealed class AudioService : IMMNotificationClient
         }
     });
 
+    /// <summary>
+    /// How loud the media app (found by <see cref="FindAppVolumeAsync"/>) sounds right now, 0–1. A browser with several
+    /// tabs tells Windows about one tab only, which may be paused while another plays: this is what's really heard.
+    /// Call off the UI thread.
+    /// </summary>
+    public float AppPeak()
+    {
+        lock (_appGate)
+        {
+            float peak = 0;
+            foreach (var s in _appSessions)
+                try { peak = Math.Max(peak, s.AudioMeterInformation.MasterPeakValue); } catch { }
+            return peak;
+        }
+    }
+
     /// <summary>Called continuously while dragging; only the latest value is ever written.</summary>
     public void SetAppVolume(float v)
     {

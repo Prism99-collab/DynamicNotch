@@ -29,6 +29,7 @@ public partial class NotchWindow : Window
 
     readonly Settings _settings;
     readonly MediaService _media;
+    readonly WebMediaLink _webLink;
     readonly AudioService _audio;
     readonly RadioService _radio;
     readonly BluetoothService _bt;
@@ -73,6 +74,7 @@ public partial class NotchWindow : Window
         InitializeComponent();
 
         _media = new MediaService(Dispatcher);
+        _webLink = new WebMediaLink(Dispatcher);
         _audio = new AudioService(Dispatcher);
         _radio = new RadioService(Dispatcher);
         _bt = new BluetoothService(Dispatcher);
@@ -871,6 +873,8 @@ public partial class NotchWindow : Window
         Safe("privacy", _privacy.Start);
         Safe("files", _files.Start);
         await SafeAsync("media", _media.InitAsync);
+        // the optional browser extension: every playing tab, not just the one a browser tells Windows about
+        Safe("browser link", () => { _media.AttachWeb(_webLink); _webLink.Start(); });
         await SafeAsync("network", _radio.InitAsync);
         _lastNetwork = _radio.NetworkName;
         Safe("media ui", OnMediaChanged);

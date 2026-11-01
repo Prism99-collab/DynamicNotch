@@ -781,6 +781,52 @@ public sealed class PreferencesWindow : Window
             colours.Children.Add(g);
         }
         _content.Children.Add(CardOf(colours));
+
+        BrowserTabs();
+    }
+
+    /// <summary>
+    /// The optional browser extension: a browser tells Windows about one playing tab only; with the extension every
+    /// tab that plays shows in the notch, with its own buttons. Its state, the folder it's in, and how to add it.
+    /// </summary>
+    void BrowserTabs()
+    {
+        Label(Loc.T("Every browser tab that plays"));
+        var box = new StackPanel { Margin = new Thickness(18, 14, 18, 14) };
+        var connected = _notch.PrefBrowsersConnected;
+        string Name(string b) => b switch { "MSEdge" => "Edge", _ => b };
+        box.Children.Add(new TextBlock
+        {
+            Text = connected.Count > 0
+                ? string.Format(Loc.T("Connected: {0}"), string.Join(", ", connected.Select(Name)))
+                : Loc.T("Optional: without it, the notch shows the one tab your browser tells Windows about"),
+            FontSize = 13.5, FontWeight = connected.Count > 0 ? FontWeights.SemiBold : FontWeights.Normal, TextWrapping = TextWrapping.Wrap,
+            Foreground = connected.Count > 0 ? Frozen(Color.FromRgb(0x30, 0xD1, 0x58)) : Text,
+        });
+        box.Children.Add(new TextBlock
+        {
+            Text = Loc.T("The \"Dynamic Notch Media\" extension shows every tab playing a video, music or a stream, with play, pause, next and previous. It only talks to the notch on this PC."),
+            FontSize = 12, Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 10),
+        });
+        string[] steps =
+        {
+            Loc.T("1. Open your browser's extensions page: chrome://extensions, edge://extensions, brave://extensions or opera://extensions"),
+            Loc.T("2. Turn on \"Developer mode\""),
+            Loc.T("3. Click \"Load unpacked\" and choose the \"chromium\" folder"),
+            Loc.T("Firefox: about:debugging → This Firefox → Load Temporary Add-on → firefox\\manifest.json"),
+        };
+        foreach (var s in steps)
+            box.Children.Add(new TextBlock { Text = s, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 4) });
+        string folder = System.IO.Path.Combine(AppContext.BaseDirectory, "extension");
+        var open = PillButton("", Loc.T("Open the extension folder"), () =>
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = true }); }
+            catch (Exception ex) { AppLog.Write("extension folder: " + ex.Message); }
+        }, primary: true);
+        open.HorizontalAlignment = HorizontalAlignment.Left;
+        open.Margin = new Thickness(0, 8, 0, 0);
+        box.Children.Add(open);
+        _content.Children.Add(CardOf(box));
     }
 
     void Alerts()

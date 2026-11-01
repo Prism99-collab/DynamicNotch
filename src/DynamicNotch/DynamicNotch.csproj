@@ -17,7 +17,7 @@
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
 
     <!-- What Windows shows in the exe's Properties > Details and in Settings > Apps -->
-    <Version>1.7.3</Version>
+    <Version>1.7.4</Version>
     <Product>Dynamic Notch</Product>
     <AssemblyTitle>Dynamic Notch</AssemblyTitle>
     <Description>A smooth Dynamic-Island-style notch and control center for Windows.</Description>
@@ -61,6 +61,15 @@
     <EmbeddedResource Include="Assets\notification.wav" LogicalName="DynamicNotch.Assets.notification.wav" />
     <!-- the Cyberpunk theme's default page backgrounds (a picture in the user's Backgrounds folder wins) -->
     <EmbeddedResource Include="Assets\Backgrounds\page*.*" LogicalName="DynamicNotch.Backgrounds.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- the optional browser extension (every playing tab in the notch), ready to load next to the app:
+         extension\chromium for Chrome, Edge, Brave, Opera, Vivaldi; extension\firefox for Firefox -->
+    <None Include="..\..\browser-extension\shared\*" Link="extension\chromium\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\browser-extension\chromium\manifest.json" Link="extension\chromium\manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\browser-extension\shared\*" Link="extension\firefox\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\browser-extension\firefox\manifest.json" Link="extension\firefox\manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
