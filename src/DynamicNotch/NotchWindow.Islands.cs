@@ -19,7 +19,7 @@ public partial class NotchWindow
     static void IslandRim(Border rim, Color c, double strength = 0.75)
     {
         if (_pillColor is { } mine) c = mine; // your pills colour (Colors page)
-        else if (_skinOn) c = CyMap(c);
+        else if (_skinOn) c = _skinMap(c);
         PlateColor(rim, c); // the cyber plate's frame wears it too
         var g = new LinearGradientBrush { StartPoint = new Point(0.5, 0), EndPoint = new Point(0.5, 1) };
         g.GradientStops.Add(new GradientStop(Color.FromArgb(0, c.R, c.G, c.B), 0));
@@ -33,7 +33,7 @@ public partial class NotchWindow
     static void IslandAura(Border aura, Color c)
     {
         if (_pillColor is { } mine) c = mine;
-        else if (_skinOn) c = CyMap(c);
+        else if (_skinOn) c = _skinMap(c);
         var g = new RadialGradientBrush
         {
             Center = new Point(0.5, 0), GradientOrigin = new Point(0.5, 0), RadiusX = 0.5, RadiusY = 1,

@@ -78,8 +78,11 @@ public sealed class PreferencesWindow : Window
     static readonly Brush Edge = Frozen(Color.FromArgb(0x1C, 0xFF, 0xFF, 0xFF));
 
     Brush CardBrush => Frozen(_mica ? Color.FromArgb(0x66, 0x1E, 0x1E, 0x24) : Color.FromRgb(0x1B, 0x1B, 0x20));
-    Color AccentColor => _s.Cyberpunk && _s.ColorAccent == null ? Color.FromRgb(0xFE, 0xE8, 0x01)
-        : Hex(_s.ColorAccent) ?? Color.FromRgb(0x0A, 0x84, 0xFF);
+    Color AccentColor => Hex(_s.ColorAccent) ?? _s.Theme switch
+    {
+        "cyberpunk" => Color.FromRgb(0xFE, 0xE8, 0x01), "liquid" => Color.FromRgb(0x7F, 0xE7, 0xD9),
+        "crystal" => Color.FromRgb(0xC8, 0xD6, 0xF0), "abyss" => Color.FromRgb(0x2E, 0xE6, 0xD6), _ => Color.FromRgb(0x0A, 0x84, 0xFF),
+    };
     Brush Accent => Frozen(AccentColor);
 
     PreferencesWindow(NotchWindow notch)
@@ -98,8 +101,9 @@ public sealed class PreferencesWindow : Window
         FontSize = 13;
         UseLayoutRounding = true;
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
-        Icon = App.WindowIcon;
         SourceInitialized += (_, _) => Chrome();
+        Resources[typeof(ScrollBar)] = ScrollStyle();
+        _scroll.PreviewMouseWheel += SmoothWheel;
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key == Key.Escape) { if (_query.Length > 0) _search.Text = ""; else Close(); }
@@ -276,6 +280,8 @@ public sealed class PreferencesWindow : Window
             case Sec.Shortcuts: Shortcuts(); break;
             case Sec.About: About(); break;
         }
+        BeginAnimation(SmoothOffsetProperty, null);
+        _scrollAnimating = false;
         _scroll.ScrollToTop();
         Enter();
     }
@@ -459,9 +465,8 @@ public sealed class PreferencesWindow : Window
     void Appearance()
     {
         Label(Loc.T("Theme"));
-        var themes = new StackPanel { Orientation = Orientation.Horizontal };
-        themes.Children.Add(ThemeCard(false));
-        themes.Children.Add(ThemeCard(true));
+        var themes = new WrapPanel();
+        foreach (var key in ThemeKeys) themes.Children.Add(ThemeCard(key));
         _content.Children.Add(themes);
 
         Label(Loc.T("Colours"));
@@ -471,38 +476,87 @@ public sealed class PreferencesWindow : Window
         Card(Rows().Where(r => r.Sec == Sec.Appearance));
     }
 
-    /// <summary>A theme, as a little picture of the notch in it.</summary>
-    FrameworkElement ThemeCard(bool cyber)
+    static readonly string[] ThemeKeys = { "original", "cyberpunk", "liquid", "crystal", "abyss" };
+    static readonly Dictionary<string, string> ThemeTitles = new()
     {
-        bool on = _s.Cyberpunk == cyber;
-        var stage = new Grid { Height = 104, ClipToBounds = true };
-        if (cyber)
+        ["original"] = "Original", ["cyberpunk"] = "Cyberpunk", ["liquid"] = "Liquid glass", ["crystal"] = "Crystal", ["abyss"] = "Abyss",
+    };
+
+    /// <summary>A theme, as a little picture of the notch in it.</summary>
+    FrameworkElement ThemeCard(string key)
+    {
+        bool on = _s.Theme == key;
+        var stage = new Grid { Height = 92, ClipToBounds = true };
+        const double w = 124, h = 32;
+        TextBlock Clock() => new() { Text = "12:07", FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        Border Glass(Brush body, Brush rim, params Brush[] lights)
         {
-            stage.Background = new LinearGradientBrush(Color.FromRgb(0x00, 0x06, 0x0E), Color.FromRgb(0x06, 0x1E, 0x2A), 90);
-            var w = 150.0; var h = 34.0;
-            var shape = new Path
-            {
-                Data = Geometry.Parse($"M0,0 L{w},0 L{w},{h - 10} L{w - 10},{h} L{w * 0.62 + 4},{h} L{w * 0.62},{h + 4} L6,{h + 4} L0,{h - 2} Z"),
-                Fill = Frozen(Color.FromRgb(0x00, 0x06, 0x0E)), Stroke = Frozen(Color.FromRgb(0xFE, 0xE8, 0x01)), StrokeThickness = 1.5,
-                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
-                Effect = new DropShadowEffect { Color = Color.FromRgb(0xFE, 0xE8, 0x01), BlurRadius = 10, ShadowDepth = 0, Opacity = 0.6 },
-            };
-            stage.Children.Add(shape);
-            stage.Children.Add(new Rectangle { Width = 40, Height = 1.5, Fill = Frozen(Color.FromRgb(0x54, 0xC1, 0xE6)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(-70, 32, 0, 0) });
-            stage.Children.Add(new TextBlock { Text = "12:07", FontFamily = new FontFamily("Bahnschrift"), FontStretch = FontStretches.SemiCondensed, FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Frozen(Color.FromRgb(0xFE, 0xE8, 0x01)), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 10, 0, 0) });
+            var g = new Grid();
+            var corner = new CornerRadius(0, 0, h / 2, h / 2);
+            g.Children.Add(new Border { CornerRadius = corner, Background = body });
+            foreach (var l in lights) g.Children.Add(new Border { CornerRadius = corner, Background = l });
+            g.Children.Add(new Border { CornerRadius = corner, BorderBrush = rim, BorderThickness = new Thickness(1.2, 0, 1.2, 1.2) });
+            g.Children.Add(Clock());
+            return new Border { Width = w, Height = h, VerticalAlignment = VerticalAlignment.Top, Child = g };
         }
-        else
+        RadialGradientBrush Light(Color c, double x, double y) => new()
         {
-            stage.Background = new LinearGradientBrush(Color.FromRgb(0x1A, 0x22, 0x3A), Color.FromRgb(0x2E, 0x1F, 0x3E), 30);
-            stage.Children.Add(new Border
-            {
-                Width = 150, Height = 36, CornerRadius = new CornerRadius(0, 0, 18, 18), Background = Brushes.Black, VerticalAlignment = VerticalAlignment.Top,
-                BorderBrush = Frozen(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(1, 0, 1, 1),
-                Child = new TextBlock { Text = "12:07", FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
-            });
+            Center = new Point(x, y), GradientOrigin = new Point(x, y), RadiusX = 0.6, RadiusY = 1.1,
+            GradientStops = { new GradientStop(c, 0), new GradientStop(Colors.Transparent, 1) },
+        };
+        LinearGradientBrush V(params (string C, double At)[] stops)
+        {
+            var g = new LinearGradientBrush { StartPoint = new Point(0.5, 0), EndPoint = new Point(0.5, 1) };
+            foreach (var (c, at) in stops) g.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(c), at));
+            return g;
         }
-        var caption = new Grid { Margin = new Thickness(14, 10, 14, 12) };
-        caption.Children.Add(new TextBlock { Text = Loc.T(cyber ? "Cyberpunk" : "Original"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+        switch (key)
+        {
+            case "cyberpunk":
+                stage.Background = new LinearGradientBrush(Color.FromRgb(0x00, 0x06, 0x0E), Color.FromRgb(0x06, 0x1E, 0x2A), 90);
+                stage.Children.Add(new Path
+                {
+                    Data = Geometry.Parse($"M0,0 L{w},0 L{w},{h - 10} L{w - 10},{h} L{w * 0.62 + 4},{h} L{w * 0.62},{h + 4} L6,{h + 4} L0,{h - 2} Z"),
+                    Fill = Frozen(Color.FromRgb(0x00, 0x06, 0x0E)), Stroke = Frozen(Color.FromRgb(0xFE, 0xE8, 0x01)), StrokeThickness = 1.5,
+                    HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
+                });
+                stage.Children.Add(new TextBlock { Text = "12:07", FontFamily = new FontFamily("Bahnschrift"), FontStretch = FontStretches.SemiCondensed, FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Frozen(Color.FromRgb(0xFE, 0xE8, 0x01)), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 9, 0, 0) });
+                break;
+            case "liquid":
+                stage.Background = new LinearGradientBrush(Color.FromRgb(0x1C, 0x4A, 0x6E), Color.FromRgb(0x4A, 0x2A, 0x6A), 35);
+                stage.Children.Add(Glass(V(("#F2080B13", 0), ("#DC101725", 0.5), ("#C41A253A", 1)), V(("#00FFFFFF", 0), ("#90FFFFFF", 1)),
+                    Light(Color.FromArgb(0x60, 0x3F, 0xE0, 0xC5), 0.15, 1), Light(Color.FromArgb(0x55, 0x9B, 0x7B, 0xFF), 0.88, 0.95)));
+                break;
+            case "crystal":
+                stage.Background = new LinearGradientBrush(Color.FromRgb(0x5A, 0x7C, 0xB8), Color.FromRgb(0xC0, 0x8C, 0xB8), 20);
+                var prism = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 0.5) };
+                foreach (var (c, at) in new[] { ("#E0FF7AA8", 0.0), ("#E0FFD36B", 0.25), ("#E06BFFC2", 0.5), ("#E06BC8FF", 0.75), ("#E0C27AFF", 1.0) })
+                    prism.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(c), at));
+                stage.Children.Add(Glass(V(("#EC050609", 0), ("#BE0B0E14", 0.5), ("#A612161F", 1)), prism, V(("#40FFFFFF", 0), ("#00FFFFFF", 0.5))));
+                break;
+            case "abyss":
+                stage.Background = new LinearGradientBrush(Color.FromRgb(0x01, 0x06, 0x10), Color.FromRgb(0x03, 0x16, 0x2E), 90);
+                stage.Children.Add(Glass(V(("#000000", 0), ("#020B1A", 0.5), ("#041E38", 1)), V(("#002EE6D6", 0), ("#702EE6D6", 1)),
+                    Light(Color.FromArgb(0x60, 0x2E, 0xE6, 0xD6), 0.5, 1.1)));
+                var rnd = new Random(3);
+                for (int i = 0; i < 9; i++)
+                    stage.Children.Add(new Ellipse
+                    {
+                        Width = 3, Height = 3, Fill = Frozen(i % 3 == 0 ? Color.FromRgb(0x7C, 0xF5, 0xFF) : Color.FromRgb(0x2E, 0xE6, 0xD6)), Opacity = 0.4 + rnd.NextDouble() * 0.5,
+                        HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(10 + rnd.NextDouble() * 150, 42 + rnd.NextDouble() * 44, 0, 0),
+                    });
+                break;
+            default:
+                stage.Background = new LinearGradientBrush(Color.FromRgb(0x1A, 0x22, 0x3A), Color.FromRgb(0x2E, 0x1F, 0x3E), 30);
+                stage.Children.Add(new Border
+                {
+                    Width = w, Height = h, CornerRadius = new CornerRadius(0, 0, h / 2, h / 2), Background = Brushes.Black, VerticalAlignment = VerticalAlignment.Top,
+                    BorderBrush = Frozen(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(1, 0, 1, 1), Child = Clock(),
+                });
+                break;
+        }
+        var caption = new Grid { Margin = new Thickness(12, 9, 12, 10) };
+        caption.Children.Add(new TextBlock { Text = Loc.T(ThemeTitles[key]), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
         if (on) caption.Children.Add(new Border
         {
             Width = 20, Height = 20, CornerRadius = new CornerRadius(10), Background = Accent, HorizontalAlignment = HorizontalAlignment.Right,
@@ -513,13 +567,13 @@ public sealed class PreferencesWindow : Window
         body.Children.Add(caption);
         var card = new Border
         {
-            Width = 236, Margin = new Thickness(0, 0, 12, 0), CornerRadius = new CornerRadius(12), Background = CardBrush, Cursor = Cursors.Hand,
+            Width = 180, Margin = new Thickness(0, 0, 10, 10), CornerRadius = new CornerRadius(12), Background = CardBrush, Cursor = Cursors.Hand,
             BorderBrush = on ? Accent : Edge, BorderThickness = new Thickness(on ? 2 : 1), Child = body, ClipToBounds = true,
         };
         card.MouseLeftButtonUp += (_, _) =>
         {
-            if (_s.Cyberpunk == cyber) return;
-            _notch.SetCyber(cyber);
+            if (_s.Theme == key) return;
+            _notch.SetTheme(key);
             Build();
             Saved();
         };
@@ -766,6 +820,79 @@ public sealed class PreferencesWindow : Window
     static void Launch(string target)
     {
         try { Process.Start(new ProcessStartInfo(target) { UseShellExecute = true }); } catch { }
+    }
+
+    // ───────────── scrolling: a slim pill of a scrollbar, and the wheel glides ─────────────
+
+    /// <summary>
+    /// A thin rounded thumb floating on nothing: barely there at rest, it widens and brightens under the pointer and
+    /// takes the accent colour while you drag it.
+    /// </summary>
+    Style ScrollStyle()
+    {
+        var a = AccentColor;
+        string accent = $"#{a.R:X2}{a.G:X2}{a.B:X2}";
+        string xaml = $@"
+<Style TargetType='ScrollBar' xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
+  <Setter Property='Width' Value='12' />
+  <Setter Property='MinWidth' Value='12' />
+  <Setter Property='Template'>
+    <Setter.Value>
+      <ControlTemplate TargetType='ScrollBar'>
+        <Grid Background='Transparent'>
+          <Track x:Name='PART_Track' IsDirectionReversed='True'>
+            <Track.Thumb>
+              <Thumb>
+                <Thumb.Template>
+                  <ControlTemplate TargetType='Thumb'>
+                    <Border x:Name='T' Width='4' CornerRadius='2' Margin='0,6,3,6' HorizontalAlignment='Right' Background='#38FFFFFF' />
+                    <ControlTemplate.Triggers>
+                      <Trigger Property='IsMouseOver' Value='True'>
+                        <Setter TargetName='T' Property='Width' Value='7' />
+                        <Setter TargetName='T' Property='CornerRadius' Value='3.5' />
+                        <Setter TargetName='T' Property='Background' Value='#80FFFFFF' />
+                      </Trigger>
+                      <Trigger Property='IsDragging' Value='True'>
+                        <Setter TargetName='T' Property='Width' Value='7' />
+                        <Setter TargetName='T' Property='CornerRadius' Value='3.5' />
+                        <Setter TargetName='T' Property='Background' Value='{accent}' />
+                      </Trigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate>
+                </Thumb.Template>
+              </Thumb>
+            </Track.Thumb>
+          </Track>
+        </Grid>
+      </ControlTemplate>
+    </Setter.Value>
+  </Setter>
+</Style>";
+        return (Style)System.Windows.Markup.XamlReader.Parse(xaml);
+    }
+
+    static readonly DependencyProperty SmoothOffsetProperty = DependencyProperty.Register("SmoothOffset", typeof(double), typeof(PreferencesWindow),
+        new PropertyMetadata(0.0, (d, e) => ((PreferencesWindow)d)._scroll.ScrollToVerticalOffset((double)e.NewValue)));
+    double _scrollTarget;
+    bool _scrollAnimating;
+
+    /// <summary>The wheel glides to where it's going (sliders and the colour wheel keep their own wheel).</summary>
+    void SmoothWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject src && (FindUp<PillSlider>(src) || FindUp<ColorWheel>(src))) return;
+        e.Handled = true;
+        if (!_scrollAnimating) _scrollTarget = _scroll.VerticalOffset;
+        _scrollTarget = Math.Clamp(_scrollTarget - e.Delta * 0.9, 0, _scroll.ScrollableHeight);
+        var glide = new DoubleAnimation(_scroll.VerticalOffset, _scrollTarget, TimeSpan.FromMilliseconds(280)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+        glide.Completed += (_, _) => _scrollAnimating = false;
+        _scrollAnimating = true;
+        BeginAnimation(SmoothOffsetProperty, glide);
+    }
+
+    static bool FindUp<T>(DependencyObject? d) where T : DependencyObject
+    {
+        while (d != null) { if (d is T) return true; d = d is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d); }
+        return false;
     }
 
     // ───────────── small pieces ─────────────

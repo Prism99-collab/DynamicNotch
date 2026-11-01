@@ -93,10 +93,10 @@ public partial class NotchWindow
     /// <summary>What each one looks like when it's left to the notch.</summary>
     Color DefaultFor(Paint p) => p switch
     {
-        Paint.Accent => _cyber ? CyYellow : _ambientAccent,
-        Paint.Glow => _cyber ? CyTeal : _hasAmbient ? _ambientAccent : Color.FromRgb(0x8E, 0x8E, 0x93),
-        Paint.Edge => _cyber ? CyYellow : Colors.White,
-        Paint.Panel => _cyber ? Color.FromRgb(0x04, 0x13, 0x1D) : Color.FromRgb(0x0B, 0x0B, 0x0E),
+        Paint.Accent => _cyber ? CyYellow : _look?.Accent ?? _ambientAccent,
+        Paint.Glow => _cyber ? CyTeal : _look?.Tint ?? (_hasAmbient ? _ambientAccent : Color.FromRgb(0x8E, 0x8E, 0x93)),
+        Paint.Edge => _cyber ? CyYellow : _look?.RimColor ?? Colors.White,
+        Paint.Panel => _cyber ? Color.FromRgb(0x04, 0x13, 0x1D) : _look != null ? Color.FromRgb(_look.Bottom.R, _look.Bottom.G, _look.Bottom.B) : Color.FromRgb(0x0B, 0x0B, 0x0E),
         Paint.Pills => _cyber ? CyYellow : Colors.White,
         _ => _cyber ? CyYellow : Colors.White,
     };
@@ -104,7 +104,7 @@ public partial class NotchWindow
     /// <summary>Your colours, everywhere they belong (also at start, and whenever the theme changes).</summary>
     void ApplyCustomColors()
     {
-        _accent = CustomAccent ?? _ambientAccent;
+        _accent = CustomAccent ?? _look?.Accent ?? _ambientAccent;
         ApplyAccent();
         _panelTint = null;
         UpdatePanelTint();
@@ -125,10 +125,11 @@ public partial class NotchWindow
     /// <summary>The notch's body: black where it meets the screen's edge, your colour deepening toward the bottom.</summary>
     void ApplyPanelColor()
     {
-        if (CustomPanel is not { } c)
+        var mine = CustomPanel;
+        if (_look != null) { Pill.Background = LookBody(_look, mine); return; } // glass stays glass, in your colour
+        if (mine is not { } c)
         {
-            if (!_cyber) Pill.Background = _pillBgBefore ?? Pill.Background; // the original (the theme puts its own)
-            else if (Pill.Background is LinearGradientBrush { IsFrozen: true } && _cyberBody != null) Pill.Background = _cyberBody;
+            Pill.Background = _cyber && _cyberBody != null ? _cyberBody : _pillBgBefore ?? Pill.Background;
             return;
         }
         var g = new LinearGradientBrush { StartPoint = new Point(0.5, 0), EndPoint = new Point(0.5, 1) };
@@ -143,6 +144,7 @@ public partial class NotchWindow
     {
         if (CustomClock is { } c) ClockText.Foreground = Frozen(c);
         else if (_cyber) ClockText.Foreground = CyYellowBrush;
+        else if (_look?.Clock is { } lc) ClockText.Foreground = Frozen(lc);
         else ClockText.ClearValue(TextBlock.ForegroundProperty);
     }
 

@@ -3,6 +3,32 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] — 2026-11-01
+
+### Added
+- Three new themes beside Original and Cyberpunk, with their own glass controls, colours and motion:
+  - Liquid glass: tinted glass with a slow teal and violet aurora inside, a rim that catches light, a caustic
+    along the bottom edge and a glint that follows the pointer near the top of the screen; a small liquid wobble
+    when it changes shape; its glow adapts to the app you're on.
+  - Crystal: clear, frosted glass with a prism rim that splits light into a thin rainbow.
+  - Abyss: the deep sea, a bioluminescent glow from below and glowing particles that drift up now and then.
+  The theme button in the notch moves to the next theme; Settings and Preferences (five preview cards) pick one
+  directly. Everything on the Colors page applies on top of every theme.
+- Cyberpunk: your own faded pictures behind each page of the control center, read from
+  `%APPDATA%\DynamicNotch\Backgrounds` (`page1.*` … `page6.*`); they cover the whole panel and cross-fade between
+  pages. Nothing is bundled with the app.
+- Cyberpunk pop-ups arrive like the game's HUD: a scan wipes them in, the icon flickers on like a hologram, the
+  title and the line under it decode behind a block cursor.
+- Cyberpunk reacts to what happens on the PC: a tiny glitch when an app comes to the front, a song changes or
+  pauses, a new activity starts, a device's battery changes, a side pill appears, or a button is pressed (at most
+  one every 0.7 s; never in games or on battery mode). Glitches tear the content sideways for a few frames.
+- A new app icon: the cyber notch, drawn in HD at every Windows size.
+
+### Changed
+- Music bars: the cover's two strongest colours flow across them, each bar lit at its tip; they move with physics
+  (up on the beat, falling with gravity), each following a different part of the sound.
+- Preferences: a slim floating scrollbar and smooth wheel scrolling.
+
 ## [1.4.0] — 2026-10-31
 
 ### Added

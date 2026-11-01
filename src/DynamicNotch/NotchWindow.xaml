@@ -178,7 +178,7 @@
                                             <Grid x:Name="CyberBg" Background="Transparent">
                                                 <Path Stretch="Fill" Data="M0,0 L15,0 L22,7 L22,22 L7,22 L0,15 Z" Fill="{TemplateBinding Background}"
                                                       Stroke="{TemplateBinding BorderBrush}" StrokeThickness="1.2" StrokeLineJoin="Miter" />
-                                                <TextBlock Text="&#xE945;" FontFamily="{StaticResource IconFont}" FontSize="10.5" Foreground="{TemplateBinding Foreground}"
+                                                <TextBlock Text="&#xE790;" FontFamily="{StaticResource IconFont}" FontSize="10.5" Foreground="{TemplateBinding Foreground}"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Grid>
                                             <ControlTemplate.Triggers>

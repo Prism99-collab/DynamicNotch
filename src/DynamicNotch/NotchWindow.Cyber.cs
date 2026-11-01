@@ -34,6 +34,8 @@ public partial class NotchWindow
     static readonly ConditionalWeakTable<TextBlock, FontBefore> _fontBefore = new();
 
     bool _cyber;
+    TranslateTransform? _stageTear;
+    static bool _pressHandler;
     Canvas _hud = null!;
     Path _cyFrame = null!, _cyGhost = null!, _cyTrace = null!, _cyTicks = null!;
     Rectangle _cyScan = null!, _cyLines = null!, _cyStripes = null!;
@@ -57,13 +59,23 @@ public partial class NotchWindow
         BuildHud();
         BuildCyberPills();
         WireCyberSkin();
-        CyberBtn.Click += (_, _) => SetCyber(!_settings.Cyberpunk);
+        CyberBtn.Click += (_, _) => NextTheme();
+        // a press in the cyber skin: a tiny glitch answers it (light, once per press)
+        if (!_pressHandler)
+        {
+            _pressHandler = true;
+            EventManager.RegisterClassHandler(typeof(System.Windows.Controls.Primitives.ButtonBase), System.Windows.Controls.Primitives.ButtonBase.ClickEvent,
+                new RoutedEventHandler((s, _) => { if (_cyber && !Eco && s is DependencyObject d && Window.GetWindow(d) == this) CyberGlitch(strong: false, light: true); }));
+        }
         if (!_cyberHandler)
         {
             _cyberHandler = true;
             EventManager.RegisterClassHandler(typeof(TextBlock), LoadedEvent, new RoutedEventHandler((s, _) => { if (s is TextBlock tb) Retype(tb, _cyberFonts); }));
         }
-        if (_settings.Cyberpunk) ApplyCyber(true, animate: false);
+        // the theme from last time (older settings only knew Cyberpunk on / off)
+        if (_settings.Cyberpunk && _settings.Theme == "original") _settings.Theme = "cyberpunk";
+        if (ThemeKey == "cyberpunk") ApplyCyber(true, animate: false);
+        else if (LookFor(ThemeKey) is { } look) ApplyLook(look, animate: false);
         StyleCyberBtn();
         // development: open the control center on start (for screenshots), no input needed
         // DYNAMICNOTCH_OPEN=1 opens it; =p2 opens it on page 2
@@ -78,23 +90,13 @@ public partial class NotchWindow
                 }
                 Expand(byHotkey: true);
                 if (open == "flip") After(1500, () => SetCyber(!_settings.Cyberpunk)); // the switch, live
+                if (open == "cycle") for (int i = 1; i <= 10; i++) After(1400 * i, NextTheme); // every theme, twice round
                 if (open.StartsWith('p') && int.TryParse(open[1..], out int pg)) GoToPage(pg, instant: true);
             });
     }
 
     /// <summary>The theme was switched (the tray icon follows it).</summary>
     public event Action<bool>? CyberChanged;
-
-    public void SetCyber(bool on)
-    {
-        if (on == _settings.Cyberpunk) return;
-        _settings.Cyberpunk = on;
-        _settings.Save();
-        Services.AppLog.Write(on ? "cyberpunk theme on" : "cyberpunk theme off");
-        ApplyCyber(on, animate: true);
-        SyncSettingsPage();
-        CyberChanged?.Invoke(on);
-    }
 
     void ApplyCyber(bool on, bool animate)
     {
@@ -128,8 +130,10 @@ public partial class NotchWindow
 
         FontFamily = on ? CyFont : _windowFontBefore;
         FontStretch = on ? FontStretches.SemiCondensed : FontStretches.Normal;
+        if (on) { _skinMap = CyMap; _skinPrefix = "Cy"; _skinCuts = true; }
         SkinAll(on); // the content: controls, cards, colours, gauges (NotchWindow.CyberSkin)
         CyberPills(on); // the side pills' plates, the data blip (NotchWindow.CyberPills)
+        CyberArt(on); // your faded pictures behind the pages (NotchWindow.CyberArt)
         Recolor("Dim", ref _dimBefore, on ? Color.FromArgb(0xB4, CyCyan.R, CyCyan.G, CyCyan.B) : null);
         Recolor("Tile", ref _tileBefore, on ? Color.FromRgb(0x0A, 0x1A, 0x24) : null);
         ApplyClockColor();
@@ -362,7 +366,7 @@ public partial class NotchWindow
         CyberHudForMode();
         CyberSkinSoon();
         if (to == Mode.Game || from == Mode.Game || to == Mode.Slim && from == Mode.Idle) return;
-        if (to == Mode.Expanded) { CyberGlitch(strong: false); CyberScan(); CyberDecode(PageTitle); }
+        if (to == Mode.Expanded) { CyberArtShow(); CyberGlitch(strong: false); CyberScan(); CyberDecode(PageTitle); }
         else if (to == Mode.Osd) CyberGlitch(strong: false);
         else if (from == Mode.Expanded || from == Mode.Osd) CyberGlitch(strong: false, light: true);
     }
@@ -395,6 +399,12 @@ public partial class NotchWindow
             a.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(t0 + on + 80))));
             b.BeginAnimation(OpacityProperty, a);
         }
+        // the content tears sideways for a few frames, like a bad signal (a pixel or two: felt more than seen)
+        _stageTear ??= new TranslateTransform();
+        if (Stage.RenderTransform != _stageTear) Stage.RenderTransform = _stageTear;
+        if (strong) Steps(_stageTear, TranslateTransform.XProperty, 28, 0, -3, 2.5, -1, 0);
+        else if (light) Steps(_stageTear, TranslateTransform.XProperty, 26, 0, 1.2, 0);
+        else Steps(_stageTear, TranslateTransform.XProperty, 28, 0, -1.8, 1.2, 0);
         if (light) return;
 
         // the cyan ghost: chromatic split of the frame
@@ -430,27 +440,30 @@ public partial class NotchWindow
     }
 
     /// <summary>A text decodes itself: scrambled symbols resolve into the real letters, left to right, in ~270 ms.</summary>
-    void CyberDecode(TextBlock tb)
+    /// <param name="cursor">a block cursor rides the edge of the decoded text while it resolves (pop-ups)</param>
+    /// <param name="holdMs">fully scrambled for a moment before it starts resolving (the line under a title)</param>
+    void CyberDecode(TextBlock tb, bool cursor = false, int holdMs = 0)
     {
         if (!_cyber || Eco) return;
         string final = tb.Text;
         if (string.IsNullOrWhiteSpace(final) || final.Length > 48) return;
         if (_decoding.Remove(tb, out var old)) old.Stop();
         const int steps = 9;
-        int step = 0;
+        int step = -(holdMs / 30); // negative: still holding
         string written = "";
         var t = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(30) };
         t.Tick += (_, _) =>
         {
             // something else changed the text meanwhile (the clock ticked, a new title): it wins
-            if (step > 0 && tb.Text != written) { t.Stop(); _decoding.Remove(tb); return; }
+            if (written.Length > 0 && tb.Text != written) { t.Stop(); _decoding.Remove(tb); return; }
             step++;
             if (step >= steps) { tb.Text = final; t.Stop(); _decoding.Remove(tb); return; }
-            int shown = final.Length * step / steps;
+            int shown = final.Length * Math.Max(0, step) / steps;
             var chars = final.ToCharArray();
             for (int i = shown; i < chars.Length; i++)
                 if (!char.IsWhiteSpace(chars[i])) chars[i] = Scramble[_cyRand.Next(Scramble.Length)];
             written = new string(chars);
+            if (cursor) written = written[..shown] + "\u2588" + written[Math.Min(written.Length, shown + 1)..];
             tb.Text = written;
         };
         _decoding[tb] = t;
@@ -460,11 +473,14 @@ public partial class NotchWindow
     /// <summary>The button: solid yellow to switch it on; dark with a yellow edge while it's on.</summary>
     void StyleCyberBtn()
     {
-        bool on = _settings.Cyberpunk;
-        CyberBtn.Background = on ? Frozen(CyNight) : CyYellowBrush;
-        CyberBtn.BorderBrush = on ? CyYellowBrush : Frozen(CyOlive);
-        CyberBtn.Foreground = on ? CyYellowBrush : Frozen(CyNight);
-        CyberBtn.ToolTip = on ? "Cyberpunk theme is on: click for the original look" : "Cyberpunk theme";
+        // the theme button wears the theme it's on; a click moves to the next one
+        string key = ThemeKey;
+        var sig = key switch { "cyberpunk" => CyYellow, "original" => Colors.White, _ => LookFor(key)?.Signature ?? Colors.White };
+        bool dark = key == "cyberpunk";
+        CyberBtn.Background = dark ? Frozen(CyNight) : Frozen(sig);
+        CyberBtn.BorderBrush = dark ? CyYellowBrush : Frozen(Color.FromArgb(0x80, 0xFF, 0xFF, 0xFF));
+        CyberBtn.Foreground = dark ? CyYellowBrush : Frozen(CyNight);
+        CyberBtn.ToolTip = string.Format(Services.Loc.T("Theme: {0} · click for the next"), Services.Loc.T(ThemeNames[key]));
     }
 
     /// <summary>Slider fills in the cyber skin: olive into yellow.</summary>

@@ -26,6 +26,11 @@ namespace DynamicNotch;
 public partial class NotchWindow
 {
     static bool _skinOn;
+    // what the pass does, set by the theme: its colour map, its control styles ("Cy…" / "Gl…"), and whether it
+    // cuts corners (Cyberpunk: cuts, square bars, flat caps, angular ears; the glass themes keep things round)
+    static Func<Color, Color> _skinMap = CyMap;
+    static string _skinPrefix = "Cy";
+    static bool _skinCuts = true;
     static NotchWindow? _skinWindow;
     static ResourceDictionary? _cyStyles;
     sealed class Skinned
@@ -65,14 +70,14 @@ public partial class NotchWindow
         {
             case SolidColorBrush s:
                 if (!s.IsFrozen && s.HasAnimatedProperties) return null; // something is animating it: leave it to its owner
-                var m = CyMap(s.Color);
+                var m = _skinMap(s.Color);
                 return m == s.Color ? null : Frozen(m);
             case GradientBrush g when g.IsFrozen || !g.HasAnimatedProperties:
                 var copy = g.CloneCurrentValue();
                 bool any = false;
                 foreach (var stop in copy.GradientStops)
                 {
-                    var k = CyMap(stop.Color);
+                    var k = _skinMap(stop.Color);
                     if (k != stop.Color) { stop.Color = k; any = true; }
                 }
                 if (!any) return null;
@@ -85,7 +90,11 @@ public partial class NotchWindow
     void WireCyberSkin()
     {
         _skinWindow = this;
-        try { _cyStyles = new ResourceDictionary { Source = new Uri("/DynamicNotch;component/Cyber.xaml", UriKind.Relative) }; }
+        try
+        {
+            _cyStyles = new ResourceDictionary { Source = new Uri("/DynamicNotch;component/Cyber.xaml", UriKind.Relative) };
+            _cyStyles.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/DynamicNotch;component/Glass.xaml", UriKind.Relative) });
+        }
         catch (Exception ex) { Services.AppLog.Write("cyber styles: " + ex.Message); }
         // every element as it appears (rows, chips, art built later) gets the skin while it's on
         EventManager.RegisterClassHandler(typeof(FrameworkElement), LoadedEvent, new RoutedEventHandler((s, _) =>
@@ -98,8 +107,8 @@ public partial class NotchWindow
     void SkinAll(bool on)
     {
         _skinOn = on;
-        PillSlider.Square = on;
-        RingGauge.Segmented = on;
+        PillSlider.Square = on && _skinCuts;
+        RingGauge.Segmented = on && _skinCuts;
         Walk(Root, on);
     }
 
@@ -109,12 +118,12 @@ public partial class NotchWindow
     /// </summary>
     void CyberSkinSoon()
     {
-        if (!_cyber || _skinQueued || _mode == Mode.Game) return;
+        if (!_skinOn || _skinQueued || _mode == Mode.Game) return;
         _skinQueued = true;
         Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
         {
             _skinQueued = false;
-            if (_cyber && _mode != Mode.Game) Walk(Root, true, full: false);
+            if (_skinOn && _mode != Mode.Game) Walk(Root, true, full: false);
         });
     }
 
@@ -157,15 +166,15 @@ public partial class NotchWindow
         // controls: the cut-corner styles
         if (_cyStyles != null)
         {
-            if (fe is ScrollBar sb && sb.Orientation == Orientation.Vertical) PutStyle(fe, "CyScrollBar");
+            if (fe is ScrollBar sb && sb.Orientation == Orientation.Vertical) PutStyle(fe, _skinPrefix + "ScrollBar");
             else if (fe is ButtonBase && fe.TemplatedParent == null)
             {
                 var local = fe.ReadLocalValue(StyleProperty);
-                string? key = local is Style st ? CyKeyFor(st) : fe is QuickToggle && local == DependencyProperty.UnsetValue ? "CyQuickToggle" : null;
+                string? key = local is Style st ? CyKeyFor(st) : fe is QuickToggle && local == DependencyProperty.UnsetValue ? _skinPrefix + "QuickToggle" : null;
                 if (key != null) PutStyle(fe, key);
             }
         }
-        if (ReferenceEquals(fe, LockBtn) && _cyStyles?["CyLockTemplate"] is ControlTemplate lockT && !ReferenceEquals(fe.ReadLocalValue(Control.TemplateProperty), lockT))
+        if (_skinCuts && ReferenceEquals(fe, LockBtn) && _cyStyles?["CyLockTemplate"] is ControlTemplate lockT && !ReferenceEquals(fe.ReadLocalValue(Control.TemplateProperty), lockT))
             Put(fe, Control.TemplateProperty, lockT);
         // parts of a control's template follow its template (and its triggers); only the control itself is touched
         if (fe.TemplatedParent != null || glow) return;
@@ -175,7 +184,7 @@ public partial class NotchWindow
             case Border b:
                 Recolor(b, Border.BackgroundProperty);
                 Recolor(b, Border.BorderBrushProperty);
-                CutCorners(b);
+                if (_skinCuts) CutCorners(b);
                 break;
             case Panel p:
                 Recolor(p, Panel.BackgroundProperty);
@@ -186,6 +195,7 @@ public partial class NotchWindow
             case Shape sh:
                 Recolor(sh, Shape.FillProperty);
                 Recolor(sh, Shape.StrokeProperty);
+                if (!_skinCuts) break;
                 if (sh.StrokeStartLineCap == PenLineCap.Round) Put(sh, Shape.StrokeStartLineCapProperty, PenLineCap.Flat);
                 if (sh.StrokeEndLineCap == PenLineCap.Round) Put(sh, Shape.StrokeEndLineCapProperty, PenLineCap.Flat);
                 if (sh is Rectangle r && (r.RadiusX > 0 || r.RadiusY > 0)) { Put(r, Rectangle.RadiusXProperty, 0.0); Put(r, Rectangle.RadiusYProperty, 0.0); }
@@ -208,7 +218,7 @@ public partial class NotchWindow
     static string? CyKeyFor(Style st)
     {
         foreach (var key in new[] { "CircleButton", "RowButton", "Switch", "ActionTile", "Capsule" })
-            if (ReferenceEquals(Application.Current.TryFindResource(key), st)) return "Cy" + key;
+            if (ReferenceEquals(Application.Current.TryFindResource(key), st)) return _skinPrefix + key;
         return null;
     }
 
@@ -316,8 +326,9 @@ public partial class NotchWindow
     /// <summary>A page changed in the cyber skin: a light glitch, the title decodes.</summary>
     void CyberPage()
     {
-        if (!_cyber) return;
+        if (!_cyber) { CyberSkinSoon(); return; } // the glass themes: just catch up with the new page's colours
         CyberGlitch(strong: false, light: true);
+        CyberArtShow();
         CyberDecode(PageTitle);
         CyberTag();
         CyberSkinSoon();

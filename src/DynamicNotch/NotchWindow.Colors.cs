@@ -62,7 +62,7 @@ public partial class NotchWindow
         if (version != _ambientVersion) return;
         _hasAmbient = c != null;
         _ambientAccent = c is { } k ? ScreenColor.Glow(k) : Colors.White;
-        _accent = CustomAccent ?? _ambientAccent; // your accent, if you picked one
+        _accent = CustomAccent ?? _look?.Accent ?? _ambientAccent; // yours, else the theme's, else the app's
         ApplyAccent();
         _panelTint = null; // repaint even if the colour is the same as last time: it fades in again with the panel
         UpdatePanelTint();
@@ -100,6 +100,7 @@ public partial class NotchWindow
         LiveActivity.Timer => ((SolidColorBrush)TimerBrush).Color,
         LiveActivity.Focus => FocusViolet,
         _ when CustomGlow is { } glow => glow, // your glow (Colors page)
+        _ when _look is { Tint: { } lt } lk && (lk.TintAlways || !_hasAmbient) => lt, // the glass themes' own light
         _ when _cyber => CyTeal, // the cyber skin glows teal from the top, whatever app is in front
         _ => _hasAmbient ? _ambientAccent : ColourfulCover ? _media.Accent : null,
     };
@@ -112,7 +113,7 @@ public partial class NotchWindow
     {
         if (_tintBrush == null) return;
         var c = PanelTintColor();
-        if (_cyber && c is { } pc && pc != CustomGlow) c = CyMap(pc); // live colours in the 2077 palette
+        if (_skinOn && c is { } pc && pc != CustomGlow) c = _skinMap(pc); // live colours in the theme's palette
         if (c == _panelTint) return;
         bool fresh = _panelTint == null;
         _panelTint = c;

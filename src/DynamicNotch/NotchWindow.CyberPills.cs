@@ -59,7 +59,7 @@ public partial class NotchWindow
             bubble.IsVisibleChanged += (_, e) =>
             {
                 // switching on: a short flicker of its frame, like a HUD panel coming up
-                if (_cyber && !Eco && e.NewValue is true) Steps(pl.Frame, OpacityProperty, 34, 0, 1, 0.2, 1, 0.5, 1);
+                if (_cyber && !Eco && e.NewValue is true) { Steps(pl.Frame, OpacityProperty, 34, 0, 1, 0.2, 1, 0.5, 1); CyberPulse(); }
             };
             _plates.Add(pl);
             _plateByRim[rim] = pl;
