@@ -214,6 +214,7 @@ public partial class NotchWindow
     void EndGame(bool linger = true)
     {
         if (_game == null) return;
+        ShowGameStats(null);
         AppLog.Write($"game mode ended: {_game.Name}");
         var left = _game;
         _game = null;
@@ -236,6 +237,7 @@ public partial class NotchWindow
     {
         if (_game != null)
         {
+            _ = GameStatsTick(); // CPU / GPU extras, when chosen (NotchWindow.GameStats)
             if (!_fpsOn && !_fpsResting) return;
             bool drawing = _fps.Read() is { } r && r >= 1;
             if (_fpsResting)

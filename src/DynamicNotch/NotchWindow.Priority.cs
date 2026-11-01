@@ -435,6 +435,12 @@ public partial class NotchWindow
         appear.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(290))));
         inT.BeginAnimation(TranslateTransform.YProperty, rise);
         show.BeginAnimation(OpacityProperty, appear);
+        if (_devicesOpen)
+        {
+            // the sound-device list is open over the cards: the new card waits, faded, until it closes
+            show.BeginAnimation(OpacityProperty, null);
+            show.Opacity = 0;
+        }
         UpdateCardDots(animate: true);
         if (media) RefreshClockAndProgress();
     }

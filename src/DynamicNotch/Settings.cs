@@ -37,6 +37,19 @@ public sealed class Settings
     public bool StrainRam { get; set; } = true;
     public bool StrainGpuTemp { get; set; } = true;
     public bool StrainCpuTemp { get; set; }
+    /// <summary>Where each strain target's line is (% or °C).</summary>
+    public double StrainCpuLine { get; set; } = 90;
+    public double StrainGpuLine { get; set; } = 95;
+    public double StrainRamLine { get; set; } = 90;
+    public double StrainGpuTempLine { get; set; } = 85;
+    public double StrainCpuTempLine { get; set; } = 90;
+    /// <summary>The FPS pill's extras (off by default) and their colours (#RRGGBB; null = soft white).</summary>
+    public bool FpsCpu { get; set; }
+    public bool FpsGpu { get; set; }
+    public bool FpsCpuTemp { get; set; }
+    public bool FpsGpuTemp { get; set; }
+    public string? FpsCpuColor { get; set; }
+    public string? FpsGpuColor { get; set; }
     /// <summary>Your colours from the Colors page (#RRGGBB); null = the notch decides.</summary>
     public string? ColorAccent { get; set; }
     public string? ColorGlow { get; set; }

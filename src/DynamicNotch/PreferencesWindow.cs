@@ -274,7 +274,7 @@ public sealed class PreferencesWindow : Window
         {
             case Sec.General: General(); break;
             case Sec.Appearance: Appearance(); break;
-            case Sec.Behaviour: Card(Rows().Where(r => r.Sec == Sec.Behaviour)); break;
+            case Sec.Behaviour: Behaviour(); break;
             case Sec.Alerts: Alerts(); break;
             case Sec.Pages: Pages(); break;
             case Sec.Shortcuts: Shortcuts(); break;
@@ -712,6 +712,58 @@ public sealed class PreferencesWindow : Window
         return CardOf(grid);
     }
 
+    /// <summary>Behaviour, and the FPS pill's extras: what shows beside the frame rate in a game, and in which colour.</summary>
+    void Behaviour()
+    {
+        Card(Rows().Where(r => r.Sec == Sec.Behaviour));
+
+        Label(Loc.T("Beside the FPS in games"));
+        var stats = new List<Row>
+        {
+            new(Sec.Behaviour, "", "CPU usage", "The processor's load, in %", () => _notch.PrefFpsStat("cpu"), v => _notch.PrefSetFpsStat("cpu", v)),
+            new(Sec.Behaviour, "", "GPU usage", "The graphics card's load, in %", () => _notch.PrefFpsStat("gpu"), v => _notch.PrefSetFpsStat("gpu", v)),
+            new(Sec.Behaviour, "", "CPU temperature", StrainService.CpuTempAvailable ? "In °C" : Loc.T("This PC doesn't report it"),
+                () => _notch.PrefFpsStat("cputemp") && StrainService.CpuTempAvailable, v => _notch.PrefSetFpsStat("cputemp", v)),
+            new(Sec.Behaviour, "", "GPU temperature", "In °C (when the graphics driver reports it)", () => _notch.PrefFpsStat("gputemp"), v => _notch.PrefSetFpsStat("gputemp", v)),
+        };
+        Card(stats);
+        _content.Children.Add(new TextBlock
+        {
+            Text = Loc.T("Small and quiet: they change once a second, in fixed widths, so nothing moves in the corner of your eye."),
+            FontSize = 11.5, Foreground = Dim, Margin = new Thickness(4, 0, 0, 6), TextWrapping = TextWrapping.Wrap,
+        });
+
+        Label(Loc.T("Their colours"));
+        var colours = new StackPanel { Margin = new Thickness(18, 12, 18, 12) };
+        foreach (bool cpu in new[] { true, false })
+        {
+            var g = new Grid { Margin = new Thickness(0, 4, 0, 4) };
+            g.Children.Add(new TextBlock { Text = cpu ? "CPU" : "GPU", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+            var swatches = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, FlowDirection = FlowDirection.LeftToRight };
+            bool isCpu = cpu;
+            void Paint()
+            {
+                string current = _notch.PrefFpsColor(isCpu) ?? NotchWindow.StatColors[0].Hex;
+                foreach (Border b in swatches.Children) b.BorderBrush = string.Equals((string)b.Tag, current, StringComparison.OrdinalIgnoreCase) ? Text : Brushes.Transparent;
+            }
+            foreach (var (name, hex) in NotchWindow.StatColors)
+            {
+                var sw = new Border
+                {
+                    Width = 22, Height = 22, CornerRadius = new CornerRadius(11), Margin = new Thickness(4, 0, 0, 0), Cursor = Cursors.Hand, Tag = hex,
+                    Background = Frozen((Color)ColorConverter.ConvertFromString(hex)), BorderThickness = new Thickness(2), ToolTip = Loc.T(name),
+                };
+                string chosen = hex;
+                sw.MouseLeftButtonUp += (_, _) => { _notch.PrefSetFpsColor(isCpu, chosen == NotchWindow.StatColors[0].Hex ? null : chosen); Paint(); Saved(); };
+                swatches.Children.Add(sw);
+            }
+            Paint();
+            g.Children.Add(swatches);
+            colours.Children.Add(g);
+        }
+        _content.Children.Add(CardOf(colours));
+    }
+
     void Alerts()
     {
         Label(Loc.T("Alerts"));
@@ -726,7 +778,7 @@ public sealed class PreferencesWindow : Window
             new(Sec.Alerts, "\uE7BA", "PC strain warnings", "A warning when something stays over its line for 20 s (never in games)",
                 () => _notch.PrefStrainOn("all"), v => _notch.PrefSetStrain("all", v)),
         };
-        foreach (var (key, name, line) in NotchWindow.PrefStrainTargets)
+        foreach (var (key, name, line) in _notch.PrefStrainTargets)
         {
             bool available = key != "cputemp" || StrainService.CpuTempAvailable;
             string glyph = key switch { "cpu" => "\uE950", "gpu" => "\uE7F4", "ram" => "\uE964", _ => "\uE9CA" };
@@ -735,6 +787,35 @@ public sealed class PreferencesWindow : Window
                 () => _notch.PrefStrainOn(key), v => { if (available) _notch.PrefSetStrain(key, v); }));
         }
         Card(strain);
+
+        // where each line is: a stepper per target (5 % / 5 °C a step)
+        Label(Loc.T("Warning lines"));
+        var lines = new StackPanel();
+        bool first = true;
+        foreach (var (key, name, _) in _notch.PrefStrainTargets)
+        {
+            if (key == "cputemp" && !StrainService.CpuTempAvailable) continue;
+            if (!first) lines.Children.Add(new Border { Height = 1, Background = Edge, Margin = new Thickness(18, 0, 18, 0) });
+            first = false;
+            var g = new Grid { Margin = new Thickness(18, 10, 14, 10) };
+            g.Children.Add(new TextBlock { Text = Loc.T(name), VerticalAlignment = VerticalAlignment.Center });
+            var stepper = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, FlowDirection = FlowDirection.LeftToRight };
+            var value = new TextBlock { MinWidth = 54, TextAlignment = TextAlignment.Center, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+            string k = key;
+            void ShowValue() { var (v, unit, _, _) = _notch.PrefStrainLine(k); value.Text = $"{v:0}{unit}"; }
+            void Step(int dir) { var (v, _, _, _) = _notch.PrefStrainLine(k); _notch.PrefSetStrainLine(k, v + dir * 5); ShowValue(); Saved(); }
+            var minus = PillButton("", "", () => Step(-1), primary: false);
+            var plus = PillButton("", "", () => Step(1), primary: false);
+            minus.Width = plus.Width = 34;
+            minus.Padding = plus.Padding = new Thickness(0);
+            stepper.Children.Add(minus);
+            stepper.Children.Add(value);
+            stepper.Children.Add(plus);
+            ShowValue();
+            g.Children.Add(stepper);
+            lines.Children.Add(g);
+        }
+        _content.Children.Add(CardOf(lines));
 
         var row = new Grid { Margin = new Thickness(18, 14, 18, 14) };
         row.Children.Add(new TextBlock { Text = Loc.T("Break reminder every"), VerticalAlignment = VerticalAlignment.Center });

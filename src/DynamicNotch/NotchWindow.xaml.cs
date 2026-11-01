@@ -133,6 +133,7 @@ public partial class NotchWindow : Window
         Safe(nameof(WireCyber), WireCyber);
         Safe(nameof(WireStrain), WireStrain);
         Safe(nameof(WireHolo), WireHolo);
+        Safe(nameof(WireGlide), WireGlide);
         Safe(nameof(ApplyCustomColors), ApplyCustomColors); // your colours from the Colors page
         Safe(nameof(WireColors), WireColors);
         Safe(nameof(WireDevices), WireDevices);
@@ -164,7 +165,14 @@ public partial class NotchWindow : Window
         SetWindowLongPtr(_hwnd, GWL_EXSTYLE, new IntPtr(ex));
 
         PositionWindow();
-        RegisterHotKey(_hwnd, HotkeyId, MOD_WIN | MOD_ALT | MOD_NOREPEAT, 0x4E); // Win+Alt+N
+        // Win+Alt+N (another app may already own it: the notch still opens from the top edge and the tray icon)
+        if (!RegisterHotKey(_hwnd, HotkeyId, MOD_WIN | MOD_ALT | MOD_NOREPEAT, 0x4E)) Services.AppLog.Write("Win+Alt+N is taken by another app: open the notch from the top edge or its tray icon");
+        System.Windows.Media.RenderCapability.TierChanged += (_, _) =>
+        {
+            _lowGraphics = null;
+            Services.AppLog.Write($"graphics changed: {(LowGraphics ? "light motion (no graphics hardware)" : "full motion")}");
+            ApplyPowerProfile();
+        };
         AddClipboardFormatListener(_hwnd);
         _shellMsg = RegisterWindowMessage("SHELLHOOK");
         RegisterShellHookWindow(_hwnd);
@@ -249,7 +257,7 @@ public partial class NotchWindow : Window
     {
         if (small == _smallWindow) return;
         _smallWindow = small;
-        Width = small ? SmallWidth : FullWidth;
+        Width = small ? Math.Max(SmallWidth, GamePillWidth + 40) : FullWidth; // wide enough for the FPS pill's extras
         Height = small ? SmallHeight : FullHeight;
         PositionWindow();
     }
@@ -349,7 +357,26 @@ public partial class NotchWindow : Window
     }
 
     /// <summary>Battery mode: on battery (or Windows battery saver) do the same job with fewer wake-ups.</summary>
-    bool Eco => _settings.EcoOnBattery && _power.HasBattery && (!_power.PluggedIn || _power.Saver);
+    bool Eco => LowGraphics || (_settings.EcoOnBattery && _power.HasBattery && (!_power.PluggedIn || _power.Saver));
+
+    /// <summary>
+    /// No graphics hardware for WPF to draw with (an old or basic GPU, a virtual machine, Remote Desktop, or hardware
+    /// drawing switched off): every frame is drawn by the CPU, so the notch keeps to its light motion (the same as
+    /// battery mode). Checked again whenever Windows reports the graphics changed.
+    /// </summary>
+    static bool LowGraphics => _lowGraphics ??= DetectLowGraphics();
+    static bool? _lowGraphics;
+
+    static bool DetectLowGraphics()
+    {
+        try
+        {
+            if ((System.Windows.Media.RenderCapability.Tier >> 16) == 0) return true;
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Avalon.Graphics");
+            return key?.GetValue("DisableHWAcceleration") is int v && v != 0;
+        }
+        catch { return false; }
+    }
 
     void ApplyPowerProfile()
     {
@@ -455,7 +482,7 @@ public partial class NotchWindow : Window
             case Mode.Media: w = MediaSize.Width; h = MediaSize.Height; r = MediaRadius; break;
             case Mode.Activity: w = ActivitySize.Width; h = ActivitySize.Height; r = MediaRadius; break;
             // the cyber skin's FPS tag is a touch tighter (just the number, small cuts, no flares)
-            case Mode.Game: w = _cyber ? 46 : GameSize.Width; h = _cyber ? 16 : GameSize.Height; r = h / 2; break;
+            case Mode.Game: w = GamePillWidth; h = _cyber ? 16 : GameSize.Height; r = h / 2; break;
             case Mode.Slim: w = SlimSize.Width; h = SlimSize.Height; r = SlimRadius; break;
             default: w = IdleSize.Width; h = IdleSize.Height; r = IdleRadius; break;
         }
@@ -849,6 +876,6 @@ public partial class NotchWindow : Window
         await Dispatcher.InvokeAsync(() => Safe("prewarm", PrewarmPanels), DispatcherPriority.ApplicationIdle);
         Safe("welcome", Welcome);
         await SafeAsync("notifications", _notifications.InitAsync);
-        Services.AppLog.Write($"notifications: {_notifications.Status} | render tier: {System.Windows.Media.RenderCapability.Tier >> 16}, mode: {(HwndSource.FromHwnd(_hwnd)?.CompositionTarget as HwndTarget)?.RenderMode}");
+        Services.AppLog.Write($"notifications: {_notifications.Status} | render tier: {System.Windows.Media.RenderCapability.Tier >> 16}{(LowGraphics ? " (light motion)" : "")}, mode: {(HwndSource.FromHwnd(_hwnd)?.CompositionTarget as HwndTarget)?.RenderMode}");
     }
 }
