@@ -324,9 +324,11 @@ public partial class NotchWindow
         OsdTextPanel.Visibility = isLevel ? Visibility.Collapsed : Visibility.Visible;
         string titleBefore = OsdTitle.Text;
         OsdTitle.Text = r.Title ?? "";
-        if (OsdTitle.Text != titleBefore) CyberDecode(OsdTitle);
+        bool freshAlert = OsdTitle.Text != titleBefore;
+        if (freshAlert) CyberDecode(OsdTitle, cursor: true);
         CyberSkinSoon(); // the pop-up's colours and art in the theme
         OsdSub.Text = r.Subtitle ?? "";
+        if (freshAlert) CyberAlertIn(); // the cyber skin's entrance: scan wipe, hologram icon, decoding line
         OsdSub.Visibility = string.IsNullOrEmpty(r.Subtitle) ? Visibility.Collapsed : Visibility.Visible;
         OsdRight.Text = r.Right ?? "";
 
@@ -407,12 +409,13 @@ public partial class NotchWindow
         // a colour: bright along the bottom, fading up the sides into the screen's edge.
         // nothing live: a faint glass bevel so the black shape still reads crisp on a dark wallpaper.
         if (c == null && _mode != Mode.Slim && CustomEdge is { } edge) c = edge; // your edge colour, all the time
-        Color k = c ?? Colors.White;
+        // nothing live: a faint bevel; the glass themes catch more light at their rim
+        Color k = c ?? _look?.RimColor ?? Colors.White;
         double strength = c != null ? (_mode == Mode.Expanded ? 0.58 : 0.62) : _mode switch
         {
             Mode.Slim => 0,
-            Mode.Expanded => 0.13,
-            _ => 0.10,
+            Mode.Expanded => _look != null ? _look.RimIdle + 0.08 : 0.13,
+            _ => _look?.RimIdle ?? 0.10,
         };
         Color At(double f) => Color.FromArgb((byte)Math.Round(255 * strength * f), k.R, k.G, k.B);
         if (Rim.BorderBrush is not LinearGradientBrush g || g.IsFrozen)

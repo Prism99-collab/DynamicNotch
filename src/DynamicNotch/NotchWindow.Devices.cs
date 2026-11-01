@@ -32,7 +32,7 @@ public partial class NotchWindow
     void OnDevicesChanged()
     {
         string summary = string.Join(", ", _devices.Devices.Select(d => $"{d.Name} {(d.Level is { } l ? l + "%" : "--")} {d.State}{(d.Charging ? " charging" : "")}"));
-        if (summary != _devicesLogged) { _devicesLogged = summary; AppLog.Write("device batteries: " + (summary.Length > 0 ? summary : "none")); }
+        if (summary != _devicesLogged) { _devicesLogged = summary; AppLog.Write("device batteries: " + (summary.Length > 0 ? summary : "none")); CyberPulse(); }
         int count = _devices.Devices.Count;
         if (count != _devicesCount)
         {

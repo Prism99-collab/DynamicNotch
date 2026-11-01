@@ -28,6 +28,8 @@ public sealed class Settings
     public bool Locked { get; set; }
     /// <summary>The cyberpunk skin (the yellow button in the control center).</summary>
     public bool Cyberpunk { get; set; }
+    /// <summary>"original", "cyberpunk", "liquid", "crystal" or "abyss".</summary>
+    public string Theme { get; set; } = "original";
     /// <summary>Your colours from the Colors page (#RRGGBB); null = the notch decides.</summary>
     public string? ColorAccent { get; set; }
     public string? ColorGlow { get; set; }

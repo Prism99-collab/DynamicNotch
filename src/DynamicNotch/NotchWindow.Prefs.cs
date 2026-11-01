@@ -103,6 +103,7 @@ public partial class NotchWindow
             PagesStrip.Children[i].Visibility = vis;
             if (i < Dots.Children.Count) Dots.Children[i].Visibility = vis;
         }
+        CyberArtPages();
         GoToPage(PageHidden(_page) ? 0 : _page, instant: true);
     }
 

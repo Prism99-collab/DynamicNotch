@@ -24,6 +24,8 @@ public sealed class MediaService
     public string Artist { get; private set; } = "";
     public ImageSource? Art { get; private set; }
     public Color Accent { get; private set; } = Colors.White;
+    /// <summary>A second colour from the cover (the next strongest hue, or a neighbour of the first): bars and glows blend the two.</summary>
+    public Color Accent2 { get; private set; } = Color.FromRgb(0x9A, 0xA4, 0xB8);
     public bool HasSession => _session != null;
     /// <summary>App id of the player ("Spotify.exe", "Chrome", "SpotifyAB.SpotifyMusic_…!Spotify").</summary>
     public string? SourceApp => _sessionId;
@@ -304,7 +306,7 @@ public sealed class MediaService
 
         byte[]? bytes = null;
         try { bytes = await ReadAllAsync(props.Thumbnail); } catch { }
-        var (art, accent) = bytes == null ? (null, Colors.White) : await Task.Run(() => Decode(bytes));
+        var (art, accent, accent2) = bytes == null ? (null, Colors.White, Color.FromRgb(0x9A, 0xA4, 0xB8)) : await Task.Run(() => Decode(bytes));
         if (version != _version) return;
 
         bool newTrack = title != Title || artist != Artist;
@@ -312,6 +314,7 @@ public sealed class MediaService
         Artist = artist;
         Art = art;
         Accent = accent;
+        Accent2 = accent2;
         ReadPlayback();
         ReadTimeline();
         Changed?.Invoke();
@@ -328,7 +331,7 @@ public sealed class MediaService
         return ms.Length > 0 ? ms.ToArray() : null;
     }
 
-    static (ImageSource?, Color) Decode(byte[] data)
+    static (ImageSource?, Color, Color) Decode(byte[] data)
     {
         try
         {
@@ -339,9 +342,10 @@ public sealed class MediaService
             bmp.StreamSource = new MemoryStream(data);
             bmp.EndInit();
             bmp.Freeze();
-            return (bmp, AccentFrom(data));
+            var accent = AccentFrom(data);
+            return (bmp, accent, SecondFrom(data, accent));
         }
-        catch { return (null, Colors.White); }
+        catch { return (null, Colors.White, Color.FromRgb(0x9A, 0xA4, 0xB8)); }
     }
 
     /// <summary>Picks a vivid representative color from the cover for the visualizer.</summary>
@@ -376,6 +380,82 @@ public sealed class MediaService
         if (mx <= 0 || (mx - mn) / mx < 0.18) return Colors.White;
         double k = 245 / mx;
         return Color.FromRgb((byte)Math.Min(255, r * k), (byte)Math.Min(255, g * k), (byte)Math.Min(255, b * k));
+    }
+
+    /// <summary>
+    /// The cover's second colour: its pixels sorted into twelve hues (weighted by how vivid they are), the strongest
+    /// hue at least 35° away from the first. A one-colour cover gets a neighbour of its own hue (an analogous pair);
+    /// a colourless one, silver.
+    /// </summary>
+    static Color SecondFrom(byte[] data, Color main)
+    {
+        if (main == Colors.White) return Color.FromRgb(0x9A, 0xA4, 0xB8);
+        try
+        {
+            var small = new BitmapImage();
+            small.BeginInit();
+            small.CacheOption = BitmapCacheOption.OnLoad;
+            small.DecodePixelWidth = 16;
+            small.StreamSource = new MemoryStream(data);
+            small.EndInit();
+            var conv = new FormatConvertedBitmap(small, PixelFormats.Bgra32, null, 0);
+            int w = conv.PixelWidth, h = conv.PixelHeight;
+            var px = new byte[w * h * 4];
+            conv.CopyPixels(px, w * 4, 0);
+            var weight = new double[12];
+            var sum = new double[12, 3];
+            for (int i = 0; i < px.Length; i += 4)
+            {
+                double b = px[i], g = px[i + 1], r = px[i + 2];
+                double max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b));
+                if (max < 40 || max - min < 25) continue;
+                double hue = Hue(r, g, b);
+                int bin = (int)(hue / 30) % 12;
+                double wgt = Math.Pow((max - min) / max, 2) * (max / 255);
+                weight[bin] += wgt;
+                sum[bin, 0] += r * wgt; sum[bin, 1] += g * wgt; sum[bin, 2] += b * wgt;
+            }
+            double mainHue = Hue(main.R, main.G, main.B);
+            int best = -1;
+            for (int k = 0; k < 12; k++)
+            {
+                double centre = k * 30 + 15, d = Math.Abs(centre - mainHue);
+                if (Math.Min(d, 360 - d) < 35 || weight[k] < 0.15) continue;
+                if (best < 0 || weight[k] > weight[best]) best = k;
+            }
+            if (best >= 0)
+            {
+                double r = sum[best, 0] / weight[best], g = sum[best, 1] / weight[best], b = sum[best, 2] / weight[best];
+                double mx = Math.Max(r, Math.Max(g, b));
+                double k = 235 / Math.Max(1, mx);
+                return Color.FromRgb((byte)Math.Min(255, r * k), (byte)Math.Min(255, g * k), (byte)Math.Min(255, b * k));
+            }
+        }
+        catch { }
+        // one colour: its neighbour on the wheel, a little deeper
+        return Shift(main, 28, 0.85);
+    }
+
+    static double Hue(double r, double g, double b)
+    {
+        double max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b)), d = max - min;
+        if (d <= 0) return 0;
+        double h = max == r ? (g - b) / d % 6 : max == g ? (b - r) / d + 2 : (r - g) / d + 4;
+        return (h * 60 + 360) % 360;
+    }
+
+    static Color Shift(Color c, double degrees, double value)
+    {
+        double r = c.R / 255.0, g = c.G / 255.0, b = c.B / 255.0;
+        double max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b));
+        double s = max <= 0 ? 0 : (max - min) / max, v = max * value;
+        double h = (Hue(c.R, c.G, c.B) + degrees) % 360;
+        double cc = v * s, x = cc * (1 - Math.Abs(h / 60 % 2 - 1)), m = v - cc;
+        (double rr, double gg, double bb) = h switch
+        {
+            < 60 => (cc, x, 0.0), < 120 => (x, cc, 0.0), < 180 => (0.0, cc, x), < 240 => (0.0, x, cc), < 300 => (x, 0.0, cc), _ => (cc, 0.0, x),
+        };
+        return Color.FromRgb((byte)((rr + m) * 255), (byte)((gg + m) * 255), (byte)((bb + m) * 255));
     }
 
     public async Task TogglePlayPauseAsync()

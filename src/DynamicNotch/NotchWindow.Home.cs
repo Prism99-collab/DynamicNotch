@@ -254,9 +254,10 @@ public partial class NotchWindow
     {
         var brush = ArtBrush(_media.Art);
         FlipArt(CompactArt, _media.Art, () => CompactArt.Background = brush ?? (Brush)new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2E)));
-        var accent = new SolidColorBrush(_media.Accent);
-        accent.Freeze();
-        foreach (var r in Eq.Children.OfType<Rectangle>()) r.Fill = accent;
+        PaintBars();
+        // the cyber skin answers the music too: a new song or play / pause
+        string key = $"{_media.Title}|{_media.IsPlaying}";
+        if (key != _mediaGlitchKey) { _mediaGlitchKey = key; CyberPulse(); }
 
         ApplyMediaColor();
         if (_mode == Mode.Expanded) RefreshMedia();
@@ -291,7 +292,39 @@ public partial class NotchWindow
 
     // ───────────────────────────── visualizer: follows the real sound ─────────────────────────────
 
-    readonly DispatcherTimer _meter = new(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) };
+    string _mediaGlitchKey = "";
+
+    /// <summary>
+    /// The bars in the cover's colours: from its main colour on the left to its second colour on the right, each
+    /// bar deeper at its foot and catching light at its tip. A colourless cover gets white fading to silver.
+    /// </summary>
+    void PaintBars()
+    {
+        var bars = Eq.Children.OfType<Rectangle>().ToArray();
+        Color a = _media.Accent, b = _media.Accent2;
+        for (int i = 0; i < bars.Length; i++)
+        {
+            double t = bars.Length > 1 ? i / (double)(bars.Length - 1) : 0;
+            var c = Mix(a, b, t);
+            var g = new LinearGradientBrush { StartPoint = new Point(0.5, 1), EndPoint = new Point(0.5, 0) };
+            g.GradientStops.Add(new GradientStop(Scale(c, 0.55), 0));
+            g.GradientStops.Add(new GradientStop(c, 0.62));
+            g.GradientStops.Add(new GradientStop(Mix(c, Colors.White, 0.35), 1));
+            g.Freeze();
+            bars[i].Fill = g;
+        }
+    }
+
+    static Color Mix(Color a, Color b, double t) =>
+        Color.FromRgb((byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));
+
+    static Color Scale(Color c, double k) => Color.FromRgb((byte)(c.R * k), (byte)(c.G * k), (byte)(c.B * k));
+
+    // the bars' physics: each listens to a different part of the sound, rises on it fast and falls with gravity
+    double _lowEnv, _prevLoud;
+    readonly double[] _eqFall = new double[4];
+
+    readonly DispatcherTimer _meter = new(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(25) };
     readonly double[] _eqLevel = { 0.35, 0.35, 0.35, 0.35 };
     double _beat;
     bool _meterWired, _eqFallback, _slimBeat;
@@ -344,15 +377,30 @@ public partial class NotchWindow
 
         if (_eqRunning && !_eqFallback)
         {
-            for (int i = 0; i < _eqBars.Length; i++)
+            // Windows gives one loudness per channel, not a spectrum: the bars are split by time instead.
+            // the body of the sound (slow), the sound itself, its punches (what rises above the body), its sparkle
+            // (how fast it changes). Each leans toward its side's channel.
+            _lowEnv += (loud - _lowEnv) * 0.10;
+            double punch = Math.Clamp((loud - _lowEnv) * 2.8, 0, 1);
+            double sparkle = Math.Clamp(Math.Abs(loud - _prevLoud) * 4.5, 0, 1);
+            _prevLoud = loud;
+            double l = Math.Sqrt(left), r = Math.Sqrt(right), lr = Math.Max(0.001, Math.Max(l, r));
+            double[] drive = { _lowEnv * 1.25, loud * 1.05, punch * 0.9 + loud * 0.35, sparkle * 0.8 + loud * 0.4 };
+            for (int i = 0; i < _eqBars.Length && i < drive.Length; i++)
             {
-                // outer bars follow each channel, inner ones the mix; a slow wobble keeps neighbours apart
-                double src = i == 0 ? left : i == _eqBars.Length - 1 ? right : (left + right) / 2;
-                double wobble = 0.82 + 0.18 * Math.Sin(t * (4.3 + i * 1.9) + i * 1.3);
-                double target = 0.22 + 0.78 * Math.Clamp(Math.Sqrt(src) * 1.3 * wobble, 0, 1);
-                // quick to jump on a beat, slower to fall: reads as music, not noise
-                _eqLevel[i] += (target - _eqLevel[i]) * (target > _eqLevel[i] ? 0.7 : 0.2);
-                if (Math.Abs(_eqBars[i].ScaleY - _eqLevel[i]) > 0.008) _eqBars[i].ScaleY = _eqLevel[i];
+                double side = i < _eqBars.Length / 2 ? l / lr : r / lr;
+                double target = 0.18 + 0.82 * Math.Clamp(drive[i] * (0.85 + 0.15 * side), 0, 1);
+                if (target >= _eqLevel[i])
+                {
+                    _eqLevel[i] += (target - _eqLevel[i]) * 0.68; // up on the beat
+                    _eqFall[i] = 0;
+                }
+                else
+                {
+                    _eqFall[i] = Math.Min(_eqFall[i] + 0.009, 0.09); // then down, faster and faster, like a weight
+                    _eqLevel[i] = Math.Max(target, _eqLevel[i] - _eqFall[i]);
+                }
+                if (Math.Abs(_eqBars[i].ScaleY - _eqLevel[i]) > 0.006) _eqBars[i].ScaleY = _eqLevel[i];
             }
         }
         if (_mode == Mode.Media) BeatAura(loud * 1.4);

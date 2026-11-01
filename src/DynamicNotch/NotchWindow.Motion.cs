@@ -175,7 +175,7 @@ public partial class NotchWindow
     /// <summary>An alert with a colour casts a faint glow of it just below the notch; it fades with the alert.</summary>
     void UpdateAura(Color? c)
     {
-        if (_cyber && c is { } cc) c = CyMap(cc);
+        if (_skinOn && c is { } cc) c = _skinMap(cc);
         _auraLive = false;
         // (not with a finger: the notch takes taps then, and the glow would catch the ones just below it)
         if (c == null && !_hidden && !Eco && !_touchMode && _mode is Mode.Media or Mode.Activity)

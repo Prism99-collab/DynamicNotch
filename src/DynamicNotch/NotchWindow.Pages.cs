@@ -687,7 +687,7 @@ public partial class NotchWindow
         Add("Music visualizer", () => _settings.AnimatedVisualizer, v => _settings.AnimatedVisualizer = v);
         Add("Hide in full screen", () => _settings.HideInFullscreen, v => _settings.HideInFullscreen = v);
         Add("FPS in games", () => _settings.GameStats && FpsService.AccountCanTrace(), SetFpsInGames);
-        Add("Cyberpunk theme", () => _settings.Cyberpunk, v => { _settings.Cyberpunk = !v; SetCyber(v); });
+        AddThemeCell(grid); // which theme: a chip that moves to the next one
         Add("Battery mode", () => _settings.EcoOnBattery, v => _settings.EcoOnBattery = v);
         // Behaviour: how it reacts, what it tells you
         grid = BehaviourGrid;

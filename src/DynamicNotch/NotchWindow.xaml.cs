@@ -380,6 +380,7 @@ public partial class NotchWindow : Window
 
     void RefreshBase()
     {
+        if (CurrentActivity != _pulseActivity) { _pulseActivity = CurrentActivity; CyberPulse(); } // a new live activity
         if (IsBase(_mode) && _mode != BaseMode) SetMode(BaseMode);
         else if (_mode == Mode.Activity) UpdateActivityContent();
         UpdateSecond();
@@ -425,7 +426,7 @@ public partial class NotchWindow : Window
         UpdateSlimGlow();
         UpdateCallUi();
         if (!IsBase(m)) SetDodged(false); // pop-ups and the open notch never hide from the cursor
-        if (modeChanged) CyberMoment(from, m);
+        if (modeChanged) { CyberMoment(from, m); LookMoment(from, m); }
     }
 
     // ───────────────────────────── spring-driven shape ─────────────────────────────
@@ -605,6 +606,7 @@ public partial class NotchWindow : Window
         double cr = _cyber ? 0 : r; // the cyber skin cuts its corners instead (see CyberShape)
         Pill.CornerRadius = new CornerRadius(0, 0, cr, cr);
         Rim.CornerRadius = new CornerRadius(0, 0, cr, cr);
+        LookRadius(cr);
         UpdateClip();
     }
 
@@ -664,6 +666,7 @@ public partial class NotchWindow : Window
         CheckKeyboardLayout();
 
         if (!GetCursorPos(out var p)) return;
+        if (_look != null) LookGlint(p.X, p.Y); // the glass themes' light follows the pointer near the top
         bool button = IsButtonDown();
         UpdateDropArming(p);
         if (_gestureLive && !button && Environment.TickCount64 - _fingerMoveAt > 600) CancelTouchGesture(); // a lift Windows never reported
@@ -744,6 +747,7 @@ public partial class NotchWindow : Window
     {
         if (_hwnd == IntPtr.Zero) return;
         var fg = GetForegroundWindow();
+        if (fg != IntPtr.Zero && fg != _hwnd && fg != _pulseWindow) { _pulseWindow = fg; CyberPulse(); } // another app in front
         bool fullscreen = false, over = false;
 
         if (fg != IntPtr.Zero && fg != _hwnd && MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST) == MonitorFromWindow(_hwnd, MONITOR_DEFAULTTONEAREST))
