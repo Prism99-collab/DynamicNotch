@@ -268,7 +268,7 @@
                                                                Foreground="#55FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
                                                 <!-- the cyberpunk theme's cover: a spinning disc in a glow, a HUD ring turning the other way (NotchWindow.Disc) -->
-                                                <Grid x:Name="ArtDisc" Width="64" Height="64" Visibility="Collapsed" IsHitTestVisible="False">
+                                                <Grid x:Name="ArtDisc" Width="64" Height="64" Visibility="Collapsed" Background="Transparent">
                                                     <Ellipse x:Name="DiscGlow" Width="88" Height="88" Margin="-12" />
                                                     <Grid x:Name="DiscHud" Width="64" Height="64" RenderTransformOrigin="0.5,0.5">
                                                         <Ellipse x:Name="DiscRing" StrokeThickness="1.2" StrokeDashArray="5 3" />

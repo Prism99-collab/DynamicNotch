@@ -3,6 +3,32 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.4] — 2026-11-01
+
+### Added
+- Every browser tab that plays, in the notch: the optional "Dynamic Notch Media" extension (in the app's
+  `extension` folder; Chrome, Edge, Brave, Opera, Vivaldi, and Firefox) shows each tab playing a video, music or a
+  stream as its own player, with play / pause, next and previous where the site has them, its cover (or the site's
+  icon) and its progress. Browsers tell Windows about one tab only; without the extension nothing changes. It only
+  talks to the notch on this PC (127.0.0.1, browser extensions only). Preferences → Behaviour shows how to add it
+  and whether it's connected.
+- Click the cover or the title on Home to bring the player itself to the front: the app, or the exact tab.
+
+### Changed
+- The cyberpunk album records spin at 60 frames a second plugged in (30 on battery), as a cached picture the
+  graphics chip turns, so they stay light.
+- The progress bar glides instead of moving in one-second steps, at only as many frames as it needs.
+- Next and previous are greyed out when the player can't do them; the bar can't be dragged on a player that can't
+  seek. A player without a title shows its name instead of "Nothing playing".
+
+### Fixed
+- The cyberpunk records spin on every PC: on battery, with battery saver or on a basic graphics chip they stood
+  still; and when a browser reports a paused tab while another tab plays, they now follow the real sound.
+- Pausing no longer throws the notch to another player: the paused one stays in front with its play button. Something
+  you start takes the front at once; something already playing alongside only after 45 s of pause.
+- The position counts at the real speed (1.5×, 2×) and from the moment you resumed, not from an old timestamp.
+- No pause flicker between two songs, and no "now playing" pop-up when you switch players yourself.
+
 ## [1.7.3] — 2026-11-01
 
 ### Added

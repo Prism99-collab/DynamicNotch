@@ -137,9 +137,32 @@ public sealed class PillSlider : Grid
     protected override void OnMouseEnter(MouseEventArgs e) { base.OnMouseEnter(e); Settle(); }
     protected override void OnMouseLeave(MouseEventArgs e) { base.OnMouseLeave(e); Settle(); }
 
+    /// <summary>
+    /// Moves to a value smoothly over <paramref name="seconds"/> (a playing song's progress between two ticks), at
+    /// only as many frames as the movement needs: a long song's bar crawls a pixel a second and costs nothing.
+    /// A jump (a seek, a new song) or a still bar is set at once. Never while you drag it.
+    /// </summary>
+    public void Glide(double to, double seconds)
+    {
+        if (IsDragging) return;
+        to = Math.Clamp(to, 0, 1);
+        double from = Value; // where it is on screen right now
+        double px = Math.Abs(to - from) * ActualWidth;
+        if (seconds <= 0 || px < 0.5 || px > 30)
+        {
+            BeginAnimation(ValueProperty, null);
+            Value = to;
+            return;
+        }
+        var a = new DoubleAnimation(from, to, TimeSpan.FromSeconds(seconds));
+        Timeline.SetDesiredFrameRate(a, (int)Math.Clamp(px / seconds * 2, 2, 30));
+        BeginAnimation(ValueProperty, a);
+    }
+
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         if (!IsInteractive) return;
+        BeginAnimation(ValueProperty, null); // a glide in progress stops under your finger
         CaptureMouse();
         IsDragging = true;
         Settle();
@@ -173,7 +196,9 @@ public sealed class PillSlider : Grid
     protected override void OnMouseWheel(MouseWheelEventArgs e)
     {
         if (!IsInteractive) return;
-        Value = Math.Clamp(Value + e.Delta / 120.0 * 0.04, 0, 1);
+        double from = Value;
+        BeginAnimation(ValueProperty, null);
+        Value = Math.Clamp(from + e.Delta / 120.0 * 0.04, 0, 1);
         ValueChanged?.Invoke(Value);
         ValueCommitted?.Invoke(Value);
         e.Handled = true;

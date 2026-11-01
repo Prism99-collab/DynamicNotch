@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -19,6 +20,9 @@ public sealed class MediaService
 
     TimeSpan _pos;
     DateTimeOffset _posAt;
+    double _rate = 1;             // 1.5×, 2× in a video player: the position counts at that speed
+    DateTimeOffset _resumedAt;    // when it last started playing: an older timeline is counted from here
+    DispatcherTimer? _pauseHold;  // see HoldPaused
 
     public string Title { get; private set; } = "";
     public string Artist { get; private set; } = "";
@@ -26,17 +30,23 @@ public sealed class MediaService
     public Color Accent { get; private set; } = Colors.White;
     /// <summary>A second colour from the cover (the next strongest hue, or a neighbour of the first): bars and glows blend the two.</summary>
     public Color Accent2 { get; private set; } = Color.FromRgb(0x9A, 0xA4, 0xB8);
-    public bool HasSession => _session != null;
+    public bool HasSession => _session != null || _webFront != null;
     /// <summary>App id of the player ("Spotify.exe", "Chrome", "SpotifyAB.SpotifyMusic_…!Spotify").</summary>
     public string? SourceApp => _sessionId;
     public bool IsPlaying { get; private set; }
     public TimeSpan Duration { get; private set; }
+    /// <summary>What the player in front lets you do (an app that can't seek or skip says so).</summary>
+    public bool CanSeek { get; private set; } = true;
+    public bool CanNext { get; private set; } = true;
+    public bool CanPrevious { get; private set; } = true;
+    /// <summary>The playback speed (1 normally; 1.5, 2 in a video player).</summary>
+    public double Rate => _rate;
 
     public TimeSpan Position
     {
         get
         {
-            var p = IsPlaying ? _pos + (DateTimeOffset.Now - _posAt) : _pos;
+            var p = IsPlaying ? _pos + TimeSpan.FromTicks((long)((DateTimeOffset.Now - _posAt).Ticks * _rate)) : _pos;
             if (p < TimeSpan.Zero) p = TimeSpan.Zero;
             return Duration > TimeSpan.Zero && p > Duration ? Duration : p;
         }
@@ -53,8 +63,15 @@ public sealed class MediaService
     public sealed class Player
     {
         internal Player(GlobalSystemMediaTransportControlsSession session, int id, string appId) { Session = session; Id = id; AppId = appId; }
-        internal readonly GlobalSystemMediaTransportControlsSession Session;
+        internal Player(WebTab tab, int id) { Web = tab; Id = id; AppId = tab.Browser; }
+        /// <summary>Windows' media session (an app, or the one tab a browser tells Windows about)...</summary>
+        internal readonly GlobalSystemMediaTransportControlsSession? Session;
+        /// <summary>...or a browser tab the "Dynamic Notch Media" extension reports.</summary>
+        internal WebTab? Web;
+        internal string? ArtUrl;
+        internal byte[]? ArtBytes;
         internal int Version;
+        public bool IsWeb => Web != null;
         public int Id { get; }
         public string AppId { get; }
         public string Title { get; internal set; } = "";
@@ -67,6 +84,7 @@ public sealed class MediaService
         {
             get
             {
+                if (Web is { Site.Length: > 0 } w) return w.Site; // a tab: its site ("youtube.com")
                 string a = AppId;
                 int bang = a.IndexOf('!');
                 if (bang >= 0) a = a[(bang + 1)..];
@@ -85,7 +103,7 @@ public sealed class MediaService
     /// <summary>Everything that has a media session open, in the order it appeared.</summary>
     public IReadOnlyList<Player> Players => _players;
     /// <summary>The one the notch and the Home card follow.</summary>
-    public Player? Current => _players.FirstOrDefault(p => ReferenceEquals(p.Session, _session));
+    public Player? Current => _webFront ?? (_session == null ? null : _players.FirstOrDefault(p => ReferenceEquals(p.Session, _session)));
     /// <summary>A player appeared, closed, started or stopped, or changed what it plays (UI thread).</summary>
     public event Action? PlayersChanged;
 
@@ -94,6 +112,7 @@ public sealed class MediaService
     {
         if (!_players.Contains(p)) return;
         _chosen = p;
+        if (!ReferenceEquals(p, Current)) Quiet(); // a switch, not a new song: no pop-up
         PickSession();
     }
 
@@ -106,7 +125,7 @@ public sealed class MediaService
         for (int i = _players.Count - 1; i >= 0; i--)
         {
             var p = _players[i];
-            if (sessions.Any(x => ReferenceEquals(x, p.Session))) continue;
+            if (p.Session == null || sessions.Any(x => ReferenceEquals(x, p.Session))) continue; // tabs come and go with the extension
             try { p.Session.PlaybackInfoChanged -= OnAnyPlayback; p.Session.MediaPropertiesChanged -= OnAnyProps; } catch { }
             _players.RemoveAt(i);
             if (ReferenceEquals(_chosen, p)) _chosen = null; // closed: forget the choice
@@ -127,6 +146,7 @@ public sealed class MediaService
         if (!changed) return;
         AppLog.Write($"media players: {_players.Count} ({string.Join(", ", _players.Select(p => p.AppName))})");
         PlayersChanged?.Invoke();
+        SyncWeb(); // a tab Windows now shows itself drops out of the extension's list (and back)
     }
 
     static bool IsSessionPlaying(GlobalSystemMediaTransportControlsSession x)
@@ -144,6 +164,8 @@ public sealed class MediaService
             if (playing == p.Playing) return;
             p.Playing = playing;
             PlayersChanged?.Invoke();
+            // another player just started while the one in front is paused: you moved on, it takes the front
+            if (playing && !ReferenceEquals(p, Current) && !IsPlaying) { _chosen = null; PickSession(); }
         });
 
     void OnAnyProps(GlobalSystemMediaTransportControlsSession s, MediaPropertiesChangedEventArgs e) =>
@@ -159,6 +181,7 @@ public sealed class MediaService
         await Task.Delay(150);
         if (version != p.Version) return;
         GlobalSystemMediaTransportControlsSessionMediaProperties? props;
+        if (p.Session == null) return;
         try { props = await p.Session.TryGetMediaPropertiesAsync(); }
         catch { return; }
         if (props == null || version != p.Version) return;
@@ -170,6 +193,163 @@ public sealed class MediaService
         p.Artist = string.IsNullOrEmpty(props.Artist) ? props.AlbumArtist ?? "" : props.Artist;
         p.Art = art;
         PlayersChanged?.Invoke();
+        SyncWeb(); // its title is known now: the same tab from the extension stays hidden
+    }
+
+    // ───────────────────────────── browser tabs (the optional extension) ─────────────────────────────
+
+    WebMediaLink? _link;
+    Player? _webFront;      // a tab is in front (instead of Windows' session)
+    byte[]? _webArtShown;
+    static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(6) };
+
+    /// <summary>The extension's tabs join the players: each playing tab gets its chip, its card and its buttons.</summary>
+    public void AttachWeb(WebMediaLink link)
+    {
+        _link = link;
+        link.Changed += SyncWeb;
+    }
+
+    static string Norm(string s) => s.Trim().ToLowerInvariant();
+
+    /// <summary>The tab Windows already shows (the browser's own session) stays Windows': it has the cover and all buttons.</summary>
+    bool ShownByWindows(WebTab t)
+    {
+        string title = Norm(t.Title);
+        if (title.Length < 3) return false;
+        return _players.Any(p => p.Session != null && Norm(p.Title) is { Length: >= 3 } pt && (pt == title || title.Contains(pt) || pt.Contains(title)));
+    }
+
+    void SyncWeb()
+    {
+        if (_link == null) return;
+        var want = _link.Tabs.Where(t => !ShownByWindows(t)).ToList();
+        bool changed = false, front = false, started = false;
+        for (int i = _players.Count - 1; i >= 0; i--)
+        {
+            var p = _players[i];
+            if (p.Web == null || want.Any(t => t.Key == p.Web.Key)) continue;
+            _players.RemoveAt(i);
+            if (ReferenceEquals(_chosen, p)) _chosen = null; // closed: forget the choice
+            if (ReferenceEquals(_webFront, p)) front = true;
+            changed = true;
+        }
+        foreach (var t in want)
+        {
+            var p = _players.FirstOrDefault(x => x.Web?.Key == t.Key);
+            if (p == null)
+            {
+                p = new Player(t, ++_nextPlayerId);
+                _players.Add(p);
+                changed = true;
+            }
+            else if (p.Web != t)
+            {
+                if (p.Title != t.Title || p.Playing != t.Playing) changed = true;
+                p.Web = t;
+            }
+            p.Title = t.Title;
+            p.Artist = t.Artist.Length > 0 ? t.Artist : t.Site;
+            if (t.Playing && !p.Playing && !ReferenceEquals(_webFront, p)) started = true; // a tab just started
+            p.Playing = t.Playing;
+            string pics = $"{t.Art}|{t.Icon}";
+            if (pics != p.ArtUrl) { p.ArtUrl = pics; _ = LoadWebArtAsync(p, t.Art, t.Icon); }
+            if (ReferenceEquals(_webFront, p)) ApplyWeb(p);
+        }
+        if (changed)
+        {
+            AppLog.Write($"browser tabs: {want.Count} ({string.Join(", ", want.Select(t => t.Site))})");
+            PlayersChanged?.Invoke();
+        }
+        // the tab in front closed: the front is chosen again. A tab started while the front is paused: you moved
+        // on, it takes the front. The tab in front paused: it stays there (see HoldPaused)
+        if (front) { Quiet(); _webFront = null; PickSession(); }
+        else if (started && !IsPlaying) { _chosen = null; PickSession(); }
+        else if (_webFront != null && !_webFront.Playing) HoldPaused();
+    }
+
+    /// <summary>The tab's cover; if there's none or it won't load (a dead link, an .svg), the site's icon.</summary>
+    async Task LoadWebArtAsync(Player p, string? art, string? icon)
+    {
+        int version = ++p.Version;
+        byte[]? bytes = null;
+        ImageSource? small = null;
+        foreach (var url in new[] { art, icon })
+        {
+            if (url == null) continue;
+            var b = await FetchAsync(url);
+            if (version != p.Version) return;
+            var pic = b == null ? null : await Task.Run(() => DecodeSmall(b, 96));
+            if (version != p.Version) return;
+            if (pic != null) { bytes = b; small = pic; break; }
+        }
+        p.ArtBytes = bytes;
+        p.Art = small;
+        PlayersChanged?.Invoke();
+        if (ReferenceEquals(_webFront, p)) ApplyWeb(p);
+    }
+
+    static async Task<byte[]?> FetchAsync(string url)
+    {
+        try
+        {
+            using var r = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            if (!r.IsSuccessStatusCode || (r.Content.Headers.ContentLength ?? 0) > 4_000_000) return null;
+            var b = await r.Content.ReadAsByteArrayAsync();
+            return b.Length is > 0 and <= 4_000_000 ? b : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>The tab in front: its title, cover, colours, position and play state become the notch's.</summary>
+    void ApplyWeb(Player p)
+    {
+        if (p.Web is not { } t) return;
+        bool newTrack = t.Title != Title;
+        Title = t.Title;
+        Artist = t.Artist.Length > 0 ? t.Artist : t.Site;
+        IsPlaying = t.Playing;
+        if (IsPlaying) _pauseHold?.Stop();
+        Duration = TimeSpan.FromSeconds(t.Dur);
+        _pos = TimeSpan.FromSeconds(t.Pos);
+        _posAt = new DateTimeOffset(t.At);
+        _rate = 1;
+        CanSeek = t.Dur > 0;
+        CanNext = t.CanNext;
+        CanPrevious = true; // the site's button, or back to the start
+        _sessionId = t.Browser; // the browser's sound: the app volume slider follows it
+        if (!ReferenceEquals(p.ArtBytes, _webArtShown))
+        {
+            _webArtShown = p.ArtBytes;
+            var bytes = p.ArtBytes;
+            int version = ++_version;
+            _ = Task.Run(() => bytes == null ? (null, Colors.White, Color.FromRgb(0x9A, 0xA4, 0xB8)) : Decode(bytes)).ContinueWith(task =>
+            {
+                if (version != _version || !ReferenceEquals(_webFront, p)) return;
+                (Art, Accent, Accent2) = task.Result;
+                Changed?.Invoke();
+            }, TaskScheduler.FromCurrentSynchronizationContext());
+        }
+        Changed?.Invoke();
+        if (newTrack && _initialized && Announce && t.Title.Length > 0) TrackChanged?.Invoke();
+    }
+
+    /// <summary>A tab takes the front: Windows' session lets go (its events stop), the tab's state shows.</summary>
+    void UseWeb(Player p)
+    {
+        if (ReferenceEquals(_webFront, p)) { ApplyWeb(p); return; }
+        if (_session != null)
+        {
+            _session.MediaPropertiesChanged -= OnProps;
+            _session.PlaybackInfoChanged -= OnPlayback;
+            _session.TimelinePropertiesChanged -= OnTimeline;
+            _session = null;
+        }
+        _webFront = p;
+        _webArtShown = null;
+        Art = null;
+        PlayersChanged?.Invoke(); // the one in front changed
+        ApplyWeb(p);
     }
 
     static ImageSource? DecodeSmall(byte[] data, int px)
@@ -202,20 +382,33 @@ public sealed class MediaService
 
     void PickSession()
     {
-        if (_mgr == null) return;
+        // your pick wins while it's open: a browser tab from the extension...
+        if (_chosen is { Web: not null } tab && _players.Contains(tab)) { UseWeb(tab); return; }
         GlobalSystemMediaTransportControlsSession? s = null;
-        try
-        {
-            if (_chosen != null && _players.Contains(_chosen)) s = _chosen.Session; // your pick wins while it's open
-            else s = _mgr.GetCurrentSession();
-            if (!ReferenceEquals(s, _chosen?.Session) &&
-                (s == null || s.GetPlaybackInfo()?.PlaybackStatus != GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing))
+        bool sessionPlays = false;
+        if (_mgr != null)
+            try
             {
-                foreach (var x in _mgr.GetSessions())
-                    if (x.GetPlaybackInfo()?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing) { s = x; break; }
+                if (_chosen != null && _players.Contains(_chosen)) s = _chosen.Session; // ...or an app
+                else s = _mgr.GetCurrentSession();
+                if (!ReferenceEquals(s, _chosen?.Session) &&
+                    (s == null || s.GetPlaybackInfo()?.PlaybackStatus != GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing))
+                {
+                    foreach (var x in _mgr.GetSessions())
+                        if (x.GetPlaybackInfo()?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing) { s = x; break; }
+                }
+                sessionPlays = s != null && (ReferenceEquals(s, _chosen?.Session) || s.GetPlaybackInfo()?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing);
             }
+            catch { }
+        // nothing Windows knows plays, but a tab does: the tab (the one already in front first)
+        if (!sessionPlays)
+        {
+            var web = _webFront is { Playing: true } f && _players.Contains(f) ? f : _players.FirstOrDefault(p => p.Web != null && p.Playing);
+            if (web == null && s == null) web = _webFront != null && _players.Contains(_webFront) ? _webFront : _players.FirstOrDefault(p => p.Web != null);
+            if (web != null) { UseWeb(web); return; }
         }
-        catch { }
+        if (_webFront != null) { _webFront = null; _webArtShown = null; } // back to Windows' session
+        else if (_mgr == null) return;
 
         string? id = null;
         try { id = s?.SourceAppUserModelId; } catch { }
@@ -261,17 +454,56 @@ public sealed class MediaService
             ReadPlayback();
             ReadTimeline();
             if (was != IsPlaying) Changed?.Invoke();
-            // another app may have started playing; prefer it
-            if (!IsPlaying) PickSession();
+            if (!IsPlaying) HoldPaused();
         });
+
+    /// <summary>
+    /// You paused: the paused player stays in front (its play button right where you left it) instead of jumping to
+    /// whatever else plays. A player that starts after this takes the front at once (OnAnyPlayback); one that was
+    /// already playing alongside only after 45 s of pause, unless you picked the paused one.
+    /// </summary>
+    void HoldPaused()
+    {
+        if (_pauseHold == null)
+        {
+            _pauseHold = new DispatcherTimer(DispatcherPriority.Background, _ui) { Interval = TimeSpan.FromSeconds(45) };
+            _pauseHold.Tick += (_, _) =>
+            {
+                _pauseHold.Stop();
+                if (IsPlaying || _chosen != null && _players.Contains(_chosen)) return;
+                Quiet(); // the same songs, another player in front: no pop-up
+                PickSession();
+            };
+        }
+        if (!_pauseHold.IsEnabled) _pauseHold.Start(); // counted from the pause, not from the latest update
+    }
+
+    DateTime _quietUntil;
+    void Quiet() => _quietUntil = DateTime.UtcNow.AddSeconds(3);
+    bool Announce => DateTime.UtcNow >= _quietUntil;
 
     void OnTimeline(GlobalSystemMediaTransportControlsSession s, TimelinePropertiesChangedEventArgs e) =>
         _ui.InvokeAsync(ReadTimeline);
 
     void ReadPlayback()
     {
-        try { IsPlaying = _session?.GetPlaybackInfo()?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing; }
+        bool was = IsPlaying;
+        try
+        {
+            var info = _session?.GetPlaybackInfo();
+            var status = info?.PlaybackStatus;
+            // "changing" is the gap between two songs: still playing, not a pause (no flicker of the pill or bars)
+            IsPlaying = status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
+                || (status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Changing && was);
+            _rate = info?.PlaybackRate is double r && r > 0.05 && r < 16 ? r : 1;
+            var c = info?.Controls;
+            CanSeek = c?.IsPlaybackPositionEnabled ?? false;
+            CanNext = c?.IsNextEnabled ?? true;
+            CanPrevious = c?.IsPreviousEnabled ?? true;
+        }
         catch { IsPlaying = false; }
+        if (IsPlaying && !was) _resumedAt = DateTimeOffset.Now;
+        if (IsPlaying) _pauseHold?.Stop();
     }
 
     void ReadTimeline()
@@ -283,6 +515,9 @@ public sealed class MediaService
             Duration = t.EndTime - t.StartTime;
             _pos = t.Position;
             _posAt = t.LastUpdatedTime.Year < 2000 ? DateTimeOffset.Now : t.LastUpdatedTime;
+            // a timeline from before the last resume is the paused position: count from the resume, not from then
+            if (IsPlaying && _posAt < _resumedAt) _posAt = _resumedAt;
+            if (_posAt > DateTimeOffset.Now) _posAt = DateTimeOffset.Now; // a clock running ahead
         }
         catch { }
     }
@@ -318,7 +553,7 @@ public sealed class MediaService
         ReadPlayback();
         ReadTimeline();
         Changed?.Invoke();
-        if (newTrack && _initialized && !string.IsNullOrEmpty(title)) TrackChanged?.Invoke();
+        if (newTrack && _initialized && Announce && !string.IsNullOrEmpty(title)) TrackChanged?.Invoke();
     }
 
     static async Task<byte[]?> ReadAllAsync(IRandomAccessStreamReference? r)
@@ -460,20 +695,39 @@ public sealed class MediaService
 
     public async Task TogglePlayPauseAsync()
     {
-        if (_session == null) return;
+        if (_session == null && _webFront == null) return;
         IsPlaying = !IsPlaying; // optimistic: UI reacts instantly
         Changed?.Invoke();
-        try { await _session.TryTogglePlayPauseAsync(); } catch { }
+        if (_webFront?.Web is { } t) { _link?.Send(t, IsPlaying ? "play" : "pause"); return; }
+        try { await _session!.TryTogglePlayPauseAsync(); } catch { }
     }
 
-    public async Task NextAsync() { try { if (_session != null) await _session.TrySkipNextAsync(); } catch { } }
-    public async Task PreviousAsync() { try { if (_session != null) await _session.TrySkipPreviousAsync(); } catch { } }
+    public async Task NextAsync()
+    {
+        if (_webFront?.Web is { } t) { _link?.Send(t, "next"); return; }
+        try { if (_session != null) await _session.TrySkipNextAsync(); } catch { }
+    }
+
+    public async Task PreviousAsync()
+    {
+        if (_webFront?.Web is { } t) { _link?.Send(t, "prev"); return; }
+        try { if (_session != null) await _session.TrySkipPreviousAsync(); } catch { }
+    }
 
     public async Task SeekAsync(TimeSpan to)
     {
-        if (_session == null) return;
+        if (_session == null && _webFront == null) return;
         _pos = to;
         _posAt = DateTimeOffset.Now;
-        try { await _session.TryChangePlaybackPositionAsync(to.Ticks); } catch { }
+        if (_webFront?.Web is { } t) { _link?.Send(t, "seek", to.TotalSeconds); return; }
+        try { await _session!.TryChangePlaybackPositionAsync(to.Ticks); } catch { }
+    }
+
+    /// <summary>Brings the tab in front to the front of its browser (a click on its card's title).</summary>
+    public bool FocusTab()
+    {
+        if (_webFront?.Web is not { } t) return false;
+        _link?.Send(t, "focus");
+        return true;
     }
 }
