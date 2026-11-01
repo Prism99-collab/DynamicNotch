@@ -3,6 +3,15 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.1] — 2026-11-01
+
+### Fixed
+- Scrolling in the notch works on every PC: the home page, the sound-device lists and every other list scroll
+  even where Windows' "Scroll inactive windows when I hover over them" is off (the notch catches the wheel over
+  itself; everywhere else the wheel is untouched; never in games).
+- Every open player stays on the notch, playing or paused, until it's closed: Spotify, each YouTube tab, a film…
+  The wheel or a swipe on the Home card goes through the call and every player in turn, with one dot per card.
+
 ## [1.7.0] — 2026-11-01
 
 ### Added

@@ -24,7 +24,7 @@ public partial class NotchWindow
 
     void WirePriority()
     {
-        _media.PlayersChanged += RenderSwitch; // a tab started, stopped or closed
+        _media.PlayersChanged += () => { RenderSwitch(); if (_mode == Mode.Expanded) UpdateCardDots(animate: true); }; // a tab started, stopped, closed, or came to the front
         LiveMenu.MouseLeave += (_, _) => HideLiveMenu();
         foreach (var row in new FrameworkElement[] { MediaRow, CallRow })
         {
@@ -54,7 +54,57 @@ public partial class NotchWindow
         _cardMedia = false;
     }
 
-    bool HasCardDeck => OnCall && _media.HasSession;
+    /// <summary>More than one card to go through on Home: the call and / or several players.</summary>
+    bool HasCardDeck => CardDeck().Count >= 2;
+
+    /// <summary>The Home card's deck: the call (when you're on one), then every player that's open, playing or paused.</summary>
+    List<SwitchItem> CardDeck() => SwitchItems().Where(i => i.Kind is LiveActivity.Call or LiveActivity.Media).ToList();
+
+    /// <summary>
+    /// The next card in the deck (wheel or swipe on the Home card): the call, then each player in turn, round and
+    /// round. A player chosen this way stays in front until you pick another or close it.
+    /// </summary>
+    void StepCard(int dir)
+    {
+        var deck = CardDeck();
+        if (deck.Count < 2) return;
+        bool callShown = OnCall && !(_cardMedia && _media.HasSession);
+        int at = callShown
+            ? deck.FindIndex(i => i.Kind == LiveActivity.Call)
+            : deck.FindIndex(i => i.Kind == LiveActivity.Media && ReferenceEquals(i.Player, _media.Current));
+        if (at < 0) at = 0;
+        var next = deck[(at + dir + deck.Count) % deck.Count];
+        bool toMedia = next.Kind == LiveActivity.Media;
+        if (toMedia && next.Player != null) _media.Select(next.Player);
+        if (toMedia == !callShown)
+        {
+            // player to player: the same card, its content slides to the next one
+            SlideCard(MediaRow, up: dir > 0);
+            _pinned = LiveActivity.Media;
+            RefreshBase();
+            RenderSwitch();
+        }
+        else FlipCard(toMedia, pin: true, up: dir > 0);
+    }
+
+    /// <summary>The card's content leaves upward (or downward) and the next one rises in; the card's own values never change.</summary>
+    void SlideCard(FrameworkElement row, bool up)
+    {
+        if (_devicesOpen || row.RenderTransform is not TranslateTransform t || t.IsFrozen) return;
+        double dir = up ? 1 : -1;
+        _lastCardFlip = DateTime.UtcNow;
+        var move = new DoubleAnimationUsingKeyFrames { FillBehavior = FillBehavior.Stop };
+        move.KeyFrames.Add(new EasingDoubleKeyFrame(-12 * dir, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(120)), new CubicEase { EasingMode = EasingMode.EaseIn }));
+        move.KeyFrames.Add(new DiscreteDoubleKeyFrame(14 * dir, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(170))));
+        move.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(560)), new SpringEase { Damping = 0.62 }));
+        var fade = new DoubleAnimationUsingKeyFrames { FillBehavior = FillBehavior.Stop };
+        fade.KeyFrames.Add(new LinearDoubleKeyFrame(0.1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(120))));
+        fade.KeyFrames.Add(new LinearDoubleKeyFrame(0.1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(170))));
+        fade.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(380))));
+        t.BeginAnimation(TranslateTransform.YProperty, move);
+        row.BeginAnimation(OpacityProperty, fade);
+        UpdateCardDots(animate: true);
+    }
 
     void Pin(LiveActivity a)
     {
@@ -93,9 +143,9 @@ public partial class NotchWindow
         if (_settings.ShowMediaActivity)
         {
             var cur = _media.Current;
-            foreach (var p in _media.Players)
-                if (p.Playing || (ReferenceEquals(p, cur) && _media.IsPlaying)) items.Add(new SwitchItem(LiveActivity.Media, p));
-            if (_media.IsPlaying && !items.Any(i => i.Kind == LiveActivity.Media)) items.Add(new SwitchItem(LiveActivity.Media, null));
+            // every player that's open stays here, playing or paused, until it's closed
+            foreach (var p in _media.Players) items.Add(new SwitchItem(LiveActivity.Media, p));
+            if (_media.HasSession && !items.Any(i => i.Kind == LiveActivity.Media)) items.Add(new SwitchItem(LiveActivity.Media, null));
         }
         // a steady order, so chips don't jump around when you pick one
         return items.OrderBy(i => Rank(i.Kind)).ThenBy(i => i.Player?.Id ?? 0).ToList();
@@ -379,7 +429,7 @@ public partial class NotchWindow
         if (!HasCardDeck) return;
         e.Handled = true;
         if ((DateTime.UtcNow - _lastCardFlip).TotalMilliseconds < 380) return;
-        FlipCard(!_cardMedia, pin: true, up: e.Delta < 0);
+        StepCard(e.Delta < 0 ? 1 : -1);
     }
 
     void OnCardDrag(object sender, MouseEventArgs e)
@@ -391,7 +441,7 @@ public partial class NotchWindow
         _cardDrag = false;
         _maybeSwipe = false; // it's a card flip, not a page swipe
         ((UIElement)sender).CaptureMouse(); // and not a button click either
-        FlipCard(!_cardMedia, pin: true, up: dy < 0);
+        StepCard(dy < 0 ? 1 : -1);
     }
 
     DateTime _lastCardFlip;
@@ -476,22 +526,34 @@ public partial class NotchWindow
         }
     }
 
-    /// <summary>Two little dots beside the card say there's another one behind it.</summary>
+    /// <summary>
+    /// Little dots beside the card, one per card in the deck (the call, each player): the one in front is long and
+    /// wears its colour. Up to 6 dots; with more, they still say "there's more".
+    /// </summary>
     void UpdateCardDots(bool animate)
     {
-        bool deck = HasCardDeck;
-        CardDots.Visibility = deck ? Visibility.Visible : Visibility.Collapsed;
-        if (!deck) return;
-        bool media = _cardMedia;
+        var deck = CardDeck();
+        bool show = deck.Count >= 2;
+        CardDots.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (!show) return;
+        int n = Math.Min(6, deck.Count);
+        while (CardDots.Children.Count < n) CardDots.Children.Add(new Border { Width = 4, Height = 4, CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 0, 0, 3) });
+        while (CardDots.Children.Count > n) CardDots.Children.RemoveAt(CardDots.Children.Count - 1);
+        bool callShown = OnCall && !(_cardMedia && _media.HasSession);
+        int front = callShown
+            ? deck.FindIndex(i => i.Kind == LiveActivity.Call)
+            : deck.FindIndex(i => i.Kind == LiveActivity.Media && ReferenceEquals(i.Player, _media.Current));
+        front = Math.Clamp(front < 0 ? 0 : front, 0, n - 1);
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        for (int i = 0; i < 2; i++)
+        for (int i = 0; i < n; i++)
         {
             var dot = (Border)CardDots.Children[i];
-            bool on = (i == 1) == media;
+            dot.Margin = new Thickness(0, 0, 0, i < n - 1 ? 3 : 0);
+            bool on = i == front;
             double h = on ? 14 : 4;
             if (animate) dot.BeginAnimation(HeightProperty, new DoubleAnimation(h, TimeSpan.FromMilliseconds(280)) { EasingFunction = ease });
             else { dot.BeginAnimation(HeightProperty, null); dot.Height = h; }
-            var c = on ? (i == 0 ? ((SolidColorBrush)CallBrush).Color : _media.Accent) : Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF);
+            var c = on ? (deck[i].Kind == LiveActivity.Call ? ((SolidColorBrush)CallBrush).Color : _media.Accent) : Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF);
             dot.Background = Frozen(c);
         }
     }

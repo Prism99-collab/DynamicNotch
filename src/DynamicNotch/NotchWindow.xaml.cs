@@ -691,6 +691,7 @@ public partial class NotchWindow : Window
         double dt = (now - _lastPoll).TotalMilliseconds;
         _lastPoll = now;
         if (++_pollCount % 8 == 0) CheckForeground(); // catches maximize / F11 without a focus change
+        WheelPoll(); // the wheel reaches the notch on every PC (NotchWindow.Wheel)
         CheckLockKeys();
         CheckKeyboardLayout();
 
