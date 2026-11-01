@@ -185,16 +185,27 @@ public partial class NotchWindow
 
     // ───────────────────────────── the drop ─────────────────────────────
 
-    void OnShelfDrop(object sender, DragEventArgs e)
+    async void OnShelfDrop(object sender, DragEventArgs e)
     {
         e.Handled = true;
         var added = new List<ShelfItem>();
         // files as they are; a picture or a file that only lives inside the app is saved as a real file first
         var (files, text) = ShelfTransfer.Capture(e.Data);
         added.AddRange(files.Select(f => new ShelfItem(f, null)));
-        if (added.Count == 0 && text != null) added.Add(new ShelfItem(null, text));
-        e.Effects = added.Count > 0 ? DragDropEffects.Copy : DragDropEffects.None;
+        // from a web page: an image, a download link, an inline picture is fetched as the real file (read now,
+        // while the drop lasts; fetched just after). A plain page link stays a link.
+        var web = added.Count == 0 ? ShelfTransfer.WebSource(e.Data) : null;
+        e.Effects = added.Count > 0 || web != null || text != null ? DragDropEffects.Copy : DragDropEffects.None;
         SetDropArmed(false);
+        if (added.Count == 0 && web is { } w)
+        {
+            try
+            {
+                if (await ShelfTransfer.DownloadAsync(w.Url, w.Name) is { } got) added.Add(new ShelfItem(got, null));
+            }
+            catch (Exception ex) { AppLog.Write("shelf web drop: " + ex.Message); }
+        }
+        if (added.Count == 0 && text != null) added.Add(new ShelfItem(null, text));
         if (added.Count == 0) { LeaveDropZone(); return; }
 
         foreach (var item in added)
@@ -269,7 +280,7 @@ public partial class NotchWindow
         StyleTab(ShelfTab, _shelfTab);
         StyleTab(RecentTab, !_shelfTab);
         ShelfScroll.Visibility = _shelfTab ? Visibility.Visible : Visibility.Collapsed;
-        FilesList.Visibility = _shelfTab ? Visibility.Collapsed : Visibility.Visible;
+        FilesScroll.Visibility = _shelfTab ? Visibility.Collapsed : Visibility.Visible;
         ShelfClear.Visibility = _shelfTab && _shelf.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         OpenDownloads.Visibility = _shelfTab ? Visibility.Collapsed : Visibility.Visible;
         if (_shelfTab) RenderShelf(); else _ = RenderFilesAsync();

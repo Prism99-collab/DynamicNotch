@@ -65,6 +65,118 @@ public static class ShelfTransfer
         return (files, null);
     }
 
+    static readonly string[] WebFileExts =
+    {
+        ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".avif", ".ico",
+        ".pdf", ".zip", ".rar", ".7z", ".mp3", ".mp4", ".mov", ".wav", ".docx", ".xlsx", ".pptx", ".txt", ".csv", ".exe", ".msi",
+    };
+
+    /// <summary>
+    /// Something dragged out of a web page that's really a file: an image (its address in the page's HTML, or a
+    /// picture link), a download link (Chrome's DownloadURL), or a picture carried inline as data. Read while the drop
+    /// lasts; fetched afterwards with <see cref="DownloadAsync"/>. A plain page link isn't a file: it stays text.
+    /// </summary>
+    public static (string Url, string? Name)? WebSource(IDataObject data)
+    {
+        try
+        {
+            // Chrome: "image/png:photo.png:https://…" for links marked downloadable
+            if (data.GetDataPresent("DownloadURL") && data.GetData("DownloadURL") is { } dl && ReadString(dl) is { } d)
+            {
+                int a = d.IndexOf(':'), b = a < 0 ? -1 : d.IndexOf(':', a + 1);
+                if (b > 0 && d[(b + 1)..].StartsWith("http", StringComparison.OrdinalIgnoreCase)) return (d[(b + 1)..], d[(a + 1)..b]);
+            }
+            // an image in the page: its source, from the HTML the browser hands over
+            if (data.GetDataPresent(DataFormats.Html) && data.GetData(DataFormats.Html) is string html)
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(html, "<img[^>]+src\\s*=\\s*[\"']([^\"']+)[\"']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (m.Success)
+                {
+                    string src = System.Net.WebUtility.HtmlDecode(m.Groups[1].Value);
+                    if (src.StartsWith("http", StringComparison.OrdinalIgnoreCase) || src.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)) return (src, null);
+                }
+            }
+            // a link that points straight at a file (a picture, a PDF, a zip…)
+            string? text = (data.GetData(DataFormats.UnicodeText) ?? data.GetData(DataFormats.Text)) as string;
+            text = text?.Trim();
+            if (text != null && !text.Contains('\n') && Uri.TryCreate(text, UriKind.Absolute, out var uri) && (uri.Scheme == "http" || uri.Scheme == "https")
+                && WebFileExts.Contains(Path.GetExtension(uri.AbsolutePath).ToLowerInvariant()))
+                return (text, null);
+            if (text != null && text.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)) return (text, null);
+        }
+        catch { }
+        return null;
+
+        static string? ReadString(object o) => o switch
+        {
+            string s => s,
+            MemoryStream ms => Encoding.Unicode.GetString(ms.ToArray()).TrimEnd('\0'),
+            _ => null,
+        };
+    }
+
+    static readonly System.Net.Http.HttpClient Web = MakeClient();
+    static System.Net.Http.HttpClient MakeClient()
+    {
+        var c = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+        c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) DynamicNotch");
+        return c;
+    }
+    const long MaxDownload = 200L * 1024 * 1024;
+
+    /// <summary>Fetches a web file (or decodes an inline picture) into the shelf folder; null if it can't.</summary>
+    public static async Task<string?> DownloadAsync(string url, string? name)
+    {
+        try
+        {
+            if (url.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
+            {
+                int comma = url.IndexOf(',');
+                if (comma < 0 || !url[..comma].Contains(";base64", StringComparison.OrdinalIgnoreCase)) return null;
+                string mime = url[5..url.IndexOf(';')];
+                byte[] bytes = Convert.FromBase64String(url[(comma + 1)..]);
+                string path = Unique($"Picture {DateTime.Now:yyyy-MM-dd HH.mm.ss}{ExtFor(mime) ?? ".png"}");
+                await File.WriteAllBytesAsync(path, bytes);
+                return path;
+            }
+            using var response = await Web.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
+            if (!response.IsSuccessStatusCode) return null;
+            if (response.Content.Headers.ContentLength > MaxDownload) return null;
+            string? file = name ?? response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"');
+            if (string.IsNullOrWhiteSpace(file)) file = Path.GetFileName(new Uri(url).AbsolutePath);
+            file = string.Concat((file ?? "").Split(Path.GetInvalidFileNameChars()));
+            if (file.Length == 0) file = $"Download {DateTime.Now:yyyy-MM-dd HH.mm.ss}";
+            if (Path.GetExtension(file).Length == 0 && ExtFor(response.Content.Headers.ContentType?.MediaType) is { } ext) file += ext;
+            string target = Unique(file);
+            await using (var src = await response.Content.ReadAsStreamAsync())
+            await using (var dst = File.Create(target))
+            {
+                var buffer = new byte[81920];
+                long total = 0;
+                int n;
+                while ((n = await src.ReadAsync(buffer)) > 0)
+                {
+                    total += n;
+                    if (total > MaxDownload) { dst.Close(); File.Delete(target); return null; }
+                    await dst.WriteAsync(buffer.AsMemory(0, n));
+                }
+            }
+            return target;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("shelf download: " + ex.Message);
+            return null;
+        }
+    }
+
+    static string? ExtFor(string? mime) => mime?.ToLowerInvariant() switch
+    {
+        "image/png" => ".png", "image/jpeg" => ".jpg", "image/gif" => ".gif", "image/webp" => ".webp", "image/svg+xml" => ".svg",
+        "image/bmp" => ".bmp", "image/avif" => ".avif", "application/pdf" => ".pdf", "application/zip" => ".zip", "video/mp4" => ".mp4",
+        "audio/mpeg" => ".mp3", "text/plain" => ".txt", _ => null,
+    };
+
     static string? Picture(IDataObject data)
     {
         BitmapSource? bmp = null;

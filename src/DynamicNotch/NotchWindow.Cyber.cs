@@ -82,6 +82,16 @@ public partial class NotchWindow
         if (Environment.GetEnvironmentVariable("DYNAMICNOTCH_OPEN") is { Length: > 0 } open)
             After(3000, () =>
             {
+                if (open == "pill")
+                {
+                    // the game pill with sample readings (development only: nothing is saved)
+                    _settings.FpsCpu = _settings.FpsGpu = _settings.FpsGpuTemp = _settings.FpsCpuTemp = true;
+                    _settings.FpsGpuColor = "#54C1E6";
+                    GameFps.Text = "144";
+                    SetMode(Mode.Game);
+                    ShowGameStats(new Services.StrainService.Reading(32, 97, 50, 71, 64));
+                    return;
+                }
                 if (open.StartsWith("prefs")) { PreferencesWindow.ShowFor(this, int.TryParse(open[5..], out int sec) ? sec : 0); return; }
                 if (open == "osd")
                 {

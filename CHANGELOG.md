@@ -3,6 +3,27 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.0] — 2026-11-01
+
+### Added
+- FPS pill extras (Preferences → Behaviour, all off by default): CPU and GPU usage in %, CPU and GPU temperature
+  in °C, beside the frame rate in small, quiet type; they change once a second at fixed widths, and CPU and GPU each
+  get the colour you choose. A temperature the PC doesn't report simply isn't shown.
+- Cyberpsychosis / strain warnings: set each target's line yourself (5 % / 5 °C steps) in Preferences → Alerts.
+- Drag from any web page onto the shelf: an image, a download link, a picture embedded in the page or a link
+  straight to a file is fetched as the real file (a plain page link stays a link).
+- Clipboard history keeps your last 30 texts; recent files show 15; both scroll.
+
+### Changed
+- Every list in the notch scrolls smoothly (devices, app mixer, clipboard, files, shelf, the live list).
+- PCs without graphics hardware for drawing (basic GPUs, virtual machines, Remote Desktop) get the light motion
+  automatically, so the notch stays fast there.
+
+### Fixed
+- The sound-device list no longer shows the music or call card through it when they switch while it's open; it
+  has a solid backdrop.
+- A taken Win+Alt+N shortcut is noted in the log instead of failing silently.
+
 ## [1.6.0] — 2026-11-01
 
 ### Added

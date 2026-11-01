@@ -351,6 +351,8 @@
                                                     <RowDefinition Height="28" />
                                                     <RowDefinition Height="*" />
                                                 </Grid.RowDefinitions>
+                                                <!-- a solid backdrop: nothing of the cards underneath can show through the list -->
+                                                <Border Grid.RowSpan="2" Margin="-8,-4,-8,-2" CornerRadius="14" Background="#F2111114" IsHitTestVisible="False" />
                                                 <!-- speakers / headphones vs microphones, one list at a time -->
                                                 <StackPanel Orientation="Horizontal" Margin="6,0" VerticalAlignment="Center">
                                                     <Button x:Name="OutputTab" Style="{StaticResource Capsule}" Height="24" Padding="11,0" Margin="0,0,4,0">
@@ -693,7 +695,15 @@
                                                 <Button x:Name="ClipClear" Style="{StaticResource CircleButton}" Width="24" Height="24" HorizontalAlignment="Right" ToolTip="Clear">
                                                     <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFont}" FontSize="11" Foreground="{StaticResource Dim}" />
                                                 </Button>
-                                                <StackPanel x:Name="ClipList" Grid.Row="1" />
+                                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
+                                                    <ScrollViewer.OpacityMask>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                            <GradientStop Color="Black" Offset="0.85" />
+                                                            <GradientStop Color="Transparent" Offset="1" />
+                                                        </LinearGradientBrush>
+                                                    </ScrollViewer.OpacityMask>
+                                                    <StackPanel x:Name="ClipList" Margin="0,0,0,12" />
+                                                </ScrollViewer>
                                                 <TextBlock x:Name="ClipEmpty" Grid.Row="1" Text="Copy text and it shows up here.&#x0a;Click an item to copy it again." TextWrapping="Wrap"
                                                            FontSize="11" Foreground="#66FFFFFF" Margin="4,8" />
                                             </Grid>
@@ -713,7 +723,15 @@
                                                 <Button x:Name="ShelfClear" Style="{StaticResource CircleButton}" Width="24" Height="24" HorizontalAlignment="Right" ToolTip="Clear the shelf" Visibility="Collapsed">
                                                     <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFont}" FontSize="11" Foreground="{StaticResource Dim}" />
                                                 </Button>
-                                                <StackPanel x:Name="FilesList" Grid.Row="1" />
+                                                <ScrollViewer x:Name="FilesScroll" Grid.Row="1" VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
+                                                    <ScrollViewer.OpacityMask>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                            <GradientStop Color="Black" Offset="0.85" />
+                                                            <GradientStop Color="Transparent" Offset="1" />
+                                                        </LinearGradientBrush>
+                                                    </ScrollViewer.OpacityMask>
+                                                    <StackPanel x:Name="FilesList" Margin="0,0,0,12" />
+                                                </ScrollViewer>
                                                 <ScrollViewer x:Name="ShelfScroll" Grid.Row="1" VerticalScrollBarVisibility="Hidden" Visibility="Collapsed">
                                                     <StackPanel x:Name="ShelfList" />
                                                 </ScrollViewer>

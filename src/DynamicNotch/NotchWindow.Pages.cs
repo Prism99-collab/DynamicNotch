@@ -581,6 +581,8 @@ public partial class NotchWindow
 
     // ───────────────────────────── page 4 · clipboard & files ─────────────────────────────
 
+    const int ClipMax = 30; // the texts you copied last, newest first
+
     void AddClipboardText(string text)
     {
         text = text.Trim();
@@ -588,7 +590,7 @@ public partial class NotchWindow
         if (text.Length > 4000) text = text[..4000];
         _clipHistory.Remove(text);
         _clipHistory.Insert(0, text);
-        if (_clipHistory.Count > 6) _clipHistory.RemoveAt(_clipHistory.Count - 1);
+        while (_clipHistory.Count > ClipMax) _clipHistory.RemoveAt(_clipHistory.Count - 1);
         if (_mode == Mode.Expanded && _page == 3) RenderClipboard();
     }
 
@@ -596,7 +598,7 @@ public partial class NotchWindow
     {
         ClipList.Children.Clear();
         ClipEmpty.Visibility = _clipHistory.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var text in _clipHistory.Take(5))
+        foreach (var text in _clipHistory)
         {
             string oneLine = string.Join(" ", text.Split(new[] { '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries));
             var row = new Grid();
@@ -629,7 +631,7 @@ public partial class NotchWindow
 
     async Task RenderFilesAsync()
     {
-        var files = await _files.RecentAsync(5);
+        var files = await _files.RecentAsync(15);
         var items = await Task.Run(() => files.Select(f => (File: f, Icon: IconHelper.ForFile(f.FullName))).ToList());
         FilesList.Children.Clear();
         if (items.Count == 0)
