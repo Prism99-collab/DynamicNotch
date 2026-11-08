@@ -83,24 +83,70 @@ public sealed class Settings
 
     static string FilePath => Path.Combine(Folder, "settings.json");
 
+    static string BackupPath => Path.Combine(Folder, "settings.bak.json");
+    static readonly object SaveLock = new();
+
+    // A damaged settings.json (power cut mid-write, disk hiccup, a bad hand edit) must never wipe the user's
+    // preferences: fall back to the last good copy, and keep the damaged file aside instead of saving over it.
     public static Settings Load()
     {
-        try
+        if (TryRead(FilePath) is { } main) return main;
+        bool damaged = File.Exists(FilePath);
+        if (TryRead(BackupPath) is { } backup)
         {
-            if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath)) ?? new Settings();
+            if (damaged) KeepAside();
+            return backup;
         }
-        catch { }
+        if (damaged) KeepAside();
         return new Settings();
     }
 
-    public void Save()
+    static Settings? TryRead(string path)
     {
         try
         {
-            Directory.CreateDirectory(Folder);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+            if (!File.Exists(path)) return null;
+            string text = File.ReadAllText(path);
+            if (string.IsNullOrWhiteSpace(text) || text.IndexOf('\0') >= 0) return null;
+            return JsonSerializer.Deserialize<Settings>(text);
         }
-        catch { }
+        catch { return null; }
+    }
+
+    static void KeepAside()
+    {
+        try { File.Copy(FilePath, Path.Combine(Folder, "settings.damaged.json"), true); } catch { }
+    }
+
+    // Written to a temp file first, then swapped in, the previous good file becoming the backup:
+    // at every moment either the old or the new settings are whole on disk.
+    public void Save()
+    {
+        lock (SaveLock)
+        {
+            string tmp = FilePath + ".tmp";
+            try
+            {
+                Directory.CreateDirectory(Folder);
+                string json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
+                using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+                using (var w = new StreamWriter(fs))
+                {
+                    w.Write(json);
+                    w.Flush();
+                    fs.Flush(true);
+                }
+                if (TryRead(FilePath) != null)
+                {
+                    try { File.Replace(tmp, FilePath, BackupPath, true); return; }
+                    catch { File.Copy(FilePath, BackupPath, true); }
+                }
+                File.Move(tmp, FilePath, true);
+            }
+            catch
+            {
+                try { File.Delete(tmp); } catch { }
+            }
+        }
     }
 }

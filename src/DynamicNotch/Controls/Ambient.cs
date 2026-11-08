@@ -50,10 +50,19 @@ public sealed class Ambient : Grid
         var sheet = new Canvas { Width = _w, Height = slides ? _h * 2 : _h, Opacity = opacity, CacheMode = new BitmapCache(1.25) };
         for (int i = 0; i < count; i++)
         {
+            var first = make(_rand);
             double x = _rand.NextDouble() * _w, y = _rand.NextDouble() * _h;
+            // a big soft light (an aurora) is kept whole inside the background, sway included: cut by the edge it
+            // would show as a hard-edged lighter box on a notch whose shell is larger than the background
+            if (first.Width > 40)
+            {
+                double mx = first.Width / 2 + sway, my = first.Height / 2;
+                x = mx * 2 < _w ? mx + _rand.NextDouble() * (_w - mx * 2) : _w / 2;
+                if (!slides) y = my * 2 < _h ? my + _rand.NextDouble() * (_h - my * 2) : _h / 2;
+            }
             for (int k = 0; k < (slides ? 2 : 1); k++)
             {
-                var el = make(_rand);
+                var el = k == 0 ? first : make(_rand);
                 Canvas.SetLeft(el, x - el.Width / 2);
                 Canvas.SetTop(el, y + k * _h - el.Height / 2);
                 sheet.Children.Add(el);

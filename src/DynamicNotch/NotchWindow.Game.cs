@@ -36,6 +36,9 @@ public partial class NotchWindow
     (uint Pid, bool Fullscreen) _gameRuledOut; // the app in front was already looked at and isn't a game
     uint _gameStarting;       // a game being set up right now (its name and the frame trace are on their way)
     Task _fpsQueue = Task.CompletedTask; // trace starts and stops, strictly one after another
+    // a game loses the front for a moment all the time (an overlay, a launcher pop-up, a toast, a loading-screen
+    // window): game mode only ends once something else has stayed in front for this long
+    readonly DispatcherTimer _gameLeaving = new(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(2) };
 
     /// <summary>Runs a trace start / stop after the previous one: leaving one game and entering the next can't cross.</summary>
     Task<T> FpsQueue<T>(Func<T> op)
@@ -103,6 +106,7 @@ public partial class NotchWindow
         _gameTimer.Tick += (_, _) => OnGameTick();
         _fpsTicker.Tick += (_, _) => OnFpsTick();
         _fpsLinger.Tick += (_, _) => StopLinger();
+        _gameLeaving.Tick += (_, _) => GameLeft();
         After(5000, EnsureFpsReader); // FPS on, but no reader yet this session: the helper (one prompt)
     }
 
@@ -148,9 +152,9 @@ public partial class NotchWindow
         if (_gameProbePid != 0 && pid != _gameProbePid) _gameProbePid = 0;
         if (_game != null)
         {
-            if (pid == _game.Pid) return;
-            if (pid != 0) EndGame(); // Alt-Tab: gone
-            else return;
+            if (pid == _game.Pid) { _gameLeaving.Stop(); return; } // back before the grace ran out: nothing changed
+            if (pid != 0 && !_gameLeaving.IsEnabled) _gameLeaving.Start(); // Alt-Tab: gone, once it sticks
+            return;
         }
         if (pid == 0 || pid == Environment.ProcessId || pid == _gameStarting) return;
         if (ResumeGame(pid)) return;
@@ -212,8 +216,23 @@ public partial class NotchWindow
         RefreshBase();
     }
 
+    /// <summary>Something else stayed in front through the grace period: the game is left for real.</summary>
+    void GameLeft()
+    {
+        _gameLeaving.Stop();
+        if (_game == null) return;
+        var fg = GetForegroundWindow();
+        uint front = 0;
+        if (fg != IntPtr.Zero && fg != _hwnd) GetWindowThreadProcessId(fg, out front);
+        front = HostedApp(fg, front); // an Xbox / Store game lives inside ApplicationFrameHost
+        if (front == _game.Pid || front == 0) return;
+        EndGame();
+        CheckForeground(); // the app now in front gets its own look (full screen hides the notch, another game...)
+    }
+
     void EndGame(bool linger = true)
     {
+        _gameLeaving.Stop();
         if (_game == null) return;
         ShowGameStats(null);
         AppLog.Write($"game mode ended: {_game.Name}");

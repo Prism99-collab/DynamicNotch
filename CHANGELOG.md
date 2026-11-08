@@ -3,6 +3,17 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.7] — 2026-11-08
+
+### Fixed
+- A damaged settings file (a power cut while saving, a disk hiccup) no longer resets every preference: settings are
+  now written to a temporary file and swapped in, the previous good copy is kept as a backup and used if the main
+  file can't be read, and the damaged file is set aside instead of being saved over.
+- Game mode no longer flickers off and on while you play: something else has to stay in front for 2 seconds (not an
+  overlay, a launcher pop-up or a notification taking the focus for a moment) before the notch leaves game mode.
+- Liquid glass: the drifting aurora lights are kept whole inside the background, so they never show as a
+  hard-edged lighter box.
+
 ## [1.7.6] — 2026-11-08
 
 ### Added
