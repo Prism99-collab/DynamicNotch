@@ -84,11 +84,12 @@ public partial class NotchWindow
             return;
         }
         bool cpu = _settings.FpsCpu || (_settings.FpsCpuTemp && r.CpuTemp != null);
-        bool gpu = _settings.FpsGpu || (_settings.FpsGpuTemp && r.GpuTemp != null);
+        bool gpuLoad = _settings.FpsGpu && r.GpuKnown; // a driver without GPU counters: no "GPU 0%"
+        bool gpu = gpuLoad || (_settings.FpsGpuTemp && r.GpuTemp != null);
         var cpuBrush = Frozen(StatColor(_settings.FpsCpuColor));
         var gpuBrush = Frozen(StatColor(_settings.FpsGpuColor));
         Fill(_cpuGroup!, _cpuValue!, _cpuTemp!, cpu, _settings.FpsCpu ? $"{r.Cpu:0}%" : null, _settings.FpsCpuTemp && r.CpuTemp is { } ct ? $"{ct:0}°" : null, cpuBrush);
-        Fill(_gpuGroup!, _gpuValue!, _gpuTemp!, gpu, _settings.FpsGpu ? $"{r.Gpu:0}%" : null, _settings.FpsGpuTemp && r.GpuTemp is { } gt ? $"{gt:0}°" : null, gpuBrush);
+        Fill(_gpuGroup!, _gpuValue!, _gpuTemp!, gpu, gpuLoad ? $"{r.Gpu:0}%" : null, _settings.FpsGpuTemp && r.GpuTemp is { } gt ? $"{gt:0}°" : null, gpuBrush);
         _statsSep!.Visibility = cpu && gpu ? Visibility.Visible : Visibility.Collapsed;
         var vis = cpu || gpu ? Visibility.Visible : Visibility.Collapsed;
         if (_statsRow.Visibility != vis) _statsRow.Visibility = vis;

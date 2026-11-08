@@ -49,8 +49,9 @@ public sealed class PowerService
     {
         if (!GetSystemPowerStatus(out var s)) return;
         HasBattery = s.BatteryFlag != 128 && s.BatteryLifePercent != 255;
-        Percent = s.BatteryLifePercent == 255 ? 100 : s.BatteryLifePercent;
-        PluggedIn = s.ACLineStatus == 1;
+        Percent = s.BatteryLifePercent == 255 ? 100 : Math.Min(100, (int)s.BatteryLifePercent);
+        // 255 is "unknown" (some firmware, some docks): taken as plugged in, so no PC is wrongly put on battery mode
+        PluggedIn = s.ACLineStatus != 0;
         Saver = s.SystemStatusFlag == 1;
     }
 

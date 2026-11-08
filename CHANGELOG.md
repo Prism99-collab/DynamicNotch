@@ -3,6 +3,38 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.6] — 2026-11-08
+
+### Added
+- Cyberpsychosis log (Strain log in the other themes), on the Tools page: every strain warning is kept with what led to
+  it: the readings then and over the minute before, the apps using the most CPU, GPU and memory, the power state, the
+  app in front, the PC itself, and the likely causes in plain words. Opens to each episode's story, as a full text
+  report, or clears. A red dot on its button while there's something new.
+- Cyberpunk: the notch boots up as it opens (a hex readout settling into "LINK // OK", panels flickering on), a
+  scanner's corner brackets lock onto whatever the pointer is on with a small label ("// VOL 62"), and data rain falls
+  behind the cards (faster and redder under load, brighter with the music, still for a moment on a notification) and,
+  in short bursts, in the idle notch while nothing plays.
+- Living backgrounds for the other themes, on every page while the notch is open: Abyss has stars twinkling in waves,
+  plankton rising and stars flaring; Liquid glass has rising glass bubbles, a drifting aurora and soft glints; Crystal
+  has frost glitter, a light sweep across the glass and prism glints; Original has a few faint motes of light.
+  All of them are drawn once and only slid or faded by the graphics chip: smooth, and nearly free.
+
+### Fixed
+- Readings that could be wrong on other PCs:
+  - GPU load is read the way Task Manager does: every engine (3D, video, compute) of every GPU, the busiest one.
+    A laptop's integrated and dedicated graphics are no longer added together.
+  - CPU load is Task Manager's own number on Windows 10 and 11 (it counts turbo), the same on every page.
+  - A fake CPU temperature (ACPI's 27.8 °C placeholder, or a sensor that never moves) is hidden instead of shown.
+  - GPU temperatures outside a real range are ignored, and new graphics cards are picked up.
+  - A PC whose graphics driver doesn't report GPU load no longer shows "GPU 0%".
+  - An unknown charger state no longer puts the PC on battery mode.
+- Network: the round trip no longer shows "timed out" when two checks ran at once; it tries several servers and, where
+  ping is blocked, times a TCP handshake instead; it's coloured by the typical value (one slow reply doesn't turn it
+  red) and shows the jitter when the connection wobbles. Speeds are steadier and no longer doubled by a VPN or a
+  Hyper-V / WSL adapter. Wi-Fi shows its generation and link rate ("Good signal · Wi-Fi 6 · 866 Mbps") and a finer
+  signal; a network asking you to sign in (hotel, café) says so. The "connection unstable" alert uses the typical
+  round trip and the jitter too.
+
 ## [1.7.5] — 2026-11-01
 
 ### Added

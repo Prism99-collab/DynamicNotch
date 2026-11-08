@@ -4,18 +4,30 @@ namespace DynamicNotch.Services;
 
 /// <summary>
 /// What a game is doing to the PC, without administrator rights: GPU load (Windows' "GPU Engine" performance
-/// counters, the same numbers as Task Manager, total and for the game's own process), GPU temperature (from the
+/// counters, read the way Task Manager does, total and for the game's own process), GPU temperature (from the
 /// graphics driver, like Task Manager's GPU page) and CPU load. Call <see cref="Sample"/> off the UI thread.
 /// </summary>
 public sealed class GameService : IDisposable
 {
     public sealed record Stats(double Gpu, double GpuApp, double? TempC, double Cpu);
 
+    /// <summary>Also note each process's share of the GPU on every reading (for the strain log).</summary>
+    public bool TrackProcesses { get; set; }
+    /// <summary>The GPU load of each process at the last reading (process id → %), when <see cref="TrackProcesses"/> is on.</summary>
+    public IReadOnlyDictionary<uint, double> GpuByProcess { get; private set; } = new Dictionary<uint, double>();
+
     readonly object _gate = new();
     IntPtr _query, _counter;
     bool _pdhTried;
-    long _idle, _kernel, _user;
     uint[]? _adapters;
+    DateTime _adaptersAt;
+
+    /// <summary>
+    /// Does this PC's graphics driver report GPU load at all? (Windows' GPU counters need a WDDM 2 driver; a very old
+    /// or basic display driver has none: then the GPU numbers are hidden rather than shown as 0 %.) Null until the
+    /// first reading.
+    /// </summary>
+    public bool? GpuAvailable { get; private set; }
 
     /// <summary>One reading. The first call primes the counters (they measure the time between two calls).</summary>
     public Stats Sample(uint pid)
@@ -27,18 +39,22 @@ public sealed class GameService : IDisposable
         }
     }
 
-    // ───────────── GPU load: \GPU Engine(*engtype_3D)\Utilization Percentage ─────────────
+    // ───────────── GPU load: \GPU Engine(*)\Utilization Percentage, the way Task Manager reads it ─────────────
+    // Every engine of every GPU (3D, video decode / encode, compute, copy...). A GPU's load is its busiest engine
+    // type (all its processes together), and the PC's GPU load is its busiest GPU: a laptop's integrated and
+    // dedicated graphics are never added together, and a video or a CUDA job counts as work, like in Task Manager.
 
     (double Total, double App) GpuLoad(uint pid)
     {
         if (!_pdhTried)
         {
             _pdhTried = true;
-            if (PdhOpenQuery(null, IntPtr.Zero, out _query) != 0) { _query = IntPtr.Zero; return (0, 0); }
-            if (PdhAddEnglishCounter(_query, @"\GPU Engine(*engtype_3D)\Utilization Percentage", IntPtr.Zero, out _counter) != 0)
+            if (PdhOpenQuery(null, IntPtr.Zero, out _query) != 0) { _query = IntPtr.Zero; GpuAvailable = false; return (0, 0); }
+            if (PdhAddEnglishCounter(_query, @"\GPU Engine(*)\Utilization Percentage", IntPtr.Zero, out _counter) != 0)
             {
                 PdhCloseQuery(_query);
                 _query = IntPtr.Zero;
+                GpuAvailable = false;
                 return (0, 0);
             }
             PdhCollectQueryData(_query);
@@ -48,21 +64,33 @@ public sealed class GameService : IDisposable
 
         uint size = 0, count = 0;
         int r = PdhGetFormattedCounterArray(_counter, PDH_FMT_DOUBLE, ref size, ref count, IntPtr.Zero);
-        if (r != PDH_MORE_DATA || size == 0) return (0, 0);
+        if (r != PDH_MORE_DATA || size == 0) { GpuAvailable ??= false; return (0, 0); }
         IntPtr buf = Marshal.AllocHGlobal((int)size);
         try
         {
             if (PdhGetFormattedCounterArray(_counter, PDH_FMT_DOUBLE, ref size, ref count, buf) != 0) return (0, 0);
-            double total = 0, app = 0;
-            string mine = $"pid_{pid}_";
+            GpuAvailable = count > 0;
+            var engines = new Dictionary<string, double>();          // "luid…_phys_0|3D" → all processes on it
+            var mine = new Dictionary<string, double>();             // the same, only the given process
+            var perPid = TrackProcesses ? new Dictionary<(uint, string), double>() : null;
             int item = Marshal.SizeOf<PDH_FMT_COUNTERVALUE_ITEM>();
             for (int i = 0; i < count; i++)
             {
                 var v = Marshal.PtrToStructure<PDH_FMT_COUNTERVALUE_ITEM>(buf + i * item);
-                if (v.Status != 0) continue;
-                total += v.Value;
-                if (pid != 0 && Marshal.PtrToStringUni(v.Name) is { } name && name.StartsWith(mine, StringComparison.Ordinal)) app += v.Value;
+                if (v.Status != 0 || v.Value <= 0 || Marshal.PtrToStringUni(v.Name) is not { } name) continue;
+                // "pid_1234_luid_0x00000000_0x0000D1B4_phys_0_eng_3_engtype_VideoDecode"
+                int l = name.IndexOf("_luid_", StringComparison.Ordinal), e = name.IndexOf("_eng_", StringComparison.Ordinal), t = name.IndexOf("engtype_", StringComparison.Ordinal);
+                if (l < 0 || e < l || t < 0) continue;
+                string key = name[(l + 6)..e] + "|" + name[(t + 8)..];
+                engines[key] = engines.GetValueOrDefault(key) + v.Value;
+                if (!uint.TryParse(name.AsSpan(4, Math.Max(0, l - 4)), out uint owner)) continue;
+                if (owner == pid && pid != 0) mine[key] = mine.GetValueOrDefault(key) + v.Value;
+                if (perPid != null) perPid[(owner, key)] = perPid.GetValueOrDefault((owner, key)) + v.Value;
             }
+            if (perPid != null)
+                GpuByProcess = perPid.GroupBy(kv => kv.Key.Item1).ToDictionary(g => g.Key, g => Math.Min(100, g.Max(kv => kv.Value)));
+            double total = engines.Count > 0 ? engines.Values.Max() : 0;
+            double app = mine.Count > 0 ? mine.Values.Max() : 0;
             return (Math.Clamp(total, 0, 100), Math.Clamp(app, 0, 100));
         }
         finally { Marshal.FreeHGlobal(buf); }
@@ -74,7 +102,12 @@ public sealed class GameService : IDisposable
     {
         try
         {
-            _adapters ??= OpenAdapters();
+            if (_adapters == null || DateTime.UtcNow - _adaptersAt > TimeSpan.FromMinutes(5))
+            {
+                CloseAdapters();
+                _adapters = OpenAdapters();
+                _adaptersAt = DateTime.UtcNow;
+            }
             double best = 0;
             IntPtr perf = Marshal.AllocHGlobal(PerfDataSize);
             try
@@ -85,7 +118,7 @@ public sealed class GameService : IDisposable
                     var q = new D3DKMT_QUERYADAPTERINFO { hAdapter = h, Type = KMTQAITYPE_ADAPTERPERFDATA, pPrivateDriverData = perf, PrivateDriverDataSize = PerfDataSize };
                     if (D3DKMTQueryAdapterInfo(ref q) != 0) continue;
                     double c = Marshal.ReadInt32(perf, 56) / 10.0; // deci-degrees Celsius
-                    if (c > best && c < 130) best = c;
+                    if (c > best && c is >= 15 and < 125) best = c; // 0 = not reported; anything else outside is a driver's nonsense
                 }
             }
             finally { Marshal.FreeHGlobal(perf); }
@@ -113,25 +146,25 @@ public sealed class GameService : IDisposable
 
     // ───────────── CPU load: all cores, since the last call ─────────────
 
-    double CpuLoad()
-    {
-        if (!GetSystemTimes(out long idle, out long kernel, out long user)) return 0;
-        long di = idle - _idle, dk = kernel - _kernel, du = user - _user;
-        bool first = _idle == 0;
-        _idle = idle; _kernel = kernel; _user = user;
-        long busy = dk + du; // kernel time includes idle time
-        return first || busy <= 0 ? 0 : Math.Clamp((busy - di) * 100.0 / busy, 0, 100);
-    }
+    readonly CpuMeter _cpu = new();
+
+    double CpuLoad() => _cpu.Read(); // the same number as Task Manager (Services/CpuMeter)
 
     public void Dispose()
     {
         lock (_gate)
         {
             if (_query != IntPtr.Zero) { PdhCloseQuery(_query); _query = IntPtr.Zero; }
-            if (_adapters != null)
-                foreach (uint h in _adapters) { var c = new D3DKMT_CLOSEADAPTER { hAdapter = h }; D3DKMTCloseAdapter(ref c); }
-            _adapters = null;
+            _cpu.Dispose();
+            CloseAdapters();
         }
+    }
+
+    void CloseAdapters()
+    {
+        if (_adapters != null)
+            foreach (uint h in _adapters) { var c = new D3DKMT_CLOSEADAPTER { hAdapter = h }; D3DKMTCloseAdapter(ref c); }
+        _adapters = null;
     }
 
     // ───────────── interop ─────────────
@@ -161,8 +194,8 @@ public sealed class GameService : IDisposable
     [DllImport("pdh.dll")] static extern int PdhCollectQueryData(IntPtr query);
     [DllImport("pdh.dll", CharSet = CharSet.Unicode)] static extern int PdhGetFormattedCounterArray(IntPtr counter, uint format, ref uint size, ref uint count, IntPtr buffer);
     [DllImport("pdh.dll")] static extern int PdhCloseQuery(IntPtr query);
+
     [DllImport("gdi32.dll")] static extern int D3DKMTEnumAdapters2(ref D3DKMT_ENUMADAPTERS2 e);
     [DllImport("gdi32.dll")] static extern int D3DKMTQueryAdapterInfo(ref D3DKMT_QUERYADAPTERINFO q);
     [DllImport("gdi32.dll")] static extern int D3DKMTCloseAdapter(ref D3DKMT_CLOSEADAPTER c);
-    [DllImport("kernel32.dll")] static extern bool GetSystemTimes(out long idle, out long kernel, out long user);
 }

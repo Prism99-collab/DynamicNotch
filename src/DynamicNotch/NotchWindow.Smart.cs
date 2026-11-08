@@ -135,7 +135,8 @@ public partial class NotchWindow
     {
         var c = await _monitor.ConnectionAsync();
         if (!c.Online) { _badNet = _goodNet = 0; return; } // offline is already announced by the Wi-Fi alert
-        bool bad = c.PingMs is null || c.PingMs > 250;
+        // the typical round trip, not one slow reply; and a round trip that wobbles a lot breaks calls just the same
+        bool bad = c.PingMs is null || (c.TypicalMs ?? c.PingMs) > 250 || c.JitterMs >= 80;
         if (bad) { _badNet++; _goodNet = 0; } else { _goodNet++; _badNet = 0; }
 
         if (_badNet >= 3 && !_netAlerted && (DateTime.UtcNow - _lastNetAlert).TotalMinutes > 15)

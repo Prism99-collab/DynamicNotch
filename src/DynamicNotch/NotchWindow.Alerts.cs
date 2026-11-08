@@ -265,6 +265,7 @@ public partial class NotchWindow
         double seconds = 1.8, bool force = false, Prio prio = Prio.Normal, Action? onClick = null, Action<int>? onWheel = null, Motion motion = Motion.Auto)
     {
         var req = new OsdRequest(kind, glyph, level, title, subtitle, right, art, glyphBrush, battery, seconds, force, prio, onClick, onWheel, motion);
+        if (level == null && kind is not ("media" or "volume" or "brightness")) RainFreeze(); // a message: the rain holds its breath
         if (SilencedByMeeting(kind, force)) return;
         if (InGame && kind != "battery") return; // nothing pops up in the middle of a game
         if (_focus.IsOn && !force && !FocusAllows(kind)) return;

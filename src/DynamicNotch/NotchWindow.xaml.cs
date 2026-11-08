@@ -138,6 +138,7 @@ public partial class NotchWindow : Window
         Safe(nameof(WireGlide), WireGlide);
         Safe(nameof(ApplyFpsScale), ApplyFpsScale);
         Safe(nameof(WireDesktopIcons), WireDesktopIcons);
+        Safe(nameof(WireStrainLog), WireStrainLog);
         Safe(nameof(ApplyCustomColors), ApplyCustomColors); // your colours from the Colors page
         Safe(nameof(WireColors), WireColors);
         Safe(nameof(WireDevices), WireDevices);
@@ -460,6 +461,9 @@ public partial class NotchWindow : Window
         UpdateCallUi();
         if (!IsBase(m)) SetDodged(false); // pop-ups and the open notch never hide from the cursor
         if (modeChanged) { CyberMoment(from, m); LookMoment(from, m); }
+        if (modeChanged && m != Mode.Expanded) Untarget();
+        UpdateRain(); // Cyberpunk: rain behind the open cards, or in the idle notch
+        UpdateAmbient(); // the other themes: their living background while it's open
     }
 
     // ───────────────────────────── spring-driven shape ─────────────────────────────
@@ -682,6 +686,7 @@ public partial class NotchWindow : Window
         _tick.Stop();
         _sysTimer.Stop();
         ShowDevices(false);
+        CloseStrainLog(); // it opens again on the page, not on top of it
         CancelSleepConfirm();
         SetMode(BaseMode);
         if (_hidden) Fade(Shell, 0, 200);
@@ -816,6 +821,8 @@ public partial class NotchWindow : Window
         _hidden = hidden;
         UpdatePrivacyBubble();
         UpdateSecond();
+        UpdateRain();
+        UpdateAmbient();
         if (_mode == Mode.Expanded) return; // fades when it closes
         if (hidden && _mode == Mode.Osd) { _osdTimer.Stop(); SetMode(BaseMode); }
         if (!hidden) ShowOnScreen(true);
@@ -835,6 +842,8 @@ public partial class NotchWindow : Window
         ShowWindow(_hwnd, on ? 4 /* SW_SHOWNOACTIVATE */ : 0 /* SW_HIDE */);
         if (on) KeepOnTop();
         SpinDisc(); // the record rests while nobody can see it
+        UpdateRain(); // so does the rain
+        UpdateAmbient();
     }
 
     // ───────────────────────────── startup ─────────────────────────────

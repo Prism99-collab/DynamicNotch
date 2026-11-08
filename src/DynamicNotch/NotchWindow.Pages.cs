@@ -342,22 +342,31 @@ public partial class NotchWindow
         Brush on = !c.Online ? DimBrush : lit <= 1 ? Orange : Brushes.White;
         for (int i = 0; i < rects.Count; i++) rects[i].Fill = i < lit ? on : Faint;
 
-        NetQuality.Text = !c.Online ? "No internet" :
-            !c.IsWifi ? "Wired connection" :
-            bars >= 4 ? "Excellent signal" : bars == 3 ? "Good signal" : bars == 2 ? "Fair signal" : "Weak signal";
+        // the signal in words, then what the link is: "Good signal · Wi-Fi 6 · 866 Mbps"
+        string signal = !c.IsWifi ? Loc.T("Wired connection") :
+            bars >= 4 ? Loc.T("Excellent signal") : bars == 3 ? Loc.T("Good signal") : bars == 2 ? Loc.T("Fair signal") : Loc.T("Weak signal");
+        string link = string.Join(" · ", new[] { c.WifiGeneration, c.LinkMbps is { } r ? $"{r} Mbps" : null }.Where(x => x != null));
+        NetQuality.Text = c.Captive ? Loc.T("Sign in to this network") : !c.Online ? Loc.T("No internet") : link.Length > 0 ? $"{signal} · {link}" : signal;
+        NetQuality.ToolTip = c.SignalPercent is { } q ? $"{Loc.T("Signal")} {q}%" : null;
+        if (c.Captive) for (int i = 0; i < rects.Count; i++) rects[i].Fill = i < lit ? Orange : Faint;
 
         if (c.PingMs is { } ms)
         {
-            PingText.Text = $"{ms} ms";
-            var quality = ms < 60 ? Green : ms < 150 ? Orange : Red;
+            // coloured by the typical round trip (one slow reply doesn't turn it red), wobbly connections said so
+            long typical = c.TypicalMs ?? ms;
+            bool shaky = c.JitterMs is >= 30;
+            PingText.Text = shaky ? $"{ms} ms · ±{c.JitterMs}" : $"{ms} ms";
+            var quality = typical < 60 && !shaky ? Green : typical < 150 ? Orange : Red;
             PingDot.Fill = quality;
             PingText.Foreground = quality;
+            PingText.ToolTip = c.JitterMs is { } j ? $"{Loc.T("Typical")} {typical} ms · {Loc.T("jitter")} {j} ms" : null;
         }
         else
         {
-            PingText.Text = c.Online ? "timed out" : "—";
+            PingText.Text = c.Online ? Loc.T("timed out") : "—";
             PingDot.Fill = c.Online ? Red : DimBrush;
             PingText.Foreground = c.Online ? Red : DimBrush;
+            PingText.ToolTip = null;
         }
     }
 

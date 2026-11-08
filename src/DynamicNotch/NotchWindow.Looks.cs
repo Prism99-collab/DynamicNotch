@@ -181,6 +181,7 @@ public partial class NotchWindow
         StyleCyberBtn();
         SyncSettingsPage();
         RefreshThemeChip();
+        UpdateAmbient(); // the new theme's living background (if it's open right now)
         CyberChanged?.Invoke(key == "cyberpunk");
     }
 

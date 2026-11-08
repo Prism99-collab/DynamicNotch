@@ -28,7 +28,8 @@ public partial class NotchWindow
         }
 
         for (int i = 0; i < items.Count && i < 16; i++)
-            Rise(items[i], 60 + i * 32);
+            if (_cyber) ClickIn(items[i], 50 + i * 26); // Cyberpunk: they power up instead (NotchWindow.Boot)
+            else Rise(items[i], 60 + i * 32);
     }
 
     static void Rise(FrameworkElement el, int delayMs)

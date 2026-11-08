@@ -77,6 +77,7 @@ public partial class NotchWindow
             ArtDisc.IsVisibleChanged += (_, _) => SpinDisc();
             MiniDisc.IsVisibleChanged += (_, _) => SpinDisc();
             _power.Changed += SpinDisc; // plugged in, unplugged, battery saver: the right pace at once
+            _power.Changed += UpdateRain; // the rain rests in power-saving mode
         }
         if (!on) { SpinDisc(); return; }
         var cyan = Frozen(Color.FromArgb(0x8C, CyCyan.R, CyCyan.G, CyCyan.B));

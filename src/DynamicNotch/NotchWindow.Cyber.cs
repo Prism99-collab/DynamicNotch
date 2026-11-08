@@ -57,6 +57,8 @@ public partial class NotchWindow
         _earRBefore = EarR.Data;
         _windowFontBefore = FontFamily;
         BuildHud();
+        BuildRain();   // the data rain (NotchWindow.Rain)
+        BuildTarget(); // the hover scanner (NotchWindow.Target)
         BuildCyberPills();
         WireCyberSkin();
         CyberBtn.Click += (_, _) => NextTheme();
@@ -101,6 +103,21 @@ public partial class NotchWindow
                 Expand(byHotkey: true);
                 if (open == "flip") After(1500, () => SetCyber(!_settings.Cyberpunk)); // the switch, live
                 if (open == "close") After(2000, Collapse); // the closing animation, live
+                if (open == "strainlog")
+                    After(500, async () =>
+                    {
+                        // a real reading logged as if it had crossed its line: the whole log, end to end
+                        _strain ??= new Services.StrainService();
+                        var svc = _strain;
+                        await Task.Run(svc.Sample);
+                        await Task.Delay(1200);
+                        var r = await Task.Run(svc.Sample);
+                        RememberStrain(r);
+                        await LogStrainAsync(StrainTargets[0], r.Cpu, 20);
+                        GoToPage(2, instant: true);
+                        OpenStrainLog();
+                        if (Services.StrainLog.Events.FirstOrDefault() is { } latest) After(1500, () => RenderLogDetail(latest));
+                    });
                 if (open == "devices") After(800, () => ShowDevices(true)); // the sound-device list over the cards
                 if (open.StartsWith("music")) After(800, () => FlipCard(true, pin: true)); // the music card, even during a call
                 if (open == "music-close") After(2500, Collapse); // then the closed notch, the music in front
@@ -155,6 +172,8 @@ public partial class NotchWindow
         if (_devicesOpen) StyleDevicesBack(); // the device list open right now follows the switch
         StyleArtDisc(); // the cover: a spinning record in this theme, the square one in the others
         RefreshDesktopBtn(); // round, or cut like its neighbours
+        UpdateRain(); // the rain comes and goes with the theme
+        if (!on) Untarget();
         Controls.BatteryIcon.Health = on; // the battery as the game's segmented health bar
         Battery.Restyle();
         OsdBattery.Restyle();
@@ -389,7 +408,7 @@ public partial class NotchWindow
         CyberHudForMode();
         CyberSkinSoon();
         if (to == Mode.Game || from == Mode.Game || to == Mode.Slim && from == Mode.Idle) return;
-        if (to == Mode.Expanded) { CyberArtShow(); CyberGlitch(strong: false); CyberScan(); CyberDecode(PageTitle); }
+        if (to == Mode.Expanded) { CyberArtShow(); CyberGlitch(strong: false); CyberScan(); CyberBoot(); CyberDecode(PageTitle); }
         else if (to == Mode.Osd) CyberGlitch(strong: false);
         else if (from == Mode.Expanded && CyberCrtOff()) { } // closing: the CRT switches off (NotchWindow.CyberFx)
         else if (from == Mode.Expanded || from == Mode.Osd) CyberGlitch(strong: false, light: true);

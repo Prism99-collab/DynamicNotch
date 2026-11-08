@@ -10,19 +10,49 @@ namespace DynamicNotch.Services;
 /// </summary>
 public sealed class StrainService : IDisposable
 {
-    public sealed record Reading(double Cpu, double Gpu, double Ram, double? GpuTemp, double? CpuTemp);
+    /// <param name="GpuKnown">false: this PC's driver doesn't report GPU load (Gpu is 0 then, and must not be shown)</param>
+    public sealed record Reading(double Cpu, double Gpu, double Ram, double? GpuTemp, double? CpuTemp, bool GpuKnown = true);
 
-    readonly GameService _gpu = new();
+    readonly GameService _gpu = new() { TrackProcesses = true };
     readonly object _gate = new();
     IntPtr _query, _zones;
     bool _zonesTried;
+
+    /// <summary>Each process's GPU load at the last <see cref="Sample"/> (process id → %).</summary>
+    public IReadOnlyDictionary<uint, double> GpuByProcess => _gpu.GpuByProcess;
 
     public Reading Sample()
     {
         var s = _gpu.Sample(0);
         double? cpuTemp;
-        lock (_gate) cpuTemp = ThermalZone();
-        return new Reading(s.Cpu, s.Gpu, MemoryLoad(), s.TempC, cpuTemp);
+        lock (_gate) cpuTemp = Trusted(ThermalZone(), s.Cpu);
+        return new Reading(s.Cpu, s.Gpu, MemoryLoad(), s.TempC, cpuTemp, GpuAvailable);
+    }
+
+    /// <summary>Does this PC report GPU load? False on a driver without Windows' GPU counters (then GPU stays hidden).</summary>
+    public bool GpuAvailable => _gpu.GpuAvailable != false;
+
+    // a thermal zone that never moves isn't a thermometer: many laptops' firmware reports a fixed value (often
+    // 27.8 °C, ACPI's default) or a zone that isn't near the CPU at all. If it hasn't changed by a single degree in
+    // 8 minutes while the CPU load swung by 50 points, it's stuck: hidden for the rest of the session
+    readonly List<(DateTime At, double Temp, double Cpu)> _zoneSeen = new();
+    bool _zoneStuck;
+
+    double? Trusted(double? temp, double cpu)
+    {
+        if (temp is not { } t || _zoneStuck) return null;
+        var now = DateTime.UtcNow;
+        _zoneSeen.Add((now, t, cpu));
+        _zoneSeen.RemoveAll(x => now - x.At > TimeSpan.FromMinutes(10));
+        if (_zoneSeen.Count >= 20 && now - _zoneSeen[0].At > TimeSpan.FromMinutes(8)
+            && _zoneSeen.Max(x => x.Temp) - _zoneSeen.Min(x => x.Temp) < 1 && _zoneSeen.Max(x => x.Cpu) - _zoneSeen.Min(x => x.Cpu) >= 50)
+        {
+            _zoneStuck = true;
+            _available = false;
+            AppLog.Write($"cpu temperature: the thermal zone stays at {t:0}°C whatever the load: not a real reading, hidden");
+            return null;
+        }
+        return t;
     }
 
     /// <summary>Does this PC report a thermal zone temperature at all?</summary>
@@ -79,7 +109,8 @@ public sealed class StrainService : IDisposable
                 double c = v.Value - 273.15; // Kelvin
                 if (c > best && c < 125) best = c;
             }
-            return best > 15 ? Math.Round(best) : null;
+            // under 28 °C a "CPU temperature" is ACPI's placeholder (27.8 °C) or a zone far from the CPU, not a reading
+            return best >= 28.5 ? Math.Round(best) : null;
         }
         finally { Marshal.FreeHGlobal(buf); }
     }

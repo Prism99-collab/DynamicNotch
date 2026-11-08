@@ -296,6 +296,7 @@ public partial class NotchWindow
         var brush = ArtBrush(_media.Art);
         FlipArt(CompactArt, _media.Art, () => CompactArt.Background = brush ?? (Brush)new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2E)));
         RefreshDisc(); // the cyberpunk records, big and small
+        UpdateRain(); // the idle rain stops when music starts, and comes back when it stops
         PaintBars();
         // the cyber skin answers the music too: a new song or play / pause
         string key = $"{_media.Title}|{_media.IsPlaying}";

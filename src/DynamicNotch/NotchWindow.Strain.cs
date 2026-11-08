@@ -19,7 +19,7 @@ public partial class NotchWindow
     static readonly StrainTarget[] StrainTargets =
     {
         new("cpu", "CPU", s => s.StrainCpuLine, "%", r => r.Cpu, s => s.StrainCpu),
-        new("gpu", "GPU", s => s.StrainGpuLine, "%", r => r.Gpu, s => s.StrainGpu),
+        new("gpu", "GPU", s => s.StrainGpuLine, "%", r => r.GpuKnown ? r.Gpu : null, s => s.StrainGpu),
         new("ram", "Memory", s => s.StrainRamLine, "%", r => r.Ram, s => s.StrainRam),
         new("gputemp", "GPU temperature", s => s.StrainGpuTempLine, "°C", r => r.GpuTemp, s => s.StrainGpuTemp),
         new("cputemp", "CPU temperature", s => s.StrainCpuTempLine, "°C", r => r.CpuTemp, s => s.StrainCpuTemp),
@@ -63,6 +63,7 @@ public partial class NotchWindow
             var service = _strain;
             var r = await Task.Run(service.Sample);
             if (!_settings.StrainWarnings) return;
+            RememberStrain(r); // the last minute, for the log (NotchWindow.StrainLog)
             foreach (var t in StrainTargets)
             {
                 if (!t.On(_settings) || t.Read(r) is not { } value) { _strainOver.Remove(t.Key); continue; }
@@ -83,6 +84,7 @@ public partial class NotchWindow
     void StrainWarn(StrainTarget t, double value, int seconds)
     {
         AppLog.Write($"strain warning: {t.Key} {value:0}{t.Unit} for {seconds}s");
+        _ = LogStrainAsync(t, value, seconds); // what led to it, kept in the log on the Tools page
         string reading = $"{Loc.T(t.Name)} {value:0}{t.Unit} · {string.Format(Loc.T("{0} s"), seconds)}";
         void TaskManager() { try { Process.Start(new ProcessStartInfo("taskmgr.exe") { UseShellExecute = true }); } catch { } }
         if (_cyber)
