@@ -712,6 +712,7 @@ public partial class NotchWindow
         Add("Lock the notch", () => _settings.Locked, v => { _settings.Locked = !v; SetLocked(v); });
         Add("Always keep running", () => _settings.KeepRunning, v => { _settings.KeepRunning = v; KeepAlive.Sync(_settings); });
         Add("Start with Windows", () => _settings.StartWithWindows, v => { _settings.StartWithWindows = v; KeepAlive.Sync(_settings); });
+        Add("Companion", () => _settings.Companion, v => _settings.Companion = v);
         BuildSettingsTabs(); // Smart is the third tab (its switches are built with the Smart page code)
 
         void Add(string label, Func<bool> get, Action<bool> set)

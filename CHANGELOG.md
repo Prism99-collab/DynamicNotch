@@ -3,6 +3,29 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.8.0] — 2026-11-09
+
+### Added
+- A companion: a small 3D netrunner on a neon swing that hangs from the notch. She is built in code and lit by neon
+  lights, and moves on every frame of your screen (60, 120, 144 Hz...).
+  - Mostly she sits still and blinks; now and then she looks around, swings her legs, and sometimes waves.
+  - She turns her head toward your pointer. While you use the mouse she follows it and points at it.
+  - While you type she opens a glass holo-deck on her lap and taps along. Only the fact that keys are pressed is
+    noticed, never which ones.
+  - She nods along to music, dozes off after 3 minutes away and wakes when you're back, cheers when the charger is
+    plugged in, and glitches red after a strain warning.
+  - Every couple of minutes she moves to another spot along the notch, away from your pointer, the swing trailing
+    behind her. When the notch changes size she follows its edge.
+  - Her swing's ropes and seat are one neon line whose colour keeps flowing (her colour, pink, violet, yellow).
+  - She comes in her own ways: dropping down, peeking out first, or flickering in like a hologram.
+- She never gets in the way: clicks go through her, and she never takes the focus. She steps away the moment the
+  pointer comes near the notch or the notch opens or shows a pop-up, and is back about a second later. Over a
+  window (a browser's tabs) she tucks up behind the notch, only her boots showing. She hides in full screen, in
+  games, in meeting mode and while a call rings.
+- She lives in her own small window, so moving her only redraws her own pixels. Sitting still she costs nothing; on
+  battery saving she moves at 30 frames, doesn't follow the pointer and keeps one colour.
+- Switches: Companion (Preferences → Appearance, and the notch's own settings), and Companion during calls.
+
 ## [1.7.7] — 2026-11-08
 
 ### Fixed

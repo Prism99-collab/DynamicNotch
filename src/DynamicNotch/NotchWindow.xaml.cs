@@ -139,6 +139,7 @@ public partial class NotchWindow : Window
         Safe(nameof(ApplyFpsScale), ApplyFpsScale);
         Safe(nameof(WireDesktopIcons), WireDesktopIcons);
         Safe(nameof(WireStrainLog), WireStrainLog);
+        Safe(nameof(WireCompanion), WireCompanion);
         Safe(nameof(ApplyCustomColors), ApplyCustomColors); // your colours from the Colors page
         Safe(nameof(WireColors), WireColors);
         Safe(nameof(WireDevices), WireDevices);
@@ -464,6 +465,7 @@ public partial class NotchWindow : Window
         if (modeChanged && m != Mode.Expanded) Untarget();
         UpdateRain(); // Cyberpunk: rain behind the open cards, or in the idle notch
         UpdateAmbient(); // the other themes: their living background while it's open
+        if (modeChanged) PalMode(); // the companion gets out of the way
     }
 
     // ───────────────────────────── spring-driven shape ─────────────────────────────
@@ -705,6 +707,7 @@ public partial class NotchWindow : Window
         CheckKeyboardLayout();
 
         if (!GetCursorPos(out var p)) return;
+        PalPointer(p); // the companion is shy
         if (_look != null) LookGlint(p.X, p.Y); // the glass themes' light follows the pointer near the top
         bool button = IsButtonDown();
         UpdateDropArming(p);
@@ -805,6 +808,7 @@ public partial class NotchWindow : Window
         // which would hide the notch forever; a real full-screen window is caught by the size check above.)
         if (!fullscreen && SHQueryUserNotificationState(out int state) == 0 && state == 3) fullscreen = true;
 
+        _fgFullscreen = fullscreen; // the companion never shows over full screen, whatever the notch does
         CheckGame(fg, fullscreen);
         SetHidden(fullscreen && _settings.HideInFullscreen && !InGame); // in a game the stats pill stays
         if (over != _overWindow)
@@ -823,6 +827,7 @@ public partial class NotchWindow : Window
         UpdateSecond();
         UpdateRain();
         UpdateAmbient();
+        if (hidden) _pal?.HideNow();
         if (_mode == Mode.Expanded) return; // fades when it closes
         if (hidden && _mode == Mode.Osd) { _osdTimer.Stop(); SetMode(BaseMode); }
         if (!hidden) ShowOnScreen(true);
@@ -833,7 +838,7 @@ public partial class NotchWindow : Window
         Shell.BeginAnimation(OpacityProperty, fade);
     }
 
-    bool _offScreen;
+    bool _offScreen, _fgFullscreen;
 
     void ShowOnScreen(bool on)
     {

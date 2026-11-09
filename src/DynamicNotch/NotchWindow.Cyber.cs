@@ -95,6 +95,7 @@ public partial class NotchWindow
                     return;
                 }
                 if (open.StartsWith("prefs")) { PreferencesWindow.ShowFor(this, int.TryParse(open[5..], out int sec) ? sec : 0); return; }
+                if (open.StartsWith("pal")) { PalDevShow(open); return; }
                 if (open == "osd")
                 {
                     ShowOsd("message", "", null, "New message", "Night City · Discord", null, glyphBrush: Green, seconds: 6, force: true);

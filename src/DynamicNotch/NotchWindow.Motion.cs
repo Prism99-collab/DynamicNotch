@@ -329,6 +329,7 @@ public partial class NotchWindow
         _dodged = on;
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
         Root.BeginAnimation(OpacityProperty, new DoubleAnimation(on ? 0.06 : 1, TimeSpan.FromMilliseconds(on ? 140 : 240)) { EasingFunction = ease });
+        PalDodge(on); // the companion fades with it
     }
 
     // ───────────────────────────── split island ─────────────────────────────

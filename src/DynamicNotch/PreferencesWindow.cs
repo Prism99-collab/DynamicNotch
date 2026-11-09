@@ -315,6 +315,8 @@ public sealed class PreferencesWindow : Window
         new(Sec.General, "", "Always keep running", "Comes back after a crash, a sleep or a lock", () => _s.KeepRunning, v => { _s.KeepRunning = v; KeepAlive.Sync(_s); }),
         new(Sec.General, "", "Battery mode", "Fewer animations and checks when unplugged", () => _s.EcoOnBattery, v => _s.EcoOnBattery = v),
 
+        new(Sec.Appearance, "", "Companion", "A little netrunner drops by on her swing, and leaves when the pointer comes near", () => _s.Companion, v => _s.Companion = v),
+        new(Sec.Appearance, "", "Companion during calls", "She also drops by while you are on a call", () => _s.CompanionInCalls, v => _s.CompanionInCalls = v),
         new(Sec.Appearance, "", "Minimal when idle", "A thin bar when nothing is happening", () => _s.MinimalWhenIdle, v => _s.MinimalWhenIdle = v),
         new(Sec.Appearance, "", "Slim over windows", "Stays slim over browser tabs and windows", () => _s.SlimOverWindows, v => _s.SlimOverWindows = v),
         new(Sec.Appearance, "", "Music activity", "Artwork and a visualizer while music plays", () => _s.ShowMediaActivity, v => _s.ShowMediaActivity = v),

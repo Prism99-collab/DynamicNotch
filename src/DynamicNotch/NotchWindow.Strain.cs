@@ -85,6 +85,7 @@ public partial class NotchWindow
     {
         AppLog.Write($"strain warning: {t.Key} {value:0}{t.Unit} for {seconds}s");
         _ = LogStrainAsync(t, value, seconds); // what led to it, kept in the log on the Tools page
+        PalStrain();
         string reading = $"{Loc.T(t.Name)} {value:0}{t.Unit} · {string.Format(Loc.T("{0} s"), seconds)}";
         void TaskManager() { try { Process.Start(new ProcessStartInfo("taskmgr.exe") { UseShellExecute = true }); } catch { } }
         if (_cyber)

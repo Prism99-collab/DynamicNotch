@@ -76,6 +76,10 @@ public sealed class Settings
     public bool SmartBreaks { get; set; } = true;
     public int BreakMinutes { get; set; } = 90;
     public bool MeetingMode { get; set; }
+
+    /// <summary>The little netrunner who drops by on her swing.</summary>
+    public bool Companion { get; set; } = true;
+    public bool CompanionInCalls { get; set; } = true;
     public DateTime? LastDownloadsNag { get; set; }
 
     public static string Folder =>
