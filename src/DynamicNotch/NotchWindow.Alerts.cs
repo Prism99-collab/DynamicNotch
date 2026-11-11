@@ -226,7 +226,7 @@ public partial class NotchWindow
     {
         CyberSkinSoon();
         if (_secondShown != LiveActivity.None) FillSecond(_secondShown);
-        CyberQuickhack(null, default); // set again below for what has a progress (Cyberpunk)
+        CyberProgress(null, default); // set again below for what has a progress (Neon)
         if (CurrentActivity == LiveActivity.Call) { FillCallPill(); return; }
         ResetCallPill();
         switch (CurrentActivity)
@@ -237,7 +237,7 @@ public partial class NotchWindow
                 ActGlyph.Text = "";
                 ActGlyph.Foreground = ActText.Foreground = TimerBrush;
                 SetDigits(ActText, FormatTimer(left));
-                CyberQuickhack(_timerTotal.TotalSeconds > 0 ? left.TotalSeconds / _timerTotal.TotalSeconds : null, CyYellow);
+                CyberProgress(_timerTotal.TotalSeconds > 0 ? left.TotalSeconds / _timerTotal.TotalSeconds : null, CyYellow);
                 break;
             case LiveActivity.Focus:
                 ActGlyph.Text = "";
@@ -253,7 +253,7 @@ public partial class NotchWindow
                 ActText.Text = _files.BytesPerSecond > 1024
                     ? $"{count}{SystemMonitor.Bytes(_files.BytesPerSecond)}/s"
                     : $"{count}{SystemMonitor.Bytes(_files.ActiveBytes)}";
-                CyberQuickhack(_files.Items.FirstOrDefault()?.Progress, CyCyan);
+                CyberProgress(_files.Items.FirstOrDefault()?.Progress, CyCyan);
                 break;
         }
     }
@@ -344,7 +344,7 @@ public partial class NotchWindow
         Osd.Width = w;
         Osd.Height = h;
         _osdSize = new Size(w, h);
-        CyberHolo(r.Kind == "ring"); // Cyberpunk: a ringing call is a holocall
+        CyberHolo(r.Kind == "ring"); // Neon: a ringing call is a holocall
 
         // a different pop-up replacing this one: slide the new content in instead of a hard swap
         if (previous != null && !sameKind)

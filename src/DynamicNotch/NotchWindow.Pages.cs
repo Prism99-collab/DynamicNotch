@@ -281,7 +281,7 @@ public partial class NotchWindow
         RamRing.AnimateTo(s.Memory);
         RamText.Text = $"{s.Memory * 100:0}%";
         RamLabel.Text = $"{s.MemUsed / 1073741824.0:0.0} / {s.MemTotal / 1073741824.0:0} GB";
-        CyberRamCells(s.Memory); // Cyberpunk: the memory as RAM cells
+        CyberRamCells(s.Memory); // Neon: the memory as RAM cells
 
         DiskRing.AnimateTo(s.Disk);
         DiskText.Text = $"{s.Disk * 100:0}%";

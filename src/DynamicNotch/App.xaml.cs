@@ -133,7 +133,7 @@ public partial class App : Application
             ShowLock();
             // the tray icon (and the windows' icon) in the theme
             _window.CyberChanged += cyber => { if (_tray != null) _tray.Icon = CreateTrayIcon(cyber); };
-            if (_settings.Cyberpunk) _tray.Icon = CreateTrayIcon(true);
+            if (_settings.Neon) _tray.Icon = CreateTrayIcon(true);
         }
     }
 
@@ -166,7 +166,7 @@ public partial class App : Application
         return icon;
     }
 
-    /// <summary>The cyberpunk notch: a cut black plate with a yellow frame and a cyan trace.</summary>
+    /// <summary>The neon notch: a cut black plate with a yellow frame and a cyan trace.</summary>
     static Drawing.Icon DrawCyberTrayIcon()
     {
         const int s = 64;

@@ -11,13 +11,13 @@ using DynamicNotch.Controls;
 namespace DynamicNotch;
 
 /// <summary>
-/// The cyberpunk theme all the way through the content, not just the shell. Every element of the notch, the ones
+/// The neon theme all the way through the content, not just the shell. Every element of the notch, the ones
 /// in the XAML and the ones built later (list rows, chips, notification art, device rings, switches), goes
 /// through one pass while the theme is on:
 ///  • controls wear the cut-corner styles of Cyber.xaml (tiles, switches, buttons, rows, chips, scrollbars);
 ///  • rounded cards, artwork, chips, menus, the tip and the side islands get 45° cuts (top-left and bottom-right,
 ///    or both bottom corners for what hangs from the top edge); small round things go square; ears go angular;
-///  • colours move into the 2077 palette: blue → cyan, green → teal, orange / gold → yellow, red → neon red,
+///  • colours move into the neon palette: blue → cyan, green → teal, orange / gold → yellow, red → neon red,
 ///    purple / pink → neon magenta, the greys → night blue;
 ///  • round line caps go flat, sliders go square with a diamond knob, ring gauges become segmented HUD dials.
 /// Each change remembers what it replaced, and is undone exactly when the theme is switched off (unless the app
@@ -27,7 +27,7 @@ public partial class NotchWindow
 {
     static bool _skinOn;
     // what the pass does, set by the theme: its colour map, its control styles ("Cy…" / "Gl…"), and whether it
-    // cuts corners (Cyberpunk: cuts, square bars, flat caps, angular ears; the glass themes keep things round)
+    // cuts corners (Neon: cuts, square bars, flat caps, angular ears; the glass themes keep things round)
     static Func<Color, Color> _skinMap = CyMap;
     static string _skinPrefix = "Cy";
     static bool _skinCuts = true;
@@ -53,7 +53,7 @@ public partial class NotchWindow
         [0xBF5AF2] = CyMagenta, [0xFF375F] = CyMagenta, [0xAF52DE] = CyMagenta,
     };
 
-    /// <summary>A colour of the original look, in the 2077 palette (alpha kept). Anything else is left alone.</summary>
+    /// <summary>A colour of the original look, in the neon palette (alpha kept). Anything else is left alone.</summary>
     static Color CyMap(Color c)
     {
         if (CyPalette.TryGetValue(c.R << 16 | c.G << 8 | c.B, out var m)) return Color.FromArgb(c.A, m.R, m.G, m.B);

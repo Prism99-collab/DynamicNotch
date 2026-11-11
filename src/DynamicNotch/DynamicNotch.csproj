@@ -20,7 +20,7 @@
     <Version>1.8.0</Version>
     <Product>Dynamic Notch</Product>
     <AssemblyTitle>Dynamic Notch</AssemblyTitle>
-    <Description>A smooth Dynamic-Island-style notch and control center for Windows.</Description>
+    <Description>A smooth animated notch and control center for Windows.</Description>
     <Company>Prism99-collab</Company>
     <Copyright>Copyright (c) 2026 Prism99-collab</Copyright>
 
@@ -59,7 +59,7 @@
   <ItemGroup>
     <None Remove="Assets\notification.wav" />
     <EmbeddedResource Include="Assets\notification.wav" LogicalName="DynamicNotch.Assets.notification.wav" />
-    <!-- the Cyberpunk theme's default page backgrounds (a picture in the user's Backgrounds folder wins) -->
+    <!-- the Neon theme's default page backgrounds (a picture in the user's Backgrounds folder wins) -->
     <EmbeddedResource Include="Assets\Backgrounds\page*.*" LogicalName="DynamicNotch.Backgrounds.%(Filename)%(Extension)" />
   </ItemGroup>
 

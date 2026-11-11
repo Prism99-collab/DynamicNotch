@@ -11,7 +11,7 @@ using DynamicNotch.Services;
 namespace DynamicNotch;
 
 /// <summary>
-/// The strain log (Cyberpunk: the Cyberpsychosis log), on the Tools page. Every strain warning is kept with what led
+/// The strain log (Neon: the Overload log), on the Tools page. Every strain warning is kept with what led
 /// to it (Services/StrainLog): the readings then and over the minute before, the apps doing the most CPU, GPU and
 /// memory work, the power state and the app in front, and the likely causes in plain words. A small button in the
 /// focus card's corner opens it (a red dot while there's something new); a warning opens to its full story, and the
@@ -71,7 +71,7 @@ public partial class NotchWindow
         catch { return null; }
     }
 
-    string LogName => Loc.T(_cyber ? "Cyberpsychosis log" : "Strain log");
+    string LogName => Loc.T(_cyber ? "Overload log" : "Strain log");
 
     // ───────────── the button and the panel ─────────────
 
@@ -168,7 +168,7 @@ public partial class NotchWindow
     {
         BuildLogPanel();
         if (_logPanel == null) return;
-        // the theme's own plate: the Cyberpunk night with a red rim, the glass themes their dark glass
+        // the theme's own plate: the Neon night with a red rim, the glass themes their dark glass
         _logPanel.Background = Frozen(_cyber ? Color.FromArgb(0xF7, 0x03, 0x08, 0x0C) : Color.FromArgb(0xF7, 0x12, 0x13, 0x17));
         _logPanel.BorderBrush = Frozen(_cyber ? Color.FromArgb(0x90, 0xFF, 0x2A, 0x4F) : Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF));
         _logPanel.CornerRadius = new CornerRadius(_cyber ? 0 : 18);
@@ -216,7 +216,7 @@ public partial class NotchWindow
             _logBody.Children.Add(new TextBlock
             {
                 Text = Loc.T(_cyber
-                    ? "No cyberpsychosis episodes yet. When one hits, everything that led to it is kept here: the readings, the minute before, the apps behind it."
+                    ? "No overload episodes yet. When one hits, everything that led to it is kept here: the readings, the minute before, the apps behind it."
                     : "Nothing yet. When a strain warning comes, everything that led to it is kept here: the readings, the minute before, the apps behind it."),
                 TextWrapping = TextWrapping.Wrap, FontSize = 11.5, Foreground = DimBrush, Margin = new Thickness(6, 8, 6, 0),
             });

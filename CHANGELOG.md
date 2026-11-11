@@ -3,10 +3,26 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Everything in the app is now its own: the theme that was named after a game is now **Neon**, its strain warning
+  is **Overload risk** and its log the **Overload log**; locking says LOCKDOWN ENGAGED and unlocking ACCESS GRANTED.
+  The tinted-glass theme is now **Prism**. Studio palettes: Synth, Neon Night, Terminal. Your theme and settings
+  carry over by themselves.
+- The Neon theme's built-in page backgrounds are new original artwork drawn by code (a skyline, a horizon grid,
+  circuits, rain, hexagons). The pictures shipped before are gone. Your own pictures in the Backgrounds folder still
+  take their place.
+- A new notification chime, synthesised for Dynamic Notch.
+
+### Added
+- A privacy policy ([PRIVACY.md](PRIVACY.md)), the name and trademark terms ([TRADEMARKS.md](TRADEMARKS.md)) and
+  the open-source notices ([THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)), also installed next to the app.
+
 ## [1.8.0] — 2026-11-09
 
 ### Added
-- A companion: a small 3D netrunner on a neon swing that hangs from the notch. She is built in code and lit by neon
+- A companion: a small 3D hacker on a neon swing that hangs from the notch. She is built in code and lit by neon
   lights, and moves on every frame of your screen (60, 120, 144 Hz...).
   - Mostly she sits still and blinks; now and then she looks around, swings her legs, and sometimes waves.
   - She turns her head toward your pointer. While you use the mouse she follows it and points at it.
@@ -34,22 +50,22 @@ and versions follow [Semantic Versioning](https://semver.org/).
   file can't be read, and the damaged file is set aside instead of being saved over.
 - Game mode no longer flickers off and on while you play: something else has to stay in front for 2 seconds (not an
   overlay, a launcher pop-up or a notification taking the focus for a moment) before the notch leaves game mode.
-- Liquid glass: the drifting aurora lights are kept whole inside the background, so they never show as a
+- Prism: the drifting aurora lights are kept whole inside the background, so they never show as a
   hard-edged lighter box.
 
 ## [1.7.6] — 2026-11-08
 
 ### Added
-- Cyberpsychosis log (Strain log in the other themes), on the Tools page: every strain warning is kept with what led to
+- Overload log (Strain log in the other themes), on the Tools page: every strain warning is kept with what led to
   it: the readings then and over the minute before, the apps using the most CPU, GPU and memory, the power state, the
   app in front, the PC itself, and the likely causes in plain words. Opens to each episode's story, as a full text
   report, or clears. A red dot on its button while there's something new.
-- Cyberpunk: the notch boots up as it opens (a hex readout settling into "LINK // OK", panels flickering on), a
+- Neon: the notch boots up as it opens (a hex readout settling into "LINK // OK", panels flickering on), a
   scanner's corner brackets lock onto whatever the pointer is on with a small label ("// VOL 62"), and data rain falls
   behind the cards (faster and redder under load, brighter with the music, still for a moment on a notification) and,
   in short bursts, in the idle notch while nothing plays.
 - Living backgrounds for the other themes, on every page while the notch is open: Abyss has stars twinkling in waves,
-  plankton rising and stars flaring; Liquid glass has rising glass bubbles, a drifting aurora and soft glints; Crystal
+  plankton rising and stars flaring; Prism has rising glass bubbles, a drifting aurora and soft glints; Crystal
   has frost glitter, a light sweep across the glass and prism glints; Original has a few faint motes of light.
   All of them are drawn once and only slid or faded by the graphics chip: smooth, and nearly free.
 
@@ -78,7 +94,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - Home's header is tidier: the desktop, theme and lock buttons sit small on one plate (cut, cyan-rimmed and twitchy
-  in Cyberpunk), the live chips fit the space between the two sides and never slide under the buttons, and the left
+  in Neon), the live chips fit the space between the two sides and never slide under the buttons, and the left
   side is just the clock and slim battery rings (the date in the clock's hint, a ring's number only when it's low).
 - Song pop-ups get out of the way: none when the song changes in the window you're using (a browser tab, Spotify),
   shorter over windows, and passing the pointer over one no longer holds it or makes it grow.
@@ -95,14 +111,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Click the cover or the title on Home to bring the player itself to the front: the app, or the exact tab.
 
 ### Changed
-- The cyberpunk album records spin at 60 frames a second plugged in (30 on battery), as a cached picture the
+- The neon album records spin at 60 frames a second plugged in (30 on battery), as a cached picture the
   graphics chip turns, so they stay light.
 - The progress bar glides instead of moving in one-second steps, at only as many frames as it needs.
 - Next and previous are greyed out when the player can't do them; the bar can't be dragged on a player that can't
   seek. A player without a title shows its name instead of "Nothing playing".
 
 ### Fixed
-- The cyberpunk records spin on every PC: on battery, with battery saver or on a basic graphics chip they stood
+- The neon records spin on every PC: on battery, with battery saver or on a basic graphics chip they stood
   still; and when a browser reports a paused tab while another tab plays, they now follow the real sound.
 - Pausing no longer throws the notch to another player: the paused one stays in front with its play button. Something
   you start takes the front at once; something already playing alongside only after 45 s of pause.
@@ -112,12 +128,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [1.7.3] — 2026-11-01
 
 ### Added
-- Cyberpunk theme: album covers are spinning records. On Home's music card the cover turns slowly while the music
+- Neon theme: album covers are spinning records. On Home's music card the cover turns slowly while the music
   plays, in a soft glow of the album's own colour, inside a cyan HUD ring that turns the other way; the closed
   notch's little cover is the same record in small, turning with it. They stop where they are on pause, and rest
   when off screen (a full-screen video, a game) or in power-saving mode. Works for every player: Spotify, browser
   tabs, film apps; a player without a cover shows a blank record.
-- Cyberpunk theme: the sound-device list has its own backdrop, a solid chamfered plate in your panel colour with
+- Neon theme: the sound-device list has its own backdrop, a solid chamfered plate in your panel colour with
   a cyan rim.
 
 ### Fixed
@@ -153,7 +169,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - FPS pill extras (Preferences → Behaviour, all off by default): CPU and GPU usage in %, CPU and GPU temperature
   in °C, beside the frame rate in small, quiet type; they change once a second at fixed widths, and CPU and GPU each
   get the colour you choose. A temperature the PC doesn't report simply isn't shown.
-- Cyberpsychosis / strain warnings: set each target's line yourself (5 % / 5 °C steps) in Preferences → Alerts.
+- Overload / strain warnings: set each target's line yourself (5 % / 5 °C steps) in Preferences → Alerts.
 - Drag from any web page onto the shelf: an image, a download link, a picture embedded in the page or a link
   straight to a file is fetched as the real file (a plain page link stays a link).
 - Clipboard history keeps your last 30 texts; recent files show 15; both scroll.
@@ -171,41 +187,41 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [1.6.0] — 2026-11-01
 
 ### Added
-- Holocall: in Cyberpunk an incoming call rings as a holocall: the caller's picture in a HUD frame, INCOMING CALL
+- Holocall: in Neon an incoming call rings as a holocall: the caller's picture in a HUD frame, INCOMING CALL
   decoding in, a live signal line; answered, LINK ESTABLISHED.
 - Ringing is caught more reliably: besides call notifications (any app, browsers included) and a call app
   flashing, a call app ringing out loud in the background (Discord, Teams, WhatsApp, Zoom…) is heard too.
-- Strain warnings (Cyberpunk: "Cyberpsychosis risk"): a warning when CPU, GPU, memory, GPU or CPU temperature stays
+- Strain warnings (Neon: "Overload risk"): a warning when CPU, GPU, memory, GPU or CPU temperature stays
   over its line for 20 s, never in games; choose what's watched in Preferences → Alerts. A click opens Task Manager.
-- Cyberpunk: the notch switches off like a CRT when it closes (a bright line, then a dot); changed digits decode in
-  (clock, timer, call length, battery); downloads and the timer show the game's segmented quickhack bar; locking is
-  BLACK ICE ENGAGED, unlocking BREACH SUCCESSFUL; the battery is a segmented health bar; RAM cells under the
+- Neon: the notch switches off like a CRT when it closes (a bright line, then a dot); changed digits decode in
+  (clock, timer, call length, battery); downloads and the timer show a segmented progress bar; locking is
+  LOCKDOWN ENGAGED, unlocking ACCESS GRANTED; the battery is a segmented health bar; RAM cells under the
   memory gauge.
-- Cyberpunk ships with default page backgrounds (your own pictures in the Backgrounds folder still win).
+- Neon ships with default page backgrounds (your own pictures in the Backgrounds folder still win).
 
 ### Changed
 - Side pills are slimmer and adapt to what they show (a small bead for an icon or a cover, a touch taller with
-  text), always clearly smaller than the notch; Cyberpunk cuts are in proportion.
+  text), always clearly smaller than the notch; Neon cuts are in proportion.
 - Hover hints: every hint in the notch is the notch's own (in front, in the theme's style), shorter, and fades by
   itself after a few seconds. Windows' white tooltips no longer appear behind the notch.
 
 ## [1.5.0] — 2026-11-01
 
 ### Added
-- Three new themes beside Original and Cyberpunk, with their own glass controls, colours and motion:
-  - Liquid glass: tinted glass with a slow teal and violet aurora inside, a rim that catches light, a caustic
+- Three new themes beside Original and Neon, with their own glass controls, colours and motion:
+  - Prism: tinted glass with a slow teal and violet aurora inside, a rim that catches light, a caustic
     along the bottom edge and a glint that follows the pointer near the top of the screen; a small liquid wobble
     when it changes shape; its glow adapts to the app you're on.
   - Crystal: clear, frosted glass with a prism rim that splits light into a thin rainbow.
   - Abyss: the deep sea, a bioluminescent glow from below and glowing particles that drift up now and then.
   The theme button in the notch moves to the next theme; Settings and Preferences (five preview cards) pick one
   directly. Everything on the Colors page applies on top of every theme.
-- Cyberpunk: your own faded pictures behind each page of the control center, read from
+- Neon: your own faded pictures behind each page of the control center, read from
   `%APPDATA%\DynamicNotch\Backgrounds` (`page1.*` … `page6.*`); they cover the whole panel and cross-fade between
   pages. Nothing is bundled with the app.
-- Cyberpunk pop-ups arrive like the game's HUD: a scan wipes them in, the icon flickers on like a hologram, the
+- Neon pop-ups arrive like a HUD: a scan wipes them in, the icon flickers on like a hologram, the
   title and the line under it decode behind a block cursor.
-- Cyberpunk reacts to what happens on the PC: a tiny glitch when an app comes to the front, a song changes or
+- Neon reacts to what happens on the PC: a tiny glitch when an app comes to the front, a song changes or
   pauses, a new activity starts, a device's battery changes, a side pill appears, or a button is pressed (at most
   one every 0.7 s; never in games or on battery mode). Glitches tear the content sideways for a few frames.
 - A new app icon: the cyber notch, drawn in HD at every Windows size.
@@ -218,8 +234,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 ## [1.4.0] — 2026-10-31
 
 ### Added
-- Cyberpunk theme (the yellow button beside the lock, Settings or Preferences): cut 45° shape with a yellow frame,
-  cyan traces, hazard stripes and a page tag; the 2077 palette and Bahnschrift everywhere; cut-corner tiles,
+- Neon theme (the yellow button beside the lock, Settings or Preferences): cut 45° shape with a yellow frame,
+  cyan traces, hazard stripes and a page tag; the neon palette and Bahnschrift everywhere; cut-corner tiles,
   switches, chips, rows, sliders and segmented gauges; glitch bursts, a scan line on opening, decoding titles and a
   data pulse along the frame. Side pills get their own cut frames. In games the FPS tag is just the number.
   Switching it off restores the original look exactly; the tray icon follows the theme.
@@ -359,7 +375,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 First public release.
 
 ### Notch
-- Dynamic-Island-style notch with spring-physics motion, crisp at any display scaling.
+- animated notch with spring-physics motion, crisp at any display scaling.
 - Minimal by default, click-through, slims over maximized windows, hides in full screen.
 - Live activities: music (cover-tinted visualizer), timer, downloads, Focus; a second activity splits into its own island.
 - Expressive motion: pulse for new things, shake for problems.

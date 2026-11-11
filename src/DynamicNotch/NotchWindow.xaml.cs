@@ -463,7 +463,7 @@ public partial class NotchWindow : Window
         if (!IsBase(m)) SetDodged(false); // pop-ups and the open notch never hide from the cursor
         if (modeChanged) { CyberMoment(from, m); LookMoment(from, m); }
         if (modeChanged && m != Mode.Expanded) Untarget();
-        UpdateRain(); // Cyberpunk: rain behind the open cards, or in the idle notch
+        UpdateRain(); // Neon: rain behind the open cards, or in the idle notch
         UpdateAmbient(); // the other themes: their living background while it's open
         if (modeChanged) PalMode(); // the companion gets out of the way
     }

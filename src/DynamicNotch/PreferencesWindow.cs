@@ -80,7 +80,7 @@ public sealed class PreferencesWindow : Window
     Brush CardBrush => Frozen(_mica ? Color.FromArgb(0x66, 0x1E, 0x1E, 0x24) : Color.FromRgb(0x1B, 0x1B, 0x20));
     Color AccentColor => Hex(_s.ColorAccent) ?? _s.Theme switch
     {
-        "cyberpunk" => Color.FromRgb(0xFE, 0xE8, 0x01), "liquid" => Color.FromRgb(0x7F, 0xE7, 0xD9),
+        "neon" => Color.FromRgb(0xFE, 0xE8, 0x01), "liquid" => Color.FromRgb(0x7F, 0xE7, 0xD9),
         "crystal" => Color.FromRgb(0xC8, 0xD6, 0xF0), "abyss" => Color.FromRgb(0x2E, 0xE6, 0xD6), _ => Color.FromRgb(0x0A, 0x84, 0xFF),
     };
     Brush Accent => Frozen(AccentColor);
@@ -196,7 +196,7 @@ public sealed class PreferencesWindow : Window
     FrameworkElement Brand()
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(20, 24, 16, 14) };
-        panel.Children.Add(MiniNotch(46, 14, _s.Cyberpunk));
+        panel.Children.Add(MiniNotch(46, 14, _s.Neon));
         var names = new StackPanel { Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         names.Children.Add(new TextBlock { Text = "Dynamic Notch", FontSize = 15, FontWeight = FontWeights.SemiBold, FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI") });
         names.Children.Add(new TextBlock { Text = Loc.T("Preferences") + " · " + Version, FontSize = 11, Foreground = Dim });
@@ -315,7 +315,7 @@ public sealed class PreferencesWindow : Window
         new(Sec.General, "", "Always keep running", "Comes back after a crash, a sleep or a lock", () => _s.KeepRunning, v => { _s.KeepRunning = v; KeepAlive.Sync(_s); }),
         new(Sec.General, "", "Battery mode", "Fewer animations and checks when unplugged", () => _s.EcoOnBattery, v => _s.EcoOnBattery = v),
 
-        new(Sec.Appearance, "", "Companion", "A little netrunner drops by on her swing, and leaves when the pointer comes near", () => _s.Companion, v => _s.Companion = v),
+        new(Sec.Appearance, "", "Companion", "A little hacker drops by on her swing, and leaves when the pointer comes near", () => _s.Companion, v => _s.Companion = v),
         new(Sec.Appearance, "", "Companion during calls", "She also drops by while you are on a call", () => _s.CompanionInCalls, v => _s.CompanionInCalls = v),
         new(Sec.Appearance, "", "Minimal when idle", "A thin bar when nothing is happening", () => _s.MinimalWhenIdle, v => _s.MinimalWhenIdle = v),
         new(Sec.Appearance, "", "Slim over windows", "Stays slim over browser tabs and windows", () => _s.SlimOverWindows, v => _s.SlimOverWindows = v),
@@ -479,10 +479,10 @@ public sealed class PreferencesWindow : Window
         Card(Rows().Where(r => r.Sec == Sec.Appearance));
     }
 
-    static readonly string[] ThemeKeys = { "original", "cyberpunk", "liquid", "crystal", "abyss" };
+    static readonly string[] ThemeKeys = { "original", "neon", "liquid", "crystal", "abyss" };
     static readonly Dictionary<string, string> ThemeTitles = new()
     {
-        ["original"] = "Original", ["cyberpunk"] = "Cyberpunk", ["liquid"] = "Liquid glass", ["crystal"] = "Crystal", ["abyss"] = "Abyss",
+        ["original"] = "Original", ["neon"] = "Neon", ["liquid"] = "Prism", ["crystal"] = "Crystal", ["abyss"] = "Abyss",
     };
 
     /// <summary>A theme, as a little picture of the notch in it.</summary>
@@ -515,7 +515,7 @@ public sealed class PreferencesWindow : Window
         }
         switch (key)
         {
-            case "cyberpunk":
+            case "neon":
                 stage.Background = new LinearGradientBrush(Color.FromRgb(0x00, 0x06, 0x0E), Color.FromRgb(0x06, 0x1E, 0x2A), 90);
                 stage.Children.Add(new Path
                 {
@@ -838,8 +838,8 @@ public sealed class PreferencesWindow : Window
         Label(Loc.T("Smart helpers"));
         Card(Rows().Where(r => r.Sec == Sec.Alerts && r.Group == "Smart"));
 
-        // strain warnings ("Cyberpsychosis risk" in Cyberpunk): the master switch and what it watches
-        Label(Loc.T(_s.Theme == "cyberpunk" ? "Cyberpsychosis watch" : "PC strain warnings"));
+        // strain warnings ("Overload risk" in Neon): the master switch and what it watches
+        Label(Loc.T(_s.Theme == "neon" ? "Overload watch" : "PC strain warnings"));
         var strain = new List<Row>
         {
             new(Sec.Alerts, "\uE7BA", "PC strain warnings", "A warning when something stays over its line for 20 s (never in games)",
@@ -957,7 +957,7 @@ public sealed class PreferencesWindow : Window
     void About()
     {
         var hero = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 22, 0, 22) };
-        var mark = MiniNotch(120, 30, _s.Cyberpunk);
+        var mark = MiniNotch(120, 30, _s.Neon);
         mark.HorizontalAlignment = HorizontalAlignment.Center;
         hero.Children.Add(mark);
         hero.Children.Add(new TextBlock { Text = "Dynamic Notch", FontSize = 24, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 0), FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI") });

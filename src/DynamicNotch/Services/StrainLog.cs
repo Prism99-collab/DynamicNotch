@@ -14,7 +14,7 @@ public sealed record StrainSample(DateTime At, double Cpu, double? Gpu, double R
 public sealed record ProcUse(string Name, int Count, double Cpu, double Gpu, long MemoryMb);
 
 /// <summary>
-/// One strain warning ("Cyberpsychosis risk") and everything around it: what crossed its line and for how long,
+/// One strain warning ("Overload risk") and everything around it: what crossed its line and for how long,
 /// every reading at that moment and for the minute before, the apps doing the most, the power state, the app in
 /// front, and the machine itself. <see cref="Causes"/> puts it in words.
 /// </summary>
@@ -199,7 +199,7 @@ public static class StrainLog
     public static string WriteReport()
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Dynamic Notch · strain log (Cyberpsychosis risk)");
+        sb.AppendLine("Dynamic Notch · strain log (Overload risk)");
         sb.AppendLine($"{Events.Count} warning(s), newest first · {DateTime.Now:yyyy-MM-dd HH:mm}");
         sb.AppendLine(new string('═', 64));
         foreach (var e in Events)

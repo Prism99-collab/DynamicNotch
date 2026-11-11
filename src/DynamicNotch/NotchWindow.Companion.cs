@@ -7,7 +7,7 @@ using static DynamicNotch.Interop.Native;
 namespace DynamicNotch;
 
 /// <summary>
-/// The companion: a small 3D netrunner on a neon swing that hangs from behind the notch (see <see cref="Companion"/>).
+/// The companion: a small 3D hacker on a neon swing that hangs from behind the notch (see <see cref="Companion"/>).
 /// She lives there: she is out whenever the notch is at rest, and only steps away
 ///  • while you use the notch (the pointer near it, the notch open, a pop-up showing): back the moment you're done;
 ///  • in full screen and in games;
@@ -69,7 +69,7 @@ public partial class NotchWindow
     /// <summary>Where her swing hangs: under the right part of the notch (DIPs: from its centre, and its bottom edge).</summary>
     (double X, double Y) PalSpot()
     {
-        double h = _sh.Target, bottom = h - (_cyber && h > 26 ? 3.5 : 0); // the Cyberpunk shape steps up on that side
+        double h = _sh.Target, bottom = h - (_cyber && h > 26 ? 3.5 : 0); // the Neon shape steps up on that side
         return (OnPixel(_sw.Target * _palSide), OnPixel(bottom - Companion.AnchorY));
     }
 

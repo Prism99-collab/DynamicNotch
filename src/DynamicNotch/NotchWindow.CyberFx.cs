@@ -8,12 +8,12 @@ using System.Windows.Threading;
 namespace DynamicNotch;
 
 /// <summary>
-/// Cyberpunk motion, part three:
+/// Neon motion, part three:
 ///  • CRT power-off: closing the notch switches it off like an old monitor: the picture squashes into a bright
 ///    line that rides the centre of the shrinking shape, the line pinches into a glowing dot, the dot fades.
 ///  • Decoding digits: when the clock, a timer, a call's length or the battery changes, only the digits that
 ///    changed scramble for a moment and lock in (140 ms). Anything else that writes the text meanwhile wins.
-///  • Quickhack bars: a download or a running timer in the activity pill shows the game's segmented upload bar
+///  • Progress bars: a download or a running timer in the activity pill shows a segmented upload bar
 ///    beside its number, the leading segment blinking as it advances.
 /// All of it runs only at the moment something happens and stops on its own; none of it in a game, on battery
 /// mode, or in another theme.
@@ -144,14 +144,14 @@ public partial class NotchWindow
         t.Start();
     }
 
-    // ───────────── quickhack bars ─────────────
+    // ───────────── progress bars ─────────────
 
     StackPanel? _qhBar;
     bool _qhBlink;
     const int QhCells = 10;
 
-    /// <summary>The activity pill's progress as the game's segmented upload bar (Cyberpunk); null hides it.</summary>
-    void CyberQuickhack(double? share, Color color)
+    /// <summary>The activity pill's progress as a segmented upload bar (Neon); null hides it.</summary>
+    void CyberProgress(double? share, Color color)
     {
         if (!_cyber || share is not { } p)
         {

@@ -6,7 +6,7 @@ using System.Windows.Threading;
 namespace DynamicNotch;
 
 /// <summary>
-/// The cyberpunk theme's album cover: the art on a round record that turns slowly while the music plays (one turn
+/// The neon theme's album cover: the art on a round record that turns slowly while the music plays (one turn
 /// every 14 s) and stops where it is when you pause, a soft glow behind it in the album's own colour, and a dashed
 /// HUD ring with a yellow tick turning the other way. The closed notch's little cover is the same record in small,
 /// turning with it. No blur effects (the glows are gradients), the records are cached pictures the graphics chip turns

@@ -2,8 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:c="clr-namespace:DynamicNotch.Controls">
     <!--
-        The cyberpunk skin's controls: the same parts and behaviour as the originals in App.xaml, cut at 45°
-        instead of rounded, in the 2077 palette. Swapped in by NotchWindow.CyberSkin while the theme is on.
+        The neon skin's controls: the same parts and behaviour as the originals in App.xaml, cut at 45°
+        instead of rounded, in the neon palette. Swapped in by NotchWindow.CyberSkin while the theme is on.
     -->
 
     <SolidColorBrush x:Key="CyYellow" Color="#FEE801" />

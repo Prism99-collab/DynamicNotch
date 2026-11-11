@@ -10,7 +10,7 @@ using DynamicNotch.Controls;
 namespace DynamicNotch;
 
 /// <summary>
-/// Cyberpunk's scanner: four corner brackets snap around whatever control the pointer is on in the open notch, with
+/// Neon's scanner: four corner brackets snap around whatever control the pointer is on in the open notch, with
 /// a tiny label under it ("// WI-FI · ON", "// VOL 62"), and glide to the next one. Built for speed: one layer on
 /// top that never takes the mouse, four tiny corners that only move (no layout, no redrawing of anything under
 /// them), and nothing at all unless the pointer moves onto another control.

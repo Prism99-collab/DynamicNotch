@@ -9,10 +9,10 @@ using System.Windows.Threading;
 namespace DynamicNotch;
 
 /// <summary>
-/// Cyberpunk theme (the yellow button beside the lock, or Settings): the notch becomes a piece of street-tech HUD.
+/// Neon theme (the yellow button beside the lock, or Settings): the notch becomes a piece of street-tech HUD.
 ///  • shape: hard 45° cuts instead of round corners, asymmetric, with a step in its bottom edge; the ears go angular;
 ///  • a yellow frame along its sides and bottom, cyan circuit traces, hazard stripes, a ruler, a part-number tag;
-///  • the palette of the 2077 title card: night #00060E, yellow #FEE801, olive #9A9F17, cyan #54C1E6, teal #39C4B6;
+///  • the palette of the neon title card: night #00060E, yellow #FEE801, olive #9A9F17, cyan #54C1E6, teal #39C4B6;
 ///    the condensed Bahnschrift that ships with Windows for all text, the clock in yellow;
 ///  • motion: a glitch burst on every change (signal slices, a cyan ghost of the frame, a jolt), a scan line
 ///    sweeping down when it opens, titles that decode letter by letter.
@@ -74,9 +74,9 @@ public partial class NotchWindow
             _cyberHandler = true;
             EventManager.RegisterClassHandler(typeof(TextBlock), LoadedEvent, new RoutedEventHandler((s, _) => { if (s is TextBlock tb) Retype(tb, _cyberFonts); }));
         }
-        // the theme from last time (older settings only knew Cyberpunk on / off)
-        if (_settings.Cyberpunk && _settings.Theme == "original") _settings.Theme = "cyberpunk";
-        if (ThemeKey == "cyberpunk") ApplyCyber(true, animate: false);
+        // the theme from last time (older settings only knew Neon on / off)
+        if (_settings.Neon && _settings.Theme == "original") _settings.Theme = "neon";
+        if (ThemeKey == "neon") ApplyCyber(true, animate: false);
         else if (LookFor(ThemeKey) is { } look) ApplyLook(look, animate: false);
         StyleCyberBtn();
         // development: open the control center on start (for screenshots), no input needed
@@ -98,11 +98,11 @@ public partial class NotchWindow
                 if (open.StartsWith("pal")) { PalDevShow(open); return; }
                 if (open == "osd")
                 {
-                    ShowOsd("message", "", null, "New message", "Night City · Discord", null, glyphBrush: Green, seconds: 6, force: true);
+                    ShowOsd("message", "", null, "New message", "Discord", null, glyphBrush: Green, seconds: 6, force: true);
                     return;
                 }
                 Expand(byHotkey: true);
-                if (open == "flip") After(1500, () => SetCyber(!_settings.Cyberpunk)); // the switch, live
+                if (open == "flip") After(1500, () => SetCyber(!_settings.Neon)); // the switch, live
                 if (open == "close") After(2000, Collapse); // the closing animation, live
                 if (open == "strainlog")
                     After(500, async () =>
@@ -175,11 +175,11 @@ public partial class NotchWindow
         RefreshDesktopBtn(); // round, or cut like its neighbours
         UpdateRain(); // the rain comes and goes with the theme
         if (!on) Untarget();
-        Controls.BatteryIcon.Health = on; // the battery as the game's segmented health bar
+        Controls.BatteryIcon.Health = on; // the battery as a segmented health bar
         Battery.Restyle();
         OsdBattery.Restyle();
         CyberRamCells(0);
-        CyberQuickhack(null, default); // the activity pill's bar comes back with its next update
+        CyberProgress(null, default); // the activity pill's bar comes back with its next update
         GameFps.Foreground = on ? Frozen(Color.FromArgb(0xE6, CyYellow.R, CyYellow.G, CyYellow.B)) : _gameFpsBefore;
         GameFpsUnit.Foreground = on ? Frozen(Color.FromArgb(0x8C, CyCyan.R, CyCyan.G, CyCyan.B)) : Frozen(Color.FromArgb(0x73, 0xFF, 0xFF, 0xFF));
 
@@ -279,7 +279,7 @@ public partial class NotchWindow
         _cyTicks.Data = ticks;
         _cyTag = new TextBlock
         {
-            Text = "DN-2077 // NOTCH.OS", FontFamily = CyFont, FontStretch = FontStretches.Condensed, FontSize = 7.5,
+            Text = "DN-99 // NOTCH.OS", FontFamily = CyFont, FontStretch = FontStretches.Condensed, FontSize = 7.5,
             Foreground = Frozen(Color.FromArgb(0xB0, CyYellow.R, CyYellow.G, CyYellow.B)),
         };
 
@@ -521,8 +521,8 @@ public partial class NotchWindow
     {
         // the theme button wears the theme it's on; a click moves to the next one
         string key = ThemeKey;
-        var sig = key switch { "cyberpunk" => CyYellow, "original" => Colors.White, _ => LookFor(key)?.Signature ?? Colors.White };
-        bool dark = key == "cyberpunk";
+        var sig = key switch { "neon" => CyYellow, "original" => Colors.White, _ => LookFor(key)?.Signature ?? Colors.White };
+        bool dark = key == "neon";
         CyberBtn.Background = dark ? Frozen(CyNight) : Frozen(sig);
         CyberBtn.BorderBrush = dark ? CyYellowBrush : Frozen(Color.FromArgb(0x80, 0xFF, 0xFF, 0xFF));
         CyberBtn.Foreground = dark ? CyYellowBrush : Frozen(CyNight);

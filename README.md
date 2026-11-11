@@ -4,7 +4,7 @@
 
 # Dynamic Notch
 
-**A smooth, Dynamic-Island-style notch and control center for Windows.**
+**A smooth, animated notch and control center for Windows.**
 Live activities, smart alerts, quick controls — and it stays out of your way.
 
 [![Latest release](https://img.shields.io/github/v/release/Prism99-collab/DynamicNotch?label=download&color=0A84FF)](https://github.com/Prism99-collab/DynamicNotch/releases/latest)
@@ -137,6 +137,18 @@ installer/                Inno Setup script
 scripts/                  build and dev-install scripts
 ```
 
-## License
+## Privacy
 
-[MIT](LICENSE) © 2026 Prism99-collab
+No account, no ads, no analytics, no telemetry: everything the notch reads stays on your PC.
+The details are in the [privacy policy](PRIVACY.md).
+
+## License, name and trademarks
+
+The code is under the [MIT license](LICENSE) © 2026 Prism99-collab.
+The **Dynamic Notch** name, its logo and its companion character are Prism99-collab's own and aren't covered by the
+MIT license: see [TRADEMARKS.md](TRADEMARKS.md). Open-source parts the app uses are listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+Windows, Edge, Chrome, Firefox, Spotify, Discord, Teams, Zoom, WhatsApp, Steam and the other apps mentioned here are
+trademarks of their owners, named only to say what Dynamic Notch works with. Dynamic Notch isn't affiliated with or
+endorsed by any of them.

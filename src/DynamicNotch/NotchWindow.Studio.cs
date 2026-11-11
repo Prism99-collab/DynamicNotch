@@ -36,11 +36,11 @@ public partial class NotchWindow
     static readonly Preset[] Presets =
     {
         new("Original · the notch decides", null, null, null, null),
-        new("Neon", "#FF2E88", "#7B2CFF", "#FF2E88", "#FF8BC4"),
-        new("Night City", "#FEE801", "#39C4B6", "#54C1E6", "#FEE801"),
+        new("Synth", "#FF2E88", "#7B2CFF", "#FF2E88", "#FF8BC4"),
+        new("Neon Night", "#FEE801", "#39C4B6", "#54C1E6", "#FEE801"),
         new("Ocean", "#3FA9F5", "#0B5ED7", "#64D2FF", "#BFE9FF"),
         new("Sunset", "#FF7A45", "#FF2D55", "#FFB86B", "#FFD6A5"),
-        new("Matrix", "#00FF66", "#00B140", "#00FF66", "#7DFFAE"),
+        new("Terminal", "#00FF66", "#00B140", "#00FF66", "#7DFFAE"),
         new("Sakura", "#FF8FB1", "#C77DFF", "#FFC2D1", "#FFE5EC"),
         new("Aurora", "#4ADE80", "#22D3EE", "#A78BFA", "#CFFAFE"),
     };

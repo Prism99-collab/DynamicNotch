@@ -5,10 +5,10 @@ using DynamicNotch.Controls;
 namespace DynamicNotch;
 
 /// <summary>
-/// Each theme's living background behind the open notch's cards, on every page (Cyberpunk has its data rain):
+/// Each theme's living background behind the open notch's cards, on every page (Neon has its data rain):
 ///  • Abyss: the deep sea at night: plankton drifting up in two depths, a sky of stars twinkling in waves, and now
 ///    and then one star flaring.
-///  • Liquid glass: glass bubbles rising and swaying, the aurora inside drifting and breathing, soft white glints.
+///  • Prism: glass bubbles rising and swaying, the aurora inside drifting and breathing, soft white glints.
 ///  • Crystal: frost glitter twinkling, a band of light sweeping across the glass every few seconds, rainbow glints.
 ///  • Original: barely there: a few motes of light floating up, so the classic look stays clean.
 /// Built from a few cached sheets the graphics chip slides and fades (Controls/Ambient): smooth, and nearly free.
@@ -41,7 +41,7 @@ public partial class NotchWindow
     {
         if (!_ambientWired) { _ambientWired = true; _power.Changed += UpdateAmbient; }
         string key = ThemeKey;
-        bool on = key != "cyberpunk" && _mode == Mode.Expanded && !Eco && !_offScreen && !_hidden && RainDev != "off"; // (=off: for measuring)
+        bool on = key != "neon" && _mode == Mode.Expanded && !Eco && !_offScreen && !_hidden && RainDev != "off"; // (=off: for measuring)
         foreach (var (k, a) in _ambients)
             if (k != key || !on) { a.Stop(); a.Visibility = Visibility.Collapsed; }
         if (!on || AmbientFor(key) is not { } mine) return;

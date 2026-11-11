@@ -10,13 +10,13 @@ using DynamicNotch.Services;
 namespace DynamicNotch;
 
 /// <summary>
-/// The themes beyond Original and Cyberpunk, all made of glass and light:
-///  • Liquid glass: tinted glass in the spirit of Apple's Liquid Glass: dark and clear at the top where it meets
+/// The themes beyond Original and Neon, all made of glass and light:
+///  • Prism: tinted glass: dark and clear at the top where it meets
 ///    the screen's edge, more see-through toward the bottom, a slow aurora (teal and violet) inside, a rim that
 ///    catches light, a soft caustic along its bottom edge, and a glint of light that follows your pointer across
 ///    it. It moves like a drop of liquid: a little jelly wobble when it changes shape. Its accent and glow adapt
 ///    to the app you're on.
-///  • Crystal: Apple's "clear" glass: more see-through still, silver light on top and a prism edge: the rim
+///  • Crystal: clear glass: more see-through still, silver light on top and a prism edge: the rim
 ///    splits light into a thin rainbow.
 ///  • Abyss: the deep sea: midnight blue, a bioluminescent glow rising from the bottom, and now and then a few
 ///    glowing particles drift up and fade, like plankton.
@@ -41,10 +41,10 @@ public partial class NotchWindow
         public Color Signature;                  // the theme button's colour
     }
 
-    static readonly string[] ThemeOrder = { "original", "cyberpunk", "liquid", "crystal", "abyss" };
+    static readonly string[] ThemeOrder = { "original", "neon", "liquid", "crystal", "abyss" };
     static readonly Dictionary<string, string> ThemeNames = new()
     {
-        ["original"] = "Original", ["cyberpunk"] = "Cyberpunk", ["liquid"] = "Liquid glass", ["crystal"] = "Crystal", ["abyss"] = "Abyss",
+        ["original"] = "Original", ["neon"] = "Neon", ["liquid"] = "Prism", ["crystal"] = "Crystal", ["abyss"] = "Abyss",
     };
 
     Look? _look;
@@ -82,7 +82,7 @@ public partial class NotchWindow
 
     static Look Liquid() => new()
     {
-        Key = "liquid", Name = "Liquid glass",
+        Key = "liquid", Name = "Prism",
         // dense enough that what's behind can't be read through it (Windows gives no blur to a window like this)
         // nearly solid: without a blur behind it, anything more see-through lets text show through. The glass is in
         // the light instead: the sheen, the rim, the caustic, the glint, the aurora
@@ -169,26 +169,26 @@ public partial class NotchWindow
         if (!ThemeOrder.Contains(key)) key = "original";
         if (key == ThemeKey) return;
         string old = ThemeKey;
-        if (old == "cyberpunk") ApplyCyber(false, animate: true);
+        if (old == "neon") ApplyCyber(false, animate: true);
         else if (_look != null) ApplyLook(null, animate: false);
         _settings.Theme = key;
-        _settings.Cyberpunk = key == "cyberpunk";
+        _settings.Neon = key == "neon";
         _settings.Save();
         AppLog.Write("theme: " + key);
-        if (key == "cyberpunk") ApplyCyber(true, animate: true);
+        if (key == "neon") ApplyCyber(true, animate: true);
         else if (LookFor(key) is { } look) ApplyLook(look, animate: true);
         ApplyCustomColors();
         StyleCyberBtn();
         SyncSettingsPage();
         RefreshThemeChip();
         UpdateAmbient(); // the new theme's living background (if it's open right now)
-        CyberChanged?.Invoke(key == "cyberpunk");
+        CyberChanged?.Invoke(key == "neon");
     }
 
     /// <summary>The theme button and the Settings chip: the next theme in the row.</summary>
     void NextTheme() => SetTheme(ThemeOrder[(Array.IndexOf(ThemeOrder, ThemeKey) + 1) % ThemeOrder.Length]);
 
-    public void SetCyber(bool on) => SetTheme(on ? "cyberpunk" : "original");
+    public void SetCyber(bool on) => SetTheme(on ? "neon" : "original");
 
     void ApplyLook(Look? look, bool animate)
     {

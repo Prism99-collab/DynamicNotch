@@ -2,7 +2,7 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:c="clr-namespace:DynamicNotch.Controls">
     <!--
-        The glass themes' controls (Liquid glass, Crystal, Abyss): the same parts and behaviour as App.xaml's, made
+        The glass themes' controls (Prism, Crystal, Abyss): the same parts and behaviour as App.xaml's, made
         of glass. A translucent body, a bright rim catching light at the top and fading down, a soft sheen on the
         upper half. Each theme fills in the colours (LookTile, LookEdge, LookSheen, LookLabel, LookSwitchOff,
         LookSwitchOn) on the notch window; nothing here animates on its own.

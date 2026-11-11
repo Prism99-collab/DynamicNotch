@@ -4,7 +4,7 @@ using System.Windows.Media.Animation;
 
 namespace DynamicNotch.Controls;
 
-/// <summary>Vector ring gauge (Apple-Watch style) whose value glides smoothly between samples.</summary>
+/// <summary>Vector ring gauge (activity-ring style) whose value glides smoothly between samples.</summary>
 public sealed class RingGauge : FrameworkElement
 {
     static readonly Pen TrackPen = MakePen(new SolidColorBrush(Color.FromArgb(0x2E, 0xFF, 0xFF, 0xFF)));
@@ -20,7 +20,7 @@ public sealed class RingGauge : FrameworkElement
 
     public const double Thickness = 6;
 
-    /// <summary>The cyberpunk skin: a segmented HUD dial instead of a smooth ring.</summary>
+    /// <summary>The neon skin: a segmented HUD dial instead of a smooth ring.</summary>
     public static bool Segmented;
 
     static Pen Dial(Brush b, double r)

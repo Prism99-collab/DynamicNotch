@@ -155,7 +155,7 @@
             </Setter>
         </Style>
 
-        <!-- iOS-style switch -->
+        <!-- toggle switch -->
         <Style x:Key="Switch" TargetType="ToggleButton">
             <Setter Property="Focusable" Value="False" />
             <Setter Property="Cursor" Value="Hand" />

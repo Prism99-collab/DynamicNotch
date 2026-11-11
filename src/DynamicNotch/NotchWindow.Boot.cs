@@ -7,7 +7,7 @@ using System.Windows.Threading;
 namespace DynamicNotch;
 
 /// <summary>
-/// Cyberpunk's boot-up as the notch opens (with the scan line that already sweeps down, and the CRT switch-off as it
+/// Neon's boot-up as the notch opens (with the scan line that already sweeps down, and the CRT switch-off as it
 /// closes): a row of hex flickers along the top edge and settles into "LINK // OK", and the panels click in one after
 /// another the way a screen powers up, in hard flickers and a sideways snap instead of a soft fade. ~0.4 s, only
 /// while opening.
@@ -60,7 +60,7 @@ public partial class NotchWindow
         }
         _bootTimer.Stop();
         _bootHex.Foreground = CyYellowBrush;
-        _bootHex.Text = $"LINK // OK · 0x{_cyRand.Next(0x1000, 0xFFFF):X4} · NC-2077";
+        _bootHex.Text = $"LINK // OK · 0x{_cyRand.Next(0x1000, 0xFFFF):X4} · DN-99";
         var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(500)) { BeginTime = TimeSpan.FromMilliseconds(450) };
         _bootHex.BeginAnimation(OpacityProperty, fade);
     }

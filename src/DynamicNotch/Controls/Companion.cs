@@ -9,7 +9,7 @@ using System.Windows.Media.Media3D;
 namespace DynamicNotch.Controls;
 
 /// <summary>
-/// The notch's companion: a small netrunner (our own character) on a neon swing that lowers from behind the notch.
+/// The notch's companion: a small hacker (our own character) on a neon swing that lowers from behind the notch.
 /// She is real 3D: a little rigged figure built from code (no picture files), lit by two neon lights, drawn by the
 /// graphics chip. One pose is worked out per frame (a few dozen numbers), and only while she is out: gone, she costs
 /// nothing at all. She never takes the mouse: everything under her keeps working.

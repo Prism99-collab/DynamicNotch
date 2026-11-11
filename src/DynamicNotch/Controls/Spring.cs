@@ -1,7 +1,7 @@
 namespace DynamicNotch.Controls;
 
 /// <summary>
-/// A real damped spring (like iOS / SwiftUI). Unlike a fixed-duration animation it keeps its velocity
+/// A real damped spring (like a physical spring). Unlike a fixed-duration animation it keeps its velocity
 /// when the target changes mid-flight, so interrupted motion stays fluid instead of stopping and restarting.
 /// </summary>
 public sealed class Spring

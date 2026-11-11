@@ -32,7 +32,7 @@
                           Visibility="Collapsed" Opacity="0">
                         <Border x:Name="CompactArt" Width="20" Height="20" CornerRadius="6" HorizontalAlignment="Left"
                                 VerticalAlignment="Center" Margin="13,0,0,1" Background="#2A2A2E" />
-                        <!-- the cyberpunk theme's: the same record in small, turning with the big one (NotchWindow.Disc) -->
+                        <!-- the neon theme's: the same record in small, turning with the big one (NotchWindow.Disc) -->
                         <Grid x:Name="MiniDisc" Width="20" Height="20" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="13,0,0,1"
                               Visibility="Collapsed" IsHitTestVisible="False">
                             <Ellipse x:Name="MiniGlow" Width="30" Height="30" Margin="-5" />
@@ -225,7 +225,7 @@
                                         </ControlTemplate>
                                     </Button.Template>
                                 </Button>
-                                <!-- cyberpunk theme: on / off -->
+                                <!-- neon theme: on / off -->
                                 <Button x:Name="CyberBtn" Width="18" Height="18" Margin="0,0,4,0" Cursor="Hand" Background="#FEE801" BorderBrush="#9A9F17" Foreground="#00060E">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
@@ -306,7 +306,7 @@
                                                     <TextBlock x:Name="ArtPlaceholder" Text="&#xE8D6;" FontFamily="{StaticResource IconFont}" FontSize="22"
                                                                Foreground="#55FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
-                                                <!-- the cyberpunk theme's cover: a spinning disc in a glow, a HUD ring turning the other way (NotchWindow.Disc) -->
+                                                <!-- the neon theme's cover: a spinning disc in a glow, a HUD ring turning the other way (NotchWindow.Disc) -->
                                                 <Grid x:Name="ArtDisc" Width="64" Height="64" Visibility="Collapsed" Background="Transparent">
                                                     <Ellipse x:Name="DiscGlow" Width="88" Height="88" Margin="-12" />
                                                     <Grid x:Name="DiscHud" Width="64" Height="64" RenderTransformOrigin="0.5,0.5">
@@ -434,7 +434,7 @@
                                                 </Grid.RowDefinitions>
                                                 <!-- a solid backdrop: nothing of the cards underneath can show through the list -->
                                                 <Border x:Name="DevicesBack" Grid.RowSpan="2" Margin="-8,-4,-8,-2" CornerRadius="14" Background="#F2111114" IsHitTestVisible="False" />
-                                                <!-- the cyberpunk theme's own: an opaque chamfered plate in the panel's body, a cyan rim, a yellow tick -->
+                                                <!-- the neon theme's own: an opaque chamfered plate in the panel's body, a cyan rim, a yellow tick -->
                                                 <Grid x:Name="DevicesBackCy" Grid.RowSpan="2" Margin="-8,-4,-8,-2" IsHitTestVisible="False" Visibility="Collapsed">
                                                     <Path x:Name="DevicesBackBase" Fill="#FF03080C" />
                                                     <Path x:Name="DevicesBackBody" />

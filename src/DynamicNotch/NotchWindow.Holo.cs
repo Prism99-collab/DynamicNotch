@@ -12,14 +12,14 @@ using Path = System.Windows.Shapes.Path;
 namespace DynamicNotch;
 
 /// <summary>
-/// Calls, the game's way, and a few small HUD touches.
+/// Calls as holograms, and a few small HUD touches.
 ///  • Ringing is caught three ways: a notification that says it's a call (any app, browsers included: WhatsApp Web,
 ///    Messenger, Meet, Discord in the browser…), a call app flashing in the taskbar while it rings, and now a call
 ///    app ringing out loud in the background (Discord, Teams, WhatsApp, Zoom…): a sound that keeps going for a few
 ///    seconds from an app that isn't in front and isn't on a call already. A message ping is far too short for that.
-///  • Cyberpunk: the ring is a holocall: the caller's picture in a HUD frame, INCOMING CALL decoding in, a live
+///  • Neon: the ring is a holocall: the caller's picture in a HUD frame, INCOMING CALL decoding in, a live
 ///    signal line beside it; answered, LINK ESTABLISHED.
-///  • Cyberpunk: locking is BLACK ICE ENGAGED, unlocking BREACH SUCCESSFUL; the battery is a segmented health bar;
+///  • Neon: locking is LOCKDOWN ENGAGED, unlocking ACCESS GRANTED; the battery is a segmented health bar;
 ///    the memory gauge carries a row of RAM cells.
 /// </summary>
 public partial class NotchWindow
@@ -82,7 +82,7 @@ public partial class NotchWindow
         catch { }
     }
 
-    // ───────────── the holocall (Cyberpunk) ─────────────
+    // ───────────── the holocall (Neon) ─────────────
 
     Path? _holoFrame;
     StackPanel? _holoSignal;
@@ -137,7 +137,7 @@ public partial class NotchWindow
         }
     }
 
-    // ───────────── RAM cells (Cyberpunk, System page) ─────────────
+    // ───────────── RAM cells (Neon, System page) ─────────────
 
     StackPanel? _ramCells;
 

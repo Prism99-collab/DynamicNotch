@@ -9,7 +9,7 @@ using DynamicNotch.Controls;
 namespace DynamicNotch;
 
 /// <summary>
-/// Cyberpunk's data rain (Controls/DataRain: three sliding sheets the graphics chip moves), in two places:
+/// Neon's data rain (Controls/DataRain: three sliding sheets the graphics chip moves), in two places:
 /// · behind the open notch's cards: falling faster and turning red as the PC works harder, brightening with the beat
 ///   of what's playing, holding still for a moment when a notification arrives;
 /// · in the closed notch while nothing plays: short bursts of rain inside the pill (a flicker of bits in the slim

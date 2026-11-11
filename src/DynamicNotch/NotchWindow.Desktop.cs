@@ -9,7 +9,7 @@ namespace DynamicNotch;
 /// A small button in Home's header: the desktop's icons, shown or hidden (an eye, or an eye struck through). It
 /// switches Windows' own setting, so it agrees with the desktop's right-click menu and stays after a restart. Lit
 /// in the accent while the icons are hidden, so you can tell at a glance why the desktop looks empty. Round in the
-/// light themes, cut like its neighbours in Cyberpunk.
+/// light themes, cut like its neighbours in Neon.
 /// </summary>
 public partial class NotchWindow
 {
@@ -22,14 +22,14 @@ public partial class NotchWindow
             PaintDesktopBtn(!(DesktopIcons.Shown ?? true));
             After(400, RefreshDesktopBtn);
         };
-        // Cyberpunk: the plate twitches when the pointer arrives and on every press (nothing runs in between)
+        // Neon: the plate twitches when the pointer arrives and on every press (nothing runs in between)
         QuickCluster.MouseEnter += (_, _) => ClusterGlitch(strong: false);
         foreach (var b in new[] { DesktopBtn, CyberBtn, LockBtn })
             b.PreviewMouseLeftButtonDown += (_, _) => ClusterGlitch(strong: true);
         RefreshDesktopBtn();
     }
 
-    /// <summary>The plate behind the three buttons: a cut, cyan-rimmed slab with a yellow tick in Cyberpunk, a soft capsule elsewhere.</summary>
+    /// <summary>The plate behind the three buttons: a cut, cyan-rimmed slab with a yellow tick in Neon, a soft capsule elsewhere.</summary>
     void StyleCluster()
     {
         ClusterRound.Visibility = _cyber ? Visibility.Collapsed : Visibility.Visible;

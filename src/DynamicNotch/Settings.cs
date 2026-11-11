@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace DynamicNotch;
 
@@ -26,11 +27,14 @@ public sealed class Settings
     public bool ShelfDrop { get; set; } = true;
     /// <summary>The notch shows things but reacts to nothing (unlocked from the tray icon).</summary>
     public bool Locked { get; set; }
-    /// <summary>The cyberpunk skin (the yellow button in the control center).</summary>
-    public bool Cyberpunk { get; set; }
-    /// <summary>"original", "cyberpunk", "liquid", "crystal" or "abyss".</summary>
+    /// <summary>The neon skin (the yellow button in the control center).</summary>
+    public bool Neon { get; set; }
+    /// <summary>The same switch under its name in settings saved before 1.8.1: read, never written again.</summary>
+    [JsonPropertyName("Cyberpunk"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool LegacyNeon { get => false; set { if (value) Neon = true; } }
+    /// <summary>"original", "neon", "liquid", "crystal" or "abyss".</summary>
     public string Theme { get; set; } = "original";
-    /// <summary>Strain warnings ("Cyberpsychosis risk" in Cyberpunk) and what they watch.</summary>
+    /// <summary>Strain warnings ("Overload risk" in Neon) and what they watch.</summary>
     public bool StrainWarnings { get; set; } = true;
     public bool StrainCpu { get; set; } = true;
     public bool StrainGpu { get; set; } = true;
@@ -77,7 +81,7 @@ public sealed class Settings
     public int BreakMinutes { get; set; } = 90;
     public bool MeetingMode { get; set; }
 
-    /// <summary>The little netrunner who drops by on her swing.</summary>
+    /// <summary>The little hacker who drops by on her swing.</summary>
     public bool Companion { get; set; } = true;
     public bool CompanionInCalls { get; set; } = true;
     public DateTime? LastDownloadsNag { get; set; }
@@ -94,15 +98,22 @@ public sealed class Settings
     // preferences: fall back to the last good copy, and keep the damaged file aside instead of saving over it.
     public static Settings Load()
     {
-        if (TryRead(FilePath) is { } main) return main;
+        if (TryRead(FilePath) is { } main) return Upgrade(main);
         bool damaged = File.Exists(FilePath);
         if (TryRead(BackupPath) is { } backup)
         {
             if (damaged) KeepAside();
-            return backup;
+            return Upgrade(backup);
         }
         if (damaged) KeepAside();
         return new Settings();
+    }
+
+    /// <summary>Settings saved by older versions, in today's words (the neon theme had another name before 1.8.1).</summary>
+    static Settings Upgrade(Settings s)
+    {
+        if (string.Equals(s.Theme, "cyber" + "punk", StringComparison.OrdinalIgnoreCase)) s.Theme = "neon";
+        return s;
     }
 
     static Settings? TryRead(string path)

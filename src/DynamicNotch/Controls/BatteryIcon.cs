@@ -6,7 +6,7 @@ using System.Windows.Shapes;
 namespace DynamicNotch.Controls;
 
 /// <summary>
-/// Vector battery glyph (crisp at any DPI), iOS style. In the cyberpunk skin (<see cref="Health"/>) it becomes
+/// Vector battery glyph (crisp at any DPI), rounded style. In the neon skin (<see cref="Health"/>) it becomes
 /// the game's health bar instead: six segments that light up with the charge, red, teal while charging.
 /// </summary>
 public sealed class BatteryIcon : Grid
@@ -21,7 +21,7 @@ public sealed class BatteryIcon : Grid
     static readonly Brush HealthTeal = Freeze(new SolidColorBrush(Color.FromRgb(0x39, 0xC4, 0xB6)));
     static readonly Brush HealthOff = Freeze(new SolidColorBrush(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF)));
 
-    /// <summary>The cyberpunk skin: a segmented health bar (call <see cref="Restyle"/> after changing it).</summary>
+    /// <summary>The neon skin: a segmented health bar (call <see cref="Restyle"/> after changing it).</summary>
     public static bool Health;
 
     readonly Border _fill, _case, _cap;

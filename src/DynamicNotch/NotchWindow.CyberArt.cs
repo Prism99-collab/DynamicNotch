@@ -8,15 +8,15 @@ using System.Windows.Media.Imaging;
 namespace DynamicNotch;
 
 /// <summary>
-/// Cyberpunk only: a faded picture behind each page of the control center. The app ships with a set for the first
+/// Neon only: a faded picture behind each page of the control center. The app ships with a set for the first
 /// five pages; yours win: the notch looks in %APPDATA%\DynamicNotch\Backgrounds for page1.*, page2.* … page6.*
 /// (png, jpg, bmp, webp) first. Replace or add a file and it shows the next time the theme comes on; a page with
 /// neither stays clean.
 /// They sit on their own strip behind the pages and slide with them (the same transform), drawn once and reused
 /// while they move. Each is decoded at the size it's shown (not the photo's full size), barely there (14 %),
 /// fading out toward the edges, with the theme's scanlines over it. Off in every other theme, and released when
-/// Cyberpunk is switched off.
-/// Also: the pop-ups arrive the way they do in the game: a scan wipes them in from the left, the icon flickers
+/// Neon is switched off.
+/// Also: the pop-ups arrive like a HUD's: a scan wipes them in from the left, the icon flickers
 /// on like a hologram, and the title and the line under it decode behind a blinking block cursor.
 /// </summary>
 public partial class NotchWindow

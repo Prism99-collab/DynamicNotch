@@ -6,11 +6,11 @@ using DynamicNotch.Services;
 namespace DynamicNotch;
 
 /// <summary>
-/// Strain warnings (Cyberpunk: "Cyberpsychosis risk"). Every 5 s, while it's on, the notch reads what you chose to
+/// Strain warnings (Neon: "Overload risk"). Every 5 s, while it's on, the notch reads what you chose to
 /// watch (CPU, GPU, memory, GPU and CPU temperature); when one stays over its line for 20 s straight, it warns you
 /// once, with the reading and how long it's lasted, and a click opens Task Manager. Then that target rests for six
 /// minutes. Never in a game or over a full-screen app, so it can't break your focus there.
-/// In Cyberpunk the warning comes the way chrome overload does in the game: a red glitch, the notch shaking.
+/// In Neon the warning comes the way chrome overload does in the game: a red glitch, the notch shaking.
 /// </summary>
 public partial class NotchWindow
 {
@@ -90,7 +90,7 @@ public partial class NotchWindow
         void TaskManager() { try { Process.Start(new ProcessStartInfo("taskmgr.exe") { UseShellExecute = true }); } catch { } }
         if (_cyber)
         {
-            ShowOsd("strain", "", null, Loc.T("CYBERPSYCHOSIS RISK"), reading, null,
+            ShowOsd("strain", "", null, Loc.T("SYSTEM OVERLOAD"), reading, null,
                 glyphBrush: Frozen(CyRed), seconds: 5, force: true, prio: Prio.High, motion: Motion.Shake, onClick: TaskManager);
             // chrome overload: the notch glitches red
             CyberGlitch(strong: true, tint: CyRed);

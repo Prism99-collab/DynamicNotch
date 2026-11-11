@@ -4,7 +4,7 @@ using System.Windows.Media.Animation;
 namespace DynamicNotch.Controls;
 
 /// <summary>
-/// Damped-spring easing (the "Dynamic Island" feel). Damping below 1 gives a small, natural overshoot.
+/// Damped-spring easing (a lively, springy feel). Damping below 1 gives a small, natural overshoot.
 /// </summary>
 public sealed class SpringEase : EasingFunctionBase
 {

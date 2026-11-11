@@ -7,7 +7,7 @@ using System.Windows.Threading;
 namespace DynamicNotch.Controls;
 
 /// <summary>
-/// The Cyberpunk theme's data rain, built to be smooth and nearly free. Three depth layers (far, middle, near: slower,
+/// The Neon theme's data rain, built to be smooth and nearly free. Three depth layers (far, middle, near: slower,
 /// dimmer, smaller toward the back), each one a sheet of falling columns drawn once into a cached picture. The
 /// graphics chip only slides each sheet down, timed to the screen's own refresh (no timer, no steps), and the sheet
 /// holds its columns twice, one screen apart, so the slide loops without a seam. Per frame that's three numbers,

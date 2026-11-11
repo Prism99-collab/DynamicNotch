@@ -18,7 +18,7 @@ public sealed class PillSlider : Grid
     readonly Rectangle _knob = new();
     readonly RotateTransform _knobTurn = new();
 
-    /// <summary>The cyberpunk skin: square track and fill, a yellow diamond knob.</summary>
+    /// <summary>The neon skin: square track and fill, a yellow diamond knob.</summary>
     public static bool Square;
     readonly ScaleTransform _knobScale = new(0, 0);
     readonly TranslateTransform _knobShift = new();

@@ -8,7 +8,7 @@ using System.Windows.Threading;
 namespace DynamicNotch;
 
 /// <summary>
-/// The cyberpunk skin, finishing touches:
+/// The neon skin, finishing touches:
 ///  • the side pills (second activity, mic / camera) get their own cut plate and frame, the same shape language
 ///    as the notch, drawn behind their content. They are never clipped, so their ears, glow and the liquid neck
 ///    to the notch stay intact. The frame wears the pill's colour, and flickers on when a pill appears;
@@ -135,6 +135,6 @@ public partial class NotchWindow
 
     void CyberTag()
     {
-        if (_cyber) _cyTag.Text = "DN-2077 // " + PageCodes[Math.Clamp(_page, 0, PageCodes.Length - 1)];
+        if (_cyber) _cyTag.Text = "DN-99 // " + PageCodes[Math.Clamp(_page, 0, PageCodes.Length - 1)];
     }
 }

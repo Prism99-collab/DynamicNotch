@@ -138,7 +138,7 @@ public partial class NotchWindow
     {
         CyberSkinSoon();
         var now = DateTime.Now;
-        SetDigits(ClockText, now.ToShortTimeString()); // Cyberpunk: changed digits decode in
+        SetDigits(ClockText, now.ToShortTimeString()); // Neon: changed digits decode in
         DateText.Text = now.ToString("ddd d MMM");
         // the progress bar lives on Home; don't redraw it while another page is showing
         if (_mode == Mode.Expanded && _page != 0) return;
@@ -190,7 +190,7 @@ public partial class NotchWindow
         PrevBtn.IsEnabled = has && _media.CanPrevious;
         RefreshAppVolume();
         RefreshClockAndProgress();
-        RefreshDisc(); // the cyberpunk record: its art, its glow, turning or still
+        RefreshDisc(); // the neon record: its art, its glow, turning or still
     }
 
     string? _appVolLogged;
@@ -295,7 +295,7 @@ public partial class NotchWindow
     {
         var brush = ArtBrush(_media.Art);
         FlipArt(CompactArt, _media.Art, () => CompactArt.Background = brush ?? (Brush)new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2E)));
-        RefreshDisc(); // the cyberpunk records, big and small
+        RefreshDisc(); // the neon records, big and small
         UpdateRain(); // the idle rain stops when music starts, and comes back when it stops
         PaintBars();
         // the cyber skin answers the music too: a new song or play / pause
@@ -507,7 +507,7 @@ public partial class NotchWindow
     bool _devicesBackWired;
 
     /// <summary>
-    /// The device list's backdrop: in the cyberpunk theme a chamfered plate in the panel's own body (your panel
+    /// The device list's backdrop: in the neon theme a chamfered plate in the panel's own body (your panel
     /// colour, or the theme's night blue) over an opaque base, so nothing of the cards underneath shows through,
     /// with a cyan rim and a yellow tick on the cut corner. Every other theme keeps the plain rounded one.
     /// </summary>

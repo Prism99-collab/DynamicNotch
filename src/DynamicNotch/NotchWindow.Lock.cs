@@ -43,8 +43,8 @@ public partial class NotchWindow
         LockChanged?.Invoke();
         if (_cyber)
         {
-            // Cyberpunk: the notch puts up black ICE; unlocking is a breach
-            ShowOsd("lock", "", null, Services.Loc.T(on ? "BLACK ICE ENGAGED" : "BREACH SUCCESSFUL"),
+            // Neon: the notch puts up lockdown; unlocking is access granted
+            ShowOsd("lock", "", null, Services.Loc.T(on ? "LOCKDOWN ENGAGED" : "ACCESS GRANTED"),
                 Services.Loc.T(on ? "Notch locked · unlock from its tray icon" : "Notch unlocked"), null,
                 glyphBrush: Frozen(on ? CyRed : CyTeal), seconds: on ? 3.4 : 1.8, force: true, motion: on ? Motion.Shake : Motion.Pulse);
             CyberGlitch(strong: on, tint: on ? CyRed : null);
