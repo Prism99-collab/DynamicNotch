@@ -3,7 +3,7 @@
 All notable changes to Dynamic Notch are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.0.0] — 2026-11-11
 
 ### Changed
 - Everything in the app is now its own: the theme that was named after a game is now **Neon**, its strain warning
