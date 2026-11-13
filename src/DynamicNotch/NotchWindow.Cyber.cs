@@ -96,6 +96,7 @@ public partial class NotchWindow
                 }
                 if (open.StartsWith("prefs")) { PreferencesWindow.ShowFor(this, int.TryParse(open[5..], out int sec) ? sec : 0); return; }
                 if (open.StartsWith("pal")) { PalDevShow(open); return; }
+                if (open.StartsWith("search")) { OpenLauncher(open.Length > 7 ? open[7..] : null); return; } // =search or =search:5 km in miles
                 if (open == "osd")
                 {
                     ShowOsd("message", "", null, "New message", "Discord", null, glyphBrush: Green, seconds: 6, force: true);

@@ -65,6 +65,7 @@ public partial class NotchWindow
     void RefreshDesktopBtn()
     {
         StyleCluster();
+        PaintSearchButton();
         var shown = DesktopIcons.Shown;
         DesktopBtn.Visibility = shown == null ? Visibility.Collapsed : Visibility.Visible;
         if (shown is { } s) PaintDesktopBtn(s);

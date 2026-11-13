@@ -15,7 +15,7 @@ namespace DynamicNotch.Controls;
 public sealed class CompanionHost : Window
 {
     /// <summary>Wide enough for her furthest spot along the widest resting notch, tall enough for the swing.</summary>
-    public const double HostWidth = 460, HostHeight = 176;
+    public const double HostWidth = 600, HostHeight = 230;
 
     IntPtr _hwnd;
     (int X, int Y, int W, int H) _placed;

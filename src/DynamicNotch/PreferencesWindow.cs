@@ -477,6 +477,25 @@ public sealed class PreferencesWindow : Window
 
         Label(Loc.T("Look"));
         Card(Rows().Where(r => r.Sec == Sec.Appearance));
+
+        Label(Loc.T("Companion size"));
+        var sizes = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+        foreach (var (name, k) in new[] { ("Small", 0.85), ("Medium", 1.0), ("Large", 1.2) })
+        {
+            var b = PillButton(null, Loc.T(name), () => { }, primary: false);
+            b.Margin = new Thickness(0, 0, 8, 8);
+            SetPill(b, Math.Abs(_s.CompanionSize - k) < 0.01);
+            double size = k;
+            b.Click += (_, _) =>
+            {
+                _s.CompanionSize = size; // she takes it on her next breath (a quarter of a second)
+                _s.Save();
+                foreach (var other in sizes.Children.OfType<Button>()) SetPill(other, ReferenceEquals(other, b));
+                Saved();
+            };
+            sizes.Children.Add(b);
+        }
+        _content.Children.Add(sizes);
     }
 
     static readonly string[] ThemeKeys = { "original", "neon", "liquid", "crystal", "abyss" };

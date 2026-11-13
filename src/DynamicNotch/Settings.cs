@@ -84,6 +84,8 @@ public sealed class Settings
     /// <summary>The little hacker who drops by on her swing.</summary>
     public bool Companion { get; set; } = true;
     public bool CompanionInCalls { get; set; } = true;
+    /// <summary>The companion's size: 0.85 small, 1 medium, 1.2 large.</summary>
+    public double CompanionSize { get; set; } = 1.0;
     public DateTime? LastDownloadsNag { get; set; }
 
     public static string Folder =>

@@ -38,6 +38,7 @@ public partial class NotchWindow
     void WireShelf()
     {
         LoadShelf();
+        LoadClips(); // the clipboard history from last time
         DragEnter += OnShelfDragEnter;
         DragOver += OnShelfDragOver;
         DragLeave += (_, e) => e.Handled = true; // leaving is decided by the drag going quiet (see UpdateDropArming)

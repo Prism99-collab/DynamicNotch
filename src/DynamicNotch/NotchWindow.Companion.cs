@@ -47,6 +47,29 @@ public partial class NotchWindow
     bool _palTyping, _palDevTyping, _palDevAwake, _palMousing, _palDevMouse;
     readonly bool[] _palMoves = new bool[6];
 
+    // the keyboard, told apart from the mouse wheel: Windows' raw input says "a key went down or up" (never which
+    // one), only while she's out. Scrolling with the wheel no longer looks like typing.
+    int _palKeyEvents;
+    bool _palRawKeys;
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    struct RAWINPUTDEVICE { public ushort UsagePage, Usage; public uint Flags; public IntPtr Target; }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    static extern bool RegisterRawInputDevices(RAWINPUTDEVICE[] devices, uint count, uint size);
+
+    void PalListenKeys(bool on)
+    {
+        if (on == _palRawKeys || _hwnd == IntPtr.Zero) return;
+        var dev = new[] { new RAWINPUTDEVICE { UsagePage = 1, Usage = 6, Flags = on ? 0x100u /* INPUTSINK */ : 0x1u /* REMOVE */, Target = on ? _hwnd : IntPtr.Zero } };
+        bool ok = RegisterRawInputDevices(dev, 1, (uint)System.Runtime.InteropServices.Marshal.SizeOf<RAWINPUTDEVICE>());
+        _palRawKeys = on && ok;
+        _palKeyEvents = 0;
+    }
+
+    /// <summary>From the window's message loop: a keyboard event happened somewhere (which key is never read).</summary>
+    void PalKeyEvent() => _palKeyEvents++;
+
     void WireCompanion()
     {
         _palPlugged = _power.PluggedIn;
@@ -78,8 +101,8 @@ public partial class NotchWindow
 
     /// <summary>The notch is at rest and on screen, and nobody is using it.</summary>
     bool PalAllowed() =>
-        _settings.Companion && !_hidden && !_offScreen && !_fgFullscreen && _game == null && _mode is Mode.Idle or Mode.Slim or Mode.Media or Mode.Activity
-        && (!OnCall || _settings.CompanionInCalls) && !Ringing && !_inMeeting && !_dodged && !_peek && !_dropArmed && _osdQueue.Count == 0
+        _settings.Companion && !_hidden && !_offScreen && !_fgFullscreen && _game == null && _mode is Mode.Idle or Mode.Slim or Mode.Media or Mode.Activity or Mode.Osd
+        && (!OnCall || _settings.CompanionInCalls) && !Ringing && !_inMeeting && !_dodged && !_peek && !_dropArmed
         && DateTime.UtcNow >= _palShyUntil && DateTime.UtcNow >= _palReadyAt;
 
     Color PalAccent()
@@ -104,6 +127,7 @@ public partial class NotchWindow
             pal.Tucked = _overWindow; // over a window (a browser's tabs...) she tucks up: only her boots show
         pal.SetAccent(PalAccent());
             pal.Fps = Eco ? 30 : 0;
+            pal.Size = _settings.CompanionSize;
             // coming back she picks a spot away from where you're working, and comes in her own way: dropping in,
             // peeking out first, or flickering in like a hologram
             if (!_palFirst) { _palSide = PalPickSpot(); (_palX, _palY) = PalSpot(); _palAt.X = _palX; }
@@ -111,12 +135,22 @@ public partial class NotchWindow
             var how = _palFirst || roll < 5 ? Companion.Entrance.Drop : roll < 8 ? Companion.Entrance.Peek : Companion.Entrance.Glitch;
             pal.Appear(Companion.Act.Chill, how);
             pal.Stir(wave: _palFirst);
+            pal.Toward = -_palAt.X;
+            // the first time she's out in the morning, she stretches
+            var local = DateTime.Now;
+            if (local.Hour is >= 5 and < 11 && _palStretchedOn != local.Date && !Eco)
+            {
+                _palStretchedOn = local.Date;
+                _palMoment = Companion.Act.Stretch;
+                _palActUntil = now.AddSeconds(3.6);
+            }
             _palFirst = false;
             _palStirEnd = now.AddSeconds(5);
             _palNextStir = now.AddSeconds(18 + _palRand.NextDouble() * 20);
             _palNextBlink = now.AddSeconds(8);
             _palNextMove = now.AddSeconds(70 + _palRand.NextDouble() * 70);
             PalKeysReset();
+            PalListenKeys(true);
             _palKeys.Start();
             return;
         }
@@ -129,6 +163,8 @@ public partial class NotchWindow
         if (spot != (_palX, _palY)) { (_palX, _palY) = spot; pal.Slide(_palX, _palY); } // the notch changed size: she follows its edge
         pal.Vivid = !Eco; // on battery saving the swing keeps one colour
         pal.Tucked = _overWindow;
+        pal.Toward = -_palAt.X; // the notch's middle is the other way from her spot
+        pal.Size = _settings.CompanionSize;
         pal.SetAccent(PalAccent());
 
         bool eco0 = Eco;
@@ -192,6 +228,19 @@ public partial class NotchWindow
         if (!eco && PalWander(pal, now)) return;
         if (now >= _palNextStir && !eco)
         {
+            // now and then something other than a look around: late at night a yawn, on a low battery a tired
+            // slump, and rarely a twirl on the swing or nodding off and catching herself
+            int roll = _palRand.Next(28);
+            int hour = DateTime.Now.Hour;
+            Companion.Act? special = roll < 2 ? Companion.Act.Spin : roll < 4 ? Companion.Act.Nod
+                : (hour >= 23 || hour < 4) && roll < 13 ? Companion.Act.Yawn
+                : PalLowBattery && roll < 14 ? Companion.Act.Tired : null;
+            if (special is { } act)
+            {
+                _palNextStir = now.AddSeconds(18 + _palRand.NextDouble() * 22);
+                PalReact(act, act switch { Companion.Act.Spin => 2.4, Companion.Act.Nod => 3.0, Companion.Act.Tired => 6, _ => 2.8 });
+                return;
+            }
             bool wave = _palRand.Next(5) == 0;
             pal.Stir(wave);
             _palStirEnd = now.AddSeconds(wave ? 5 : 3 + _palRand.NextDouble() * 1.5);
@@ -260,15 +309,17 @@ public partial class NotchWindow
 
     void PalKeys()
     {
-        if (_pal is not { IsOut: true, Leaving: false }) { _palKeys.Stop(); PalKeysReset(); return; }
+        if (_pal is not { IsOut: true, Leaving: false }) { _palKeys.Stop(); PalKeysReset(); PalListenKeys(false); return; }
         var li = new LASTINPUTINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<LASTINPUTINFO>() };
         if (!GetLastInputInfo(ref li) || !GetCursorPos(out var cur)) return;
         bool input = _palLastInput != 0 && li.dwTime != _palLastInput;
         bool still = cur.X == _palLastCursor.X && cur.Y == _palLastCursor.Y;
         _palLastInput = li.dwTime;
         _palLastCursor = cur;
-        // the keyboard: input while the pointer stays put; the mouse: the pointer moving
-        _palHits[_palHitAt % _palHits.Length] = input && still;
+        // the keyboard: key events (raw input), or where that isn't available, input while the pointer stays put;
+        // the mouse: the pointer moving
+        _palHits[_palHitAt % _palHits.Length] = _palRawKeys ? _palKeyEvents > 0 : input && still;
+        _palKeyEvents = 0;
         _palMoves[_palHitAt % _palMoves.Length] = !still;
         _palHitAt = (_palHitAt + 1) % (_palHits.Length * _palMoves.Length);
         int keys = 0, moves = 0;
@@ -302,8 +353,8 @@ public partial class NotchWindow
     void PalMode()
     {
         if (_pal is not { IsOut: true } pal) return;
-        if (_mode is Mode.Idle or Mode.Slim or Mode.Media or Mode.Activity) pal.Leave(fast: true);
-        else pal.HideNow();
+        if (_mode is Mode.Idle or Mode.Slim or Mode.Media or Mode.Activity or Mode.Osd) return; // she follows the edge
+        pal.HideNow();
     }
 
     void PalPower()
@@ -313,6 +364,19 @@ public partial class NotchWindow
         if (!plugged || was || !_power.HasBattery || _pal is not { IsOut: true, Leaving: false }) return;
         _palMoment = Companion.Act.Cheer; // power: she cheers
         _palActUntil = DateTime.UtcNow.AddSeconds(3.6);
+        PalTick();
+    }
+
+    DateTime _palStretchedOn;
+
+    bool PalLowBattery => _power.HasBattery && !_power.PluggedIn && _power.Percent <= 20;
+
+    /// <summary>One of her reactions, for a few seconds, if she's out (then back to what she was doing).</summary>
+    void PalReact(Companion.Act act, double seconds)
+    {
+        if (_pal is not { IsOut: true, Leaving: false }) return;
+        _palMoment = act;
+        _palActUntil = DateTime.UtcNow.AddSeconds(seconds);
         PalTick();
     }
 

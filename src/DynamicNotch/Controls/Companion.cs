@@ -16,7 +16,7 @@ namespace DynamicNotch.Controls;
 /// </summary>
 public sealed class Companion : Grid
 {
-    public enum Act { Chill, Music, Sleep, Strain, Cheer, Hack, Scan }
+    public enum Act { Chill, Music, Sleep, Strain, Cheer, Hack, Scan, Point, Pump, Ears, Tired, Stretch, Yawn, Spin, Nod }
     public enum Entrance { Drop, Glitch, Peek }
 
     /// <summary>Her box, and where in it the swing's ropes meet the notch's bottom edge (everything above is cut).</summary>
@@ -116,9 +116,10 @@ public sealed class Companion : Grid
         IsHitTestVisible = false;
         UseLayoutRounding = true; // her picture sits on whole screen pixels: not blurred by a half-pixel offset
         Visibility = Visibility.Collapsed;
-        Clip = new RectangleGeometry(new Rect(-40, AnchorY, BoxWidth + 80, BoxHeight)); // she comes from behind the notch
+        Clip = new RectangleGeometry(new Rect(-90, AnchorY, BoxWidth + 180, BoxHeight * 1.6)); // she comes from behind the notch
         Clip.Freeze();
-        _view.RenderTransform = new TransformGroup { Children = { _scan, _jitter } };
+        _view.RenderTransform = new TransformGroup { Children = { _scan, _jitter, _size } };
+        _fx.RenderTransform = _size;
         _view.Effect = _halo; // a soft neon halo around her: she glows against any background
         _swing.RenderTransform = _view.RenderTransform;
         _swingLine.Stroke = _swingGlow.Stroke = _swingPaint;
@@ -155,9 +156,7 @@ public sealed class Companion : Grid
         SwingColours(true);
         // drawn at exactly twice the screen's pixels, then halved: every screen pixel is the average of four, so
         // edges are smooth and nothing shimmers as she moves (an uneven ratio skips pixels)
-        double sharp = 2 * VisualTreeHelper.GetDpi(this).DpiScaleX;
-        if (_view.CacheMode is not BitmapCache { } cache || Math.Abs(cache.RenderAtScale - sharp) > 0.01)
-            _view.CacheMode = new BitmapCache(sharp);
+        Sharpen();
         _act = act;
         _how = how;
         _phase = 1;
@@ -192,6 +191,25 @@ public sealed class Companion : Grid
     bool _tucked;
 
     /// <summary>Over a window: she pulls herself up behind the notch, only her boots showing. Off: back down.</summary>
+    /// <summary>Which way the notch's middle is from her: -1 left, +1 right (she points that way).</summary>
+    public double Toward { get => _toward; set => _toward = value < 0 ? -1 : 1; }
+    double _toward = -1;
+
+    /// <summary>Her size: 0.85 small, 1 medium, 1.2 large (drawn sharp at every size).</summary>
+    public double Size
+    {
+        get => _size.ScaleX;
+        set { double v = Math.Clamp(value, 0.7, 1.4); if (Math.Abs(v - _size.ScaleX) < 0.001) return; _size.ScaleX = _size.ScaleY = v; Sharpen(); }
+    }
+    readonly ScaleTransform _size = new(1, 1, BoxWidth / 2, AnchorY);
+
+    void Sharpen()
+    {
+        double sharp = 2 * VisualTreeHelper.GetDpi(this).DpiScaleX * _size.ScaleX;
+        if (_view.CacheMode is not BitmapCache { } cache || Math.Abs(cache.RenderAtScale - sharp) > 0.01)
+            _view.CacheMode = new BitmapCache(sharp);
+    }
+
     public bool Tucked
     {
         get => _tucked;
@@ -350,7 +368,7 @@ public sealed class Companion : Grid
         if (_phase == 0) return;
 
         double t = (now - _t0) / 1000.0, sinceAct = (now - _actAt) / 1000.0, since = (now - _phaseAt) / 1000.0;
-        var p = Target(_act, t, _wave);
+        var p = Target(_act, t, _wave, _toward);
         double blend = Smooth(Math.Min(1, sinceAct / 0.3));
         if (blend < 1) p = Pose.Lerp(_from, p, blend);
         double opacity = 1, scan = 1, jitter = 0;
@@ -437,7 +455,11 @@ public sealed class Companion : Grid
         }
 
         // her gaze, eased toward the pointer (asleep or in a strain she doesn't look; hacking, only half)
-        double look = _act switch { Act.Sleep or Act.Strain => 0, Act.Hack => 0.4, _ => 1 };
+        double look = _act switch
+        {
+            Act.Sleep or Act.Strain or Act.Point or Act.Ears or Act.Stretch or Act.Spin or Act.Nod => 0,
+            Act.Hack or Act.Yawn or Act.Tired => 0.35, Act.Pump => 0.5, _ => 1,
+        };
         double ease = 1 - Math.Exp(-dt * 7);
         _gazeYaw += (_gazeYawTo * look - _gazeYaw) * ease;
         _gazePitch += (_gazePitchTo * look - _gazePitch) * ease;
@@ -521,7 +543,7 @@ public sealed class Companion : Grid
     /// <summary>What she is doing, as a pose at a moment in time.</summary>
     static Pose Still() => new() { Len = Full, Eye = 1, Mouth = 1, Pulse = 0.35, HandL = HoldL, HandR = HoldR, Roll = 3, Yaw = -7, Twist = 5 };
 
-    static Pose Target(Act act, double t, bool wave = true)
+    static Pose Target(Act act, double t, bool wave = true, double toward = -1)
     {
         var p = new Pose { Len = Full, Eye = 1, Mouth = 1, Pulse = 0.35, HandL = HoldL, HandR = HoldR };
         switch (act)
@@ -628,6 +650,120 @@ public sealed class Companion : Grid
                 p.Pulse = 0.5 + 0.5 * Wave(t, 0.25);
                 p.HandL = new Vector3D(-1.02, 2.55, 0.6);
                 p.HandR = new Vector3D(1.02, 2.55, 0.6);
+                break;
+            }
+            case Act.Point:
+            {
+                // a notification: she points up at it, toward the middle of the notch, eyes wide
+                double up = Smooth(Math.Min(1, t / 0.3));
+                var hand = new Vector3D(toward * 1.25, 2.6 + 0.45 * up + 0.05 * Math.Sin(t * 9), 0.55);
+                if (toward < 0) p.HandL = HoldL + (hand - HoldL) * up; else p.HandR = HoldR + (hand - HoldR) * up;
+                p.Yaw = toward * 26 * up;
+                p.Pitch = -13 * up;
+                p.Roll = -toward * 5 * up;
+                p.Eye = 1.15;
+                p.Mouth = 1.5;
+                p.Bob = 0.03 * Math.Abs(Math.Sin(t * 6));
+                p.ShinL = 10 * Wave(t, 0.9);
+                p.ShinR = 10 * Wave(t, 0.9, 1.2);
+                break;
+            }
+            case Act.Pump:
+            {
+                // something finished: a fist pump, happy eyes
+                double pump = Math.Abs(Math.Sin(t * Math.PI * 2.2));
+                p.HandR = new Vector3D(0.95, 1.95 + 0.55 * pump, 0.95);
+                p.Eye = 0.22;
+                p.Mouth = 2.1;
+                p.Pitch = -5;
+                p.Roll = 6 * Math.Sin(t * 4.4);
+                p.Bob = 0.06 * pump;
+                p.ShinL = p.ShinR = 14 + 18 * pump;
+                p.Pulse = 0.9;
+                break;
+            }
+            case Act.Ears:
+            {
+                // the volume hit the top: hands over her headphones, eyes squeezed shut
+                p.HandL = new Vector3D(-1.05, 2.26, 0.2);
+                p.HandR = new Vector3D(1.05, 2.26, 0.2);
+                p.Eye = 0.1;
+                p.Mouth = 0.55;
+                p.Yaw = 9 * Math.Sin(t * 15);
+                p.Pitch = 7;
+                p.Sway = 1.5 * Wave(t, 0.5);
+                p.ShinL = p.ShinR = 22;
+                p.Pulse = 1;
+                break;
+            }
+            case Act.Tired:
+            {
+                // low battery: slumped, heavy eyelids, a slow sway
+                p.Pitch = 17 + 2 * Wave(t, 3.5);
+                p.Roll = 9;
+                p.Eye = 0.38 + 0.08 * Wave(t, 2.7);
+                p.Mouth = 0.75;
+                p.Sway = 1.5 * Wave(t, 5.5);
+                p.Bob = -0.03;
+                p.ShinL = 2 * Wave(t, 6);
+                p.ShinR = 2 * Wave(t, 6, 1);
+                p.Pulse = 0.08;
+                break;
+            }
+            case Act.Stretch:
+            {
+                // a morning stretch: arms up high, a big yawn, legs out
+                double up = Smooth(Math.Clamp(t / 0.8, 0, 1)) * Smooth(Math.Clamp((3.3 - t) / 0.6, 0, 1));
+                p.HandL = HoldL + (new Vector3D(-1.55, 3.25, 0.45) - HoldL) * up;
+                p.HandR = HoldR + (new Vector3D(1.55, 3.25, 0.45) - HoldR) * up;
+                p.Pitch = -11 * up;
+                p.Roll = 4 * Math.Sin(t * 1.4) * up;
+                p.Eye = 1 - 0.9 * up;
+                p.Mouth = 1 + 1.6 * up;
+                p.ShinL = p.ShinR = 34 * up;
+                break;
+            }
+            case Act.Yawn:
+            {
+                // late at night: a hand over a big yawn
+                double y = Smooth(Math.Clamp(t / 0.5, 0, 1)) * Smooth(Math.Clamp((2.4 - t) / 0.5, 0, 1));
+                p.HandL = HoldL + (new Vector3D(-0.22, 1.98, 1.02) - HoldL) * y;
+                p.Mouth = 1 + 1.8 * y;
+                p.Eye = 1 - 0.85 * y;
+                p.Pitch = -9 * y;
+                p.Roll = 5 * y;
+                break;
+            }
+            case Act.Spin:
+            {
+                // a rare one: the whole swing twirls round once, legs out
+                double u = Math.Clamp(t / 1.9, 0, 1);
+                p.Twist = 360 * (u * u * u * (u * (u * 6 - 15) + 10));
+                p.ShinL = p.ShinR = 38 * Math.Sin(Math.PI * u);
+                p.Mouth = 2.0;
+                p.Eye = 0.3;
+                p.Pitch = -6;
+                p.Sway = 3 * Math.Sin(Math.PI * u);
+                break;
+            }
+            case Act.Nod:
+            {
+                // another rare one: she nods off... and catches herself
+                if (t < 1.7)
+                {
+                    double d = Smooth(t / 1.7);
+                    p.Pitch = 30 * d;
+                    p.Eye = 1 - 0.9 * d;
+                    p.Roll = 6 * d;
+                }
+                else
+                {
+                    double back = Math.Min(1, (t - 1.7) / 0.12), settle = Smooth(Math.Clamp((t - 1.9) / 0.7, 0, 1));
+                    p.Pitch = 30 + (-12 - 30) * back + 12 * settle;
+                    p.Eye = 1.25 - 0.25 * settle;
+                    p.Mouth = 1.5 - 0.5 * settle;
+                    p.Yaw = 10 * Math.Sin((t - 1.7) * 18) * (1 - settle);
+                }
                 break;
             }
             case Act.Cheer:

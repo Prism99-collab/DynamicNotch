@@ -140,6 +140,7 @@ public partial class NotchWindow : Window
         Safe(nameof(WireDesktopIcons), WireDesktopIcons);
         Safe(nameof(WireStrainLog), WireStrainLog);
         Safe(nameof(WireCompanion), WireCompanion);
+        Safe(nameof(WireLauncher), WireLauncher);
         Safe(nameof(ApplyCustomColors), ApplyCustomColors); // your colours from the Colors page
         Safe(nameof(WireColors), WireColors);
         Safe(nameof(WireDevices), WireDevices);
@@ -173,6 +174,7 @@ public partial class NotchWindow : Window
         PositionWindow();
         // Win+Alt+N (another app may already own it: the notch still opens from the top edge and the tray icon)
         if (!RegisterHotKey(_hwnd, HotkeyId, MOD_WIN | MOD_ALT | MOD_NOREPEAT, 0x4E)) Services.AppLog.Write("Win+Alt+N is taken by another app: open the notch from the top edge or its tray icon");
+        RegisterLauncherKey(); // Alt+Space: the notch's search
         System.Windows.Media.RenderCapability.TierChanged += (_, _) =>
         {
             _lowGraphics = null;
@@ -291,11 +293,18 @@ public partial class NotchWindow : Window
         {
             case WM_MOUSEACTIVATE:
                 handled = true;
-                return new IntPtr(MA_NOACTIVATE);
+                return new IntPtr(LauncherTakesClicks ? 1 /* MA_ACTIVATE */ : MA_NOACTIVATE);
+            case WM_HOTKEY when wParam.ToInt32() == LauncherHotkeyId:
+                handled = true;
+                OnLauncherHotkey();
+                break;
             case WM_HOTKEY when wParam.ToInt32() == HotkeyId:
                 handled = true;
                 if (_settings.Locked) { SetLocked(false); Expand(byHotkey: true); } // the shortcut is deliberate: it unlocks
                 else if (_mode == Mode.Expanded) Collapse(); else Expand(byHotkey: true);
+                break;
+            case 0x00FF: // WM_INPUT: a key went down or up somewhere (the companion's typing pose); left to Windows to free
+                PalKeyEvent();
                 break;
             case WM_CLIPBOARDUPDATE:
                 Dispatcher.InvokeAsync(OnClipboardChanged, DispatcherPriority.Background);
@@ -342,6 +351,8 @@ public partial class NotchWindow : Window
         if (_hwnd != IntPtr.Zero)
         {
             UnregisterHotKey(_hwnd, HotkeyId);
+            UnregisterHotKey(_hwnd, LauncherHotkeyId);
+            UpdateTypeToSearch(false);
             RemoveClipboardFormatListener(_hwnd);
             DeregisterShellHookWindow(_hwnd);
         }
@@ -685,6 +696,8 @@ public partial class NotchWindow : Window
     void Collapse()
     {
         if (_mode != Mode.Expanded) return;
+        EndLauncher(giveBack: false);
+        UpdateTypeToSearch(false);
         _tick.Stop();
         _sysTimer.Stop();
         ShowDevices(false);
@@ -754,6 +767,8 @@ public partial class NotchWindow : Window
         double ex = (ExpandedSize.Width / 2 + 10 + 16) * _scale;
         double cxe = _winLeft + _winW / 2.0;
         bool inside = p.X >= cxe - ex && p.X <= cxe + ex && p.Y >= _winTop && p.Y <= _winTop + (ExpandedSize.Height + 16) * _scale;
+        UpdateTypeToSearch(inside); // with the pointer on the open notch, typing starts a search
+        if (_launcherOpen) return;   // the search stays until Esc, Enter or a click elsewhere
         bool dragging = VolSlider.IsDragging || BriSlider.IsDragging || ExtBriSlider.IsDragging || AppVolSlider.IsDragging || ProgressSlider.IsDragging || _swiping || _dragOut;
 
         if (inside) { _entered = true; _leave = 0; return; }

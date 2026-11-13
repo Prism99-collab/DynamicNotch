@@ -119,6 +119,7 @@ public partial class NotchWindow
             if (!_settings.SystemAlerts) return;
             // the shell icon and file size come from disk: fetch them off the UI thread
             var (icon, size) = await Task.Run(() => (IconHelper.ForPath(path), SafeLength(path)));
+            PalReact(Controls.Companion.Act.Pump, 2.6); // the companion: a fist pump
             ShowOsd("download", null, null, "Download complete", Path.GetFileName(path), SystemMonitor.Bytes(size),
                 art: icon, seconds: 4, prio: Prio.High, onClick: () => OpenPath(path));
         };
@@ -148,6 +149,7 @@ public partial class NotchWindow
             // a burst of messages rings once, not ten times in a row
             if ((DateTime.UtcNow - _lastToast.At).TotalSeconds > 2) _notificationSound.Play();
             _lastToast = (t.App, DateTime.UtcNow);
+            PalReact(Controls.Companion.Act.Point, 2.8); // the companion points up at it
             ShowOsd("toast:" + t.App, t.Icon == null ? "" : null, null, t.Title, string.IsNullOrEmpty(t.Body) ? t.App : t.Body, null,
                 art: t.Icon, seconds: 4, prio: Prio.High, onClick: () => OpenApp(t.Aumid),
                 motion: SoundsLikeFailure(t.Title + " " + t.Body) ? Motion.Tremble : Motion.Auto); // "Sign-in failed" shivers instead of pulsing
@@ -199,6 +201,7 @@ public partial class NotchWindow
     void ShowVolumeOsd()
     {
         double v = _audio.Muted ? 0 : _audio.Volume;
+        if (v >= 0.995 && _pal is { Current: not Controls.Companion.Act.Ears }) PalReact(Controls.Companion.Act.Ears, 2.2); // too loud for her
         ShowOsd("volume", VolumeGlyph(), v, null, null, $"{(int)Math.Round(v * 100)}", prio: Prio.Low,
             onClick: () => ExpandTo(0),
             onWheel: d =>
@@ -627,6 +630,7 @@ public partial class NotchWindow
         int threshold = p <= 10 ? 10 : p <= 20 ? 20 : 101;
         if (threshold >= _batteryAlertedAt || threshold == 101) return;
         _batteryAlertedAt = threshold;
+        PalReact(Controls.Companion.Act.Tired, 6); // the companion is running low too
         ShowOsd("battery", null, null, threshold == 10 ? "Battery critically low" : "Battery low", RemainingHint() ?? "Plug in your charger", $"{p}%",
             battery: (p / 100.0, false), seconds: 5, force: true, prio: Prio.High, onClick: () => Launch("ms-settings:batterysaver"));
     }
@@ -668,6 +672,10 @@ public partial class NotchWindow
 
         if (version != _clipVersion) return;
         if (text != null) AddClipboardText(text);
+        if (kind == "Image")
+        {
+            try { if (Clipboard.GetImage() is { } picture) AddClipboardImage(picture); } catch { }
+        }
         if (!_settings.ClipboardAlerts || _mode == Mode.Expanded || !_alertsReady) return;
         if (kind == "Image")
         {

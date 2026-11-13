@@ -46,7 +46,6 @@ public partial class NotchWindow
     QuickToggle? _sleepTile;
 
     // clipboard & files
-    readonly List<string> _clipHistory = new();
     DateTime _ignoreClipboardUntil;
     bool _dragOut;
     Point _fileDown;
@@ -106,7 +105,7 @@ public partial class NotchWindow
         UpdateTimerUi();
 
         // clipboard & files
-        ClipClear.Click += (_, _) => { _clipHistory.Clear(); RenderClipboard(); };
+        ClipClear.Click += (_, _) => ClearClips(); // pinned items stay
         OpenDownloads.Click += (_, _) => { if (_files.DownloadsDir != null) Launch(_files.DownloadsDir); };
 
         BuildSettings();
@@ -462,6 +461,7 @@ public partial class NotchWindow
                 _focusRounds++;
                 bool longBreak = _focusRounds >= 4;
                 int breakMin = longBreak ? 15 : 5;
+                PalReact(Controls.Companion.Act.Pump, 2.6); // a focus round done: the companion cheers you on
                 ShowOsd("timer", "", null, longBreak ? "4 rounds done · well earned" : $"Focus round {_focusRounds} done",
                     $"{_timerTotal.TotalMinutes:0} min of focus · click for a {breakMin} min break", null,
                     glyphBrush: Orange, seconds: 8, force: true, prio: Prio.High,
@@ -589,46 +589,6 @@ public partial class NotchWindow
     static void Keybd(byte vk, bool up) => keybd_event(vk, 0, up ? 2u : 0u, UIntPtr.Zero);
 
     // ───────────────────────────── page 4 · clipboard & files ─────────────────────────────
-
-    const int ClipMax = 30; // the texts you copied last, newest first
-
-    void AddClipboardText(string text)
-    {
-        text = text.Trim();
-        if (text.Length == 0) return;
-        if (text.Length > 4000) text = text[..4000];
-        _clipHistory.Remove(text);
-        _clipHistory.Insert(0, text);
-        while (_clipHistory.Count > ClipMax) _clipHistory.RemoveAt(_clipHistory.Count - 1);
-        if (_mode == Mode.Expanded && _page == 3) RenderClipboard();
-    }
-
-    void RenderClipboard()
-    {
-        ClipList.Children.Clear();
-        ClipEmpty.Visibility = _clipHistory.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var text in _clipHistory)
-        {
-            string oneLine = string.Join(" ", text.Split(new[] { '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries));
-            var row = new Grid();
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(22) });
-            row.ColumnDefinitions.Add(new ColumnDefinition());
-            row.Children.Add(Glyph(LooksLikeLink(text) ? "" : "", 11, DimBrush));
-            var t = new TextBlock { Text = oneLine, FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetColumn(t, 1);
-            row.Children.Add(t);
-            var btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = 34, ToolTip = text.Length > 300 ? text[..300] + "…" : text };
-            string value = text;
-            btn.Click += (_, _) =>
-            {
-                _ignoreClipboardUntil = DateTime.UtcNow.AddMilliseconds(600);
-                try { Clipboard.SetText(value); } catch { }
-                AddClipboardText(value);
-                FlashRow(btn);
-            };
-            ClipList.Children.Add(btn);
-        }
-    }
 
     static bool LooksLikeLink(string s) => s.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || s.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 

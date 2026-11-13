@@ -780,7 +780,7 @@
                                                     <RowDefinition Height="*" />
                                                 </Grid.RowDefinitions>
                                                 <TextBlock Text="Clipboard" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Dim}" VerticalAlignment="Center" Margin="4,0" />
-                                                <Button x:Name="ClipClear" Style="{StaticResource CircleButton}" Width="24" Height="24" HorizontalAlignment="Right" ToolTip="Clear">
+                                                <Button x:Name="ClipClear" Style="{StaticResource CircleButton}" Width="24" Height="24" HorizontalAlignment="Right" ToolTip="Clear (pinned items stay)">
                                                     <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFont}" FontSize="11" Foreground="{StaticResource Dim}" />
                                                 </Button>
                                                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
@@ -792,7 +792,7 @@
                                                     </ScrollViewer.OpacityMask>
                                                     <StackPanel x:Name="ClipList" Margin="0,0,0,12" />
                                                 </ScrollViewer>
-                                                <TextBlock x:Name="ClipEmpty" Grid.Row="1" Text="Copy text and it shows up here.&#x0a;Click an item to copy it again." TextWrapping="Wrap"
+                                                <TextBlock x:Name="ClipEmpty" Grid.Row="1" Text="Copy text or a picture and it shows up here.&#x0a;Click to copy again · pin to keep · right-click to remove." TextWrapping="Wrap"
                                                            FontSize="11" Foreground="#66FFFFFF" Margin="4,8" />
                                             </Grid>
                                             <Grid Grid.Column="2">
