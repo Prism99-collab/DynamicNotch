@@ -45,12 +45,13 @@ public sealed class PreferencesWindow : Window
         _open.Activate();
     }
 
-    enum Sec { General, Appearance, Behaviour, Alerts, Pages, Shortcuts, About }
+    enum Sec { General, Appearance, Behaviour, Alerts, Pages, Shortcuts, About, Search }
     static readonly (Sec Sec, string Glyph, string Name, string Sub)[] Sections =
     {
         (Sec.General, "", "General", "Language, start-up and power"),
         (Sec.Appearance, "", "Appearance", "Theme, colours and how the notch looks"),
         (Sec.Behaviour, "", "Behaviour", "How the notch reacts to you"),
+        (Sec.Search, "\uE721", "Search", "What it finds, how it opens, what it remembers"),
         (Sec.Alerts, "", "Alerts", "What the notch tells you, and the smart helpers"),
         (Sec.Pages, "", "Pages", "Choose the pages of the control center"),
         (Sec.Shortcuts, "", "Shortcuts", "Keys and gestures"),
@@ -278,6 +279,7 @@ public sealed class PreferencesWindow : Window
             case Sec.Alerts: Alerts(); break;
             case Sec.Pages: Pages(); break;
             case Sec.Shortcuts: Shortcuts(); break;
+            case Sec.Search: SearchSection(); break;
             case Sec.About: About(); break;
         }
         BeginAnimation(SmoothOffsetProperty, null);
@@ -339,6 +341,18 @@ public sealed class PreferencesWindow : Window
         new(Sec.Alerts, "", "Break reminder", "After long stretches of work", () => _s.SmartBreaks, v => _notch.PrefSetBreaks(v), "Smart"),
         new(Sec.Alerts, "", "Meeting mode", "Camera on: pause music, quiet", () => _s.MeetingMode, v => _notch.PrefSetMeeting(v), "Smart"),
         new(Sec.Alerts, "\uE7BA", "PC strain warnings", "CPU, GPU, memory and heat watched; warns when one stays high", () => _notch.PrefStrainOn("all"), v => _notch.PrefSetStrain("all", v), "Strain"),
+
+        new(Sec.Search, "\uE765", "Type to search", "With the notch open and the pointer on it, just start typing", () => _s.SearchTypeToOpen, v => { _s.SearchTypeToOpen = v; _notch.PrefSearchChanged(); }, "open"),
+        new(Sec.Search, "\uE721", "Search button", "The magnifier in the control center's header", () => _s.SearchButton, v => { _s.SearchButton = v; _notch.PrefSearchChanged(); }, "open"),
+        new(Sec.Search, "\uE8EF", "Commands and answers", "“volume 30”, “remind me…”, sums, time zones and dates", () => _s.SearchCommands, v => _s.SearchCommands = v, "find"),
+        new(Sec.Search, "\uE8B7", "Files across the PC", "From the index Windows keeps for File Explorer's search", () => _s.SearchWholePc, v => _s.SearchWholePc = v, "find"),
+        new(Sec.Search, "\uE8A5", "Words inside documents", "Finds a PDF or a Word file by what's written in it", () => _s.SearchInsideFiles, v => _s.SearchInsideFiles = v, "find"),
+        new(Sec.Search, "\uE7C4", "Open windows", "Goes to an app or a window that's already open", () => _s.SearchWindows, v => _s.SearchWindows = v, "find"),
+        new(Sec.Search, "\uE77F", "Clipboard and shelf", "Finds what you copied or kept on the shelf", () => _s.SearchClipboard, v => _s.SearchClipboard = v, "find"),
+        new(Sec.Search, "\uE945", "Learn from my picks", "What you choose for what you type moves to the top", () => _s.SearchLearn, v => _s.SearchLearn = v, "find"),
+        new(Sec.Search, "\uE734", "Frequent apps", "Your most-used apps when the search is empty", () => _s.SearchFrequent, v => _s.SearchFrequent = v, "empty"),
+        new(Sec.Search, "\uE81C", "Recent searches", "Shown when the search is empty; ↑ brings them back", () => _s.SearchRecent, v => _s.SearchRecent = v, "empty"),
+        new(Sec.Search, "\uE82F", "Suggestions", "A few things to try", () => _s.SearchTry, v => _s.SearchTry = v, "empty"),
 
         new(Sec.Pages, "", "System", "CPU, memory, storage, network and battery", () => !_s.HiddenPages.Contains(1), v => _notch.PrefSetPage(1, v)),
         new(Sec.Pages, "", "Tools", "Timer, snip, terminal, calculator and more", () => !_s.HiddenPages.Contains(2), v => _notch.PrefSetPage(2, v)),
@@ -933,6 +947,112 @@ public sealed class PreferencesWindow : Window
         _content.Children.Add(CardOf(fixedRow));
         Label(Loc.T("Shown in the control center"));
         Card(Rows().Where(r => r.Sec == Sec.Pages));
+    }
+
+    /// <summary>The search: its key, how else it opens, what it looks through, what it shows when empty, the web, memory.</summary>
+    void SearchSection()
+    {
+        Label(Loc.T("Shortcut"));
+        var keys = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+        var taken = new TextBlock { Foreground = Frozen(Color.FromRgb(0xFF, 0xB0, 0x20)), FontSize = 12, Margin = new Thickness(4, 0, 0, 10), TextWrapping = TextWrapping.Wrap };
+        void ShowTaken()
+        {
+            string name = NotchWindow.LauncherKeyOf(_s.SearchHotkey).Name;
+            taken.Text = _notch.PrefSearchKeyTaken ? string.Format(Loc.T("{0} is taken by another app: pick another one"), name) : "";
+            taken.Visibility = taken.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        foreach (var (key, name) in new[] { ("alt-space", "Alt+Space"), ("ctrl-space", "Ctrl+Space"), ("ctrl-alt-space", "Ctrl+Alt+Space"), ("win-alt-space", "Win+Alt+Space"), ("off", "Off") })
+        {
+            var b = PillButton(null, key == "off" ? Loc.T(name) : name, () => { }, primary: false);
+            b.Margin = new Thickness(0, 0, 8, 8);
+            SetPill(b, _s.SearchHotkey == key || key == "alt-space" && NotchWindow.LauncherKeyOf(_s.SearchHotkey).Name == "Alt+Space");
+            string k = key;
+            b.Click += (_, _) =>
+            {
+                _s.SearchHotkey = k;
+                _notch.PrefSearchChanged();
+                foreach (var other in keys.Children.OfType<Button>()) SetPill(other, ReferenceEquals(other, b));
+                ShowTaken();
+                Saved();
+            };
+            keys.Children.Add(b);
+        }
+        _content.Children.Add(keys);
+        ShowTaken();
+        _content.Children.Add(taken);
+        Card(Rows().Where(r => r.Sec == Sec.Search && r.Group == "open"));
+
+        Label(Loc.T("What it finds"));
+        Card(Rows().Where(r => r.Sec == Sec.Search && r.Group == "find"));
+
+        Label(Loc.T("When it's empty"));
+        Card(Rows().Where(r => r.Sec == Sec.Search && r.Group == "empty"));
+        if (_notch.PrefHiddenApps > 0)
+        {
+            Button? back = null;
+            back = PillButton("\uE7B3", string.Format(Loc.T("Show removed apps again ({0})"), _notch.PrefHiddenApps), () =>
+            {
+                _notch.PrefShowHiddenApps();
+                if (back != null) back.Visibility = Visibility.Collapsed;
+                Saved();
+            }, primary: false);
+            back.HorizontalAlignment = HorizontalAlignment.Left;
+            back.Margin = new Thickness(0, 0, 0, 6);
+            _content.Children.Add(back);
+        }
+
+        Choice(Loc.T("Web search"), new[] { ("google", "Google"), ("bing", "Bing"), ("duckduckgo", "DuckDuckGo"), ("brave", "Brave Search") },
+            () => _s.SearchEngine, v => _s.SearchEngine = v);
+        Choice(Loc.T("AI assistant for questions"), new[] { ("chatgpt", "ChatGPT"), ("claude", "Claude"), ("perplexity", "Perplexity"), ("copilot", "Copilot"), ("off", Loc.T("Off")) },
+            () => _s.SearchAssistant, v => _s.SearchAssistant = v);
+
+        Label(Loc.T("Memory"));
+        var memory = new WrapPanel();
+        Button? recent = null;
+        recent = PillButton("\uE81C", Loc.T("Forget recent searches"), () =>
+        {
+            _notch.PrefForgetSearches();
+            if (recent != null) recent.IsEnabled = false;
+            Saved();
+        }, primary: false);
+        recent.Margin = new Thickness(0, 0, 8, 8);
+        recent.IsEnabled = _notch.PrefRecentSearches > 0;
+        memory.Children.Add(recent);
+        var learned = PillButton("\uE945", Loc.T("Forget what it learned"), () =>
+        {
+            if (MessageBox.Show(this, Loc.T("Frequent apps and the order of results start over."), Loc.T("Forget what it learned"),
+                    MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
+            _notch.PrefForgetLearned();
+            Saved();
+        }, primary: false);
+        learned.Margin = new Thickness(0, 0, 8, 8);
+        memory.Children.Add(learned);
+        _content.Children.Add(memory);
+    }
+
+    /// <summary>A row of pills, one of them picked (saved at once).</summary>
+    void Choice(string title, (string Key, string Name)[] options, Func<string> get, Action<string> set)
+    {
+        Label(title);
+        var row = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+        string now = get();
+        bool any = options.Any(o => o.Key == now);
+        foreach (var (key, name) in options)
+        {
+            var b = PillButton(null, name, () => { }, primary: false);
+            b.Margin = new Thickness(0, 0, 8, 8);
+            SetPill(b, key == now || !any && key == options[0].Key);
+            string k = key;
+            b.Click += (_, _) =>
+            {
+                set(k);
+                _notch.PrefChanged();
+                foreach (var other in row.Children.OfType<Button>()) SetPill(other, ReferenceEquals(other, b));
+                Saved();
+            };
+            row.Children.Add(b);
+        }
+        _content.Children.Add(row);
     }
 
     void Shortcuts()

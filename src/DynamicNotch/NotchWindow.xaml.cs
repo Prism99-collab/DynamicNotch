@@ -352,6 +352,7 @@ public partial class NotchWindow : Window
         {
             UnregisterHotKey(_hwnd, HotkeyId);
             UnregisterHotKey(_hwnd, LauncherHotkeyId);
+            _fileIndex.SaveIfChanged();
             UpdateTypeToSearch(false);
             RemoveClipboardFormatListener(_hwnd);
             DeregisterShellHookWindow(_hwnd);

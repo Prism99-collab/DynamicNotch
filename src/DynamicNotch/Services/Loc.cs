@@ -20,6 +20,19 @@ public static class Loc
 
     static readonly Dictionary<string, string> Fr = new()
     {
+        // the search
+        ["What it finds, how it opens, what it remembers"] = "Ce qu'elle trouve, comment elle s'ouvre, ce qu'elle retient", ["Type to search"] = "Taper pour chercher", ["With the notch open and the pointer on it, just start typing"] = "Encoche ouverte et pointeur dessus : commencez simplement à taper",
+        ["Search button"] = "Bouton de recherche", ["The magnifier in the control center's header"] = "La loupe dans l'en-tête du centre de contrôle", ["Commands and answers"] = "Commandes et réponses",
+        ["“volume 30”, “remind me…”, sums, time zones and dates"] = "« volume 30 », « rappelle-moi… », calculs, fuseaux horaires et dates", ["Files across the PC"] = "Fichiers de tout le PC", ["From the index Windows keeps for File Explorer's search"] = "Depuis l'index que Windows tient pour la recherche de l'Explorateur",
+        ["Words inside documents"] = "Mots dans les documents", ["Finds a PDF or a Word file by what's written in it"] = "Trouve un PDF ou un fichier Word d'après son contenu", ["Open windows"] = "Fenêtres ouvertes",
+        ["Goes to an app or a window that's already open"] = "Va vers une app ou une fenêtre déjà ouverte", ["Clipboard and shelf"] = "Presse-papiers et étagère", ["Finds what you copied or kept on the shelf"] = "Retrouve ce que vous avez copié ou gardé sur l'étagère",
+        ["Learn from my picks"] = "Apprendre de mes choix", ["What you choose for what you type moves to the top"] = "Ce que vous choisissez pour ce que vous tapez passe en premier", ["Frequent apps"] = "Apps fréquentes",
+        ["Your most-used apps when the search is empty"] = "Vos apps les plus utilisées quand la recherche est vide", ["Recent searches"] = "Recherches récentes", ["Shown when the search is empty; ↑ brings them back"] = "Affichées quand la recherche est vide ; ↑ les rappelle",
+        ["Suggestions"] = "Suggestions", ["A few things to try"] = "Quelques idées à essayer", ["Shortcut"] = "Raccourci",
+        ["Off"] = "Désactivé", ["{0} is taken by another app: pick another one"] = "{0} est déjà pris par une autre app : choisissez-en un autre", ["What it finds"] = "Ce qu'elle trouve",
+        ["When it's empty"] = "Quand elle est vide", ["Web search"] = "Recherche web", ["AI assistant for questions"] = "Assistant IA pour les questions",
+        ["Memory"] = "Mémoire", ["Forget recent searches"] = "Oublier les recherches récentes", ["Forget what it learned"] = "Oublier ce qu'elle a appris",
+        ["Show removed apps again ({0})"] = "Réafficher les apps retirées ({0})", ["Frequent apps and the order of results start over."] = "Les apps fréquentes et l'ordre des résultats repartent de zéro.",
         // preferences
         ["Preferences"] = "Préférences", ["General"] = "Général", ["Language, start-up and power"] = "Langue, démarrage et énergie",
         ["Appearance"] = "Apparence", ["Theme, colours and how the notch looks"] = "Thème, couleurs et allure de l'encoche",
@@ -122,6 +135,19 @@ public static class Loc
 
     static readonly Dictionary<string, string> Ar = new()
     {
+        // the search
+        ["What it finds, how it opens, what it remembers"] = "ما يجده، وكيف يُفتح، وما يتذكره", ["Type to search"] = "اكتب للبحث", ["With the notch open and the pointer on it, just start typing"] = "والنوتش مفتوح والمؤشر فوقه، ابدأ الكتابة فقط",
+        ["Search button"] = "زر البحث", ["The magnifier in the control center's header"] = "العدسة في رأس مركز التحكم", ["Commands and answers"] = "الأوامر والإجابات",
+        ["“volume 30”, “remind me…”, sums, time zones and dates"] = "«volume 30»، «ذكّرني…»، الحسابات والمناطق الزمنية والتواريخ", ["Files across the PC"] = "الملفات في كامل الحاسوب", ["From the index Windows keeps for File Explorer's search"] = "من الفهرس الذي يحتفظ به Windows لبحث مستكشف الملفات",
+        ["Words inside documents"] = "الكلمات داخل المستندات", ["Finds a PDF or a Word file by what's written in it"] = "يجد ملف PDF أو Word من محتواه", ["Open windows"] = "النوافذ المفتوحة",
+        ["Goes to an app or a window that's already open"] = "ينتقل إلى تطبيق أو نافذة مفتوحة بالفعل", ["Clipboard and shelf"] = "الحافظة والرف", ["Finds what you copied or kept on the shelf"] = "يجد ما نسخته أو احتفظت به على الرف",
+        ["Learn from my picks"] = "التعلّم من اختياراتي", ["What you choose for what you type moves to the top"] = "ما تختاره لما تكتبه يصعد إلى الأعلى", ["Frequent apps"] = "التطبيقات المتكررة",
+        ["Your most-used apps when the search is empty"] = "أكثر تطبيقاتك استخدامًا عندما يكون البحث فارغًا", ["Recent searches"] = "عمليات البحث الأخيرة", ["Shown when the search is empty; ↑ brings them back"] = "تظهر عندما يكون البحث فارغًا؛ ↑ يعيدها",
+        ["Suggestions"] = "اقتراحات", ["A few things to try"] = "أشياء قليلة للتجربة", ["Shortcut"] = "الاختصار",
+        ["Off"] = "متوقف", ["{0} is taken by another app: pick another one"] = "{0} يستخدمه تطبيق آخر: اختر غيره", ["What it finds"] = "ما يجده",
+        ["When it's empty"] = "عندما يكون فارغًا", ["Web search"] = "البحث في الويب", ["AI assistant for questions"] = "مساعد الذكاء الاصطناعي للأسئلة",
+        ["Memory"] = "الذاكرة", ["Forget recent searches"] = "نسيان عمليات البحث الأخيرة", ["Forget what it learned"] = "نسيان ما تعلّمه",
+        ["Show removed apps again ({0})"] = "إظهار التطبيقات المحذوفة مجددًا ({0})", ["Frequent apps and the order of results start over."] = "تبدأ التطبيقات المتكررة وترتيب النتائج من جديد.",
         ["Preferences"] = "التفضيلات", ["General"] = "عام", ["Language, start-up and power"] = "اللغة والتشغيل والطاقة",
         ["Appearance"] = "المظهر", ["Theme, colours and how the notch looks"] = "السمة والألوان وشكل النوتش",
         ["Behaviour"] = "السلوك", ["How the notch reacts to you"] = "كيف يتفاعل النوتش معك",

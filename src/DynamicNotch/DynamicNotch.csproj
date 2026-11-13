@@ -17,7 +17,7 @@
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
 
     <!-- What Windows shows in the exe's Properties > Details and in Settings > Apps -->
-    <Version>2.1.0</Version>
+    <Version>2.3.0</Version>
     <Product>Dynamic Notch</Product>
     <AssemblyTitle>Dynamic Notch</AssemblyTitle>
     <Description>A smooth animated notch and control center for Windows.</Description>

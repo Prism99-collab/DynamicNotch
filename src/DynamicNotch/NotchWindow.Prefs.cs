@@ -23,6 +23,23 @@ public partial class NotchWindow
 
     internal void PrefSetFps(bool on) => SetFpsInGames(on);
 
+    // the search
+    /// <summary>A search setting changed: the shortcut, the magnifier and type-to-search follow at once.</summary>
+    internal void PrefSearchChanged()
+    {
+        _settings.Save();
+        RegisterLauncherKey();
+        PaintSearchButton();
+        if (!_settings.SearchTypeToOpen) UpdateTypeToSearch(false);
+        EnsureFileIndex();
+    }
+    internal bool PrefSearchKeyTaken => LauncherKeyTaken;
+    internal int PrefHiddenApps => _settings.SearchHiddenApps.Count;
+    internal void PrefShowHiddenApps() { _settings.SearchHiddenApps.Clear(); _settings.Save(); }
+    internal int PrefRecentSearches => _index.Recent.Count;
+    internal void PrefForgetSearches() => _index.ForgetRecent();
+    internal void PrefForgetLearned() => _index.ForgetLearned();
+
     internal void PrefSetBreaks(bool on) { _settings.SmartBreaks = on; _activeSince = null; PrefChanged(); }
 
     internal void PrefSetMeeting(bool on)

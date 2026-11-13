@@ -96,7 +96,31 @@ public partial class NotchWindow
                 }
                 if (open.StartsWith("prefs")) { PreferencesWindow.ShowFor(this, int.TryParse(open[5..], out int sec) ? sec : 0); return; }
                 if (open.StartsWith("pal")) { PalDevShow(open); return; }
-                if (open.StartsWith("search")) { OpenLauncher(open.Length > 7 ? open[7..] : null); return; } // =search or =search:5 km in miles
+                if (open.StartsWith("typing:"))
+                {
+                    // =typing:spotify — the box fills one letter every 90 ms (set in code, no keys pressed), each search timed in the log
+                    string word = open[7..];
+                    OpenLauncher(null);
+                    _measureSearch = true;
+                    for (int i = 1; i <= word.Length; i++)
+                    {
+                        string part = word[..i];
+                        After(600 + 90 * i, () => { if (_launchBox != null) { _launchBox.Text = part; _launchBox.CaretIndex = part.Length; } });
+                    }
+                    After(600 + 90 * word.Length + 1500, () => _measureSearch = false);
+                    return;
+                }
+                if (open.StartsWith("search"))
+                {
+                    // =search, =search:5 km in miles, =search:notch>>2 (and the second level of line 2)
+                    string q = open.Length > 7 ? open[7..] : "";
+                    int more = q.IndexOf(">>", StringComparison.Ordinal);
+                    int line = more >= 0 && int.TryParse(q[(more + 2)..], out int n) ? n : -1;
+                    if (more >= 0) q = q[..more];
+                    OpenLauncher(q.Length > 0 ? q : null);
+                    if (line >= 0) After(2500, () => { if (line < _hits.Count) { _launchSel = line; EnterActions(); } });
+                    return;
+                }
                 if (open == "osd")
                 {
                     ShowOsd("message", "", null, "New message", "Discord", null, glyphBrush: Green, seconds: 6, force: true);

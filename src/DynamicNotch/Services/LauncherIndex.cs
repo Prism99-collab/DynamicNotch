@@ -28,7 +28,7 @@ public sealed class LauncherIndex
     public IReadOnlyList<Entry> Entries => _entries;
     public event Action? Changed;
 
-    public LauncherIndex() => LoadUsage();
+    public LauncherIndex() { LoadUsage(); LoadPicks(); }
 
     /// <summary>Builds (or refreshes) the list in the background when it's missing or older than 5 minutes.</summary>
     public void Refresh(bool force = false)
@@ -212,8 +212,8 @@ public sealed class LauncherIndex
     }
 
     /// <summary>What you open most, for the empty search.</summary>
-    public IEnumerable<Entry> Favourites(int n) =>
-        _entries.Where(e => e.Kind == Kind.App).Select(e => (e, h: Habit(e))).Where(x => x.h > 0).OrderByDescending(x => x.h).Take(n).Select(x => x.e);
+    public IEnumerable<Entry> Favourites(int n, ICollection<string>? hidden = null) =>
+        _entries.Where(e => e.Kind == Kind.App && (hidden == null || !hidden.Contains(e.Target))).Select(e => (e, h: Habit(e))).Where(x => x.h > 0).OrderByDescending(x => x.h).Take(n).Select(x => x.e);
 
     void LoadUsage()
     {
@@ -224,6 +224,116 @@ public sealed class LauncherIndex
             if (d == null) return;
             foreach (var (k, v) in d)
                 if (v.Length == 2) _usage[k] = (v[0], DateTime.UnixEpoch.AddMinutes(v[1]));
+        }
+        catch { }
+    }
+
+    // ───── what you picked for what you typed ("ch" + Enter was Chrome twice: "ch" means Chrome now)
+
+    readonly Dictionary<string, Dictionary<string, (int Count, DateTime Last)>> _picks = new();
+    readonly List<string> _recent = new();
+    static string PicksFile => Path.Combine(Settings.Folder, "launcher-picks.json");
+    const int MaxPrefixes = 1500, MaxRecent = 25;
+
+    sealed class PicksData
+    {
+        public Dictionary<string, Dictionary<string, int[]>> Picks { get; set; } = new();
+        public List<string> Recent { get; set; } = new();
+    }
+
+    /// <summary>Remembers that, for what was typed (and every shorter start of it), this was the one you wanted.</summary>
+    public void Picked(string query, Entry e)
+    {
+        string q = query.Trim().ToLowerInvariant();
+        if (q.Length == 0) return;
+        string key = e.Kind + "|" + e.Target;
+        var now = DateTime.UtcNow;
+        for (int len = 1; len <= Math.Min(q.Length, 24); len++)
+        {
+            string p = q[..len];
+            if (!_picks.TryGetValue(p, out var map)) _picks[p] = map = new();
+            map[key] = (map.TryGetValue(key, out var v) ? Math.Min(v.Count + 1, 50) : 1, now);
+            if (map.Count > 4) map.Remove(map.OrderBy(x => x.Value.Last).First().Key); // a few per start is plenty
+        }
+        if (_picks.Count > MaxPrefixes)
+            foreach (var old in _picks.OrderBy(x => x.Value.Values.Max(v => v.Last)).Take(_picks.Count - MaxPrefixes).Select(x => x.Key).ToList())
+                _picks.Remove(old);
+        SavePicks();
+    }
+
+    /// <summary>A lift for what you usually pick when you type this: big enough to put it first, fading over a few weeks.</summary>
+    public double PickBoost(string query, Entry e)
+    {
+        string q = query.Trim().ToLowerInvariant();
+        if (q.Length == 0 || !_picks.TryGetValue(q.Length > 24 ? q[..24] : q, out var map)) return 0;
+        if (!map.TryGetValue(e.Kind + "|" + e.Target, out var v)) return 0;
+        double fresh = Math.Max(0.4, 1 - (DateTime.UtcNow - v.Last).TotalDays / 45);
+        return (180 + 60 * Math.Min(v.Count, 4) / 4.0) * fresh;
+    }
+
+    /// <summary>What you searched for and then ran something, newest first (↑ in the empty box brings them back).</summary>
+    public IReadOnlyList<string> Recent => _recent;
+
+    public void Searched(string query)
+    {
+        string q = query.Trim();
+        if (q.Length < 2) return;
+        _recent.RemoveAll(r => string.Equals(r, q, StringComparison.OrdinalIgnoreCase));
+        _recent.Insert(0, q);
+        if (_recent.Count > MaxRecent) _recent.RemoveRange(MaxRecent, _recent.Count - MaxRecent);
+        SavePicks();
+    }
+
+    public void ForgetRecent() { _recent.Clear(); SavePicks(); }
+
+    /// <summary>Back to knowing nothing about you: no picks, no counts (Frequent starts over).</summary>
+    public void ForgetLearned()
+    {
+        _picks.Clear();
+        _usage.Clear();
+        SavePicks();
+        _ = Task.Run(() => { try { File.Delete(UsageFile); } catch { } });
+    }
+
+    int _picksVersion;
+
+    async void SavePicks()
+    {
+        int v = ++_picksVersion;
+        await Task.Delay(1200); // many picks in a row are saved once
+        if (v != _picksVersion) return;
+        var data = new PicksData
+        {
+            Picks = _picks.ToDictionary(p => p.Key, p => p.Value.ToDictionary(x => x.Key, x => new[] { x.Value.Count, (int)(x.Value.Last - DateTime.UnixEpoch).TotalMinutes })),
+            Recent = _recent.ToList(),
+        };
+        await Task.Run(() =>
+        {
+            try
+            {
+                Directory.CreateDirectory(Settings.Folder);
+                string tmp = PicksFile + ".tmp";
+                File.WriteAllText(tmp, JsonSerializer.Serialize(data));
+                File.Move(tmp, PicksFile, overwrite: true);
+            }
+            catch { }
+        });
+    }
+
+    void LoadPicks()
+    {
+        try
+        {
+            if (!File.Exists(PicksFile)) return;
+            var data = JsonSerializer.Deserialize<PicksData>(File.ReadAllText(PicksFile));
+            if (data == null) return;
+            foreach (var (p, map) in data.Picks)
+            {
+                var m = new Dictionary<string, (int, DateTime)>();
+                foreach (var (k, v) in map) if (v.Length == 2) m[k] = (v[0], DateTime.UnixEpoch.AddMinutes(v[1]));
+                if (m.Count > 0) _picks[p] = m;
+            }
+            _recent.AddRange(data.Recent.Where(r => !string.IsNullOrWhiteSpace(r)).Take(MaxRecent));
         }
         catch { }
     }

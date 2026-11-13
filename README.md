@@ -42,8 +42,13 @@ open the control center, then swipe between its pages:
 
 ### Search
 
-Press <kbd>Alt</kbd>+<kbd>Space</kbd>, click the magnifier, or start typing while the notch is open. It finds apps,
-files, folders and settings, and understands short instructions:
+Press <kbd>Alt</kbd>+<kbd>Space</kbd>, click the magnifier, or just start typing while the notch is open.
+
+It looks through your apps, settings, open windows, clipboard history and the files on every drive of your PC.
+Apps come first, then everything else. It also remembers what you pick, so the thing you want tends to be on top
+next time. Right-click any result for more options, like opening the folder it's in or copying its path.
+
+It understands short instructions too:
 
 ```
 remind me to call mum at 6        timer 25            focus for 45 min
@@ -53,6 +58,9 @@ volume 30 and dark mode           turn off bluetooth  shut down in an hour
 
 Each instruction shows what it will do, and nothing happens until you press Enter. Everything runs on your PC,
 except web searches and questions you choose to send to an AI assistant.
+
+If you keep your desktop icons hidden, the search shows your desktop instead, so nothing gets lost.
+You can change the shortcut and what the search looks through in **Preferences → Search**.
 
 ### Also
 

@@ -1,6 +1,6 @@
 # Privacy policy
 
-*Dynamic Notch · updated 13 November 2026*
+*Dynamic Notch · updated 13 November 2026 (version 2.3)*
 
 Dynamic Notch has no account, no ads, no analytics and no telemetry. Nothing about you or your PC is sent to the
 developer or to anyone else.
@@ -19,7 +19,8 @@ All of this stays on your PC.
 | The app in front and whether it's full screen | To step aside and hide in games and videos |
 | CPU, GPU, memory, temperatures and the apps using them | For the System page, game stats and warnings |
 | Battery, Wi-Fi, Bluetooth, brightness and audio devices | For the controls and alerts |
-| Start menu apps, recent files, and file names in Downloads, Desktop and Documents | For the search |
+| Start menu apps, recent files, and the names of files and folders on your drives | For the search |
+| The windows you have open | So the search can take you to them |
 
 ## What it keeps
 
@@ -29,7 +30,9 @@ Only on your PC, in `%APPDATA%\DynamicNotch`:
 - the shelf;
 - the clipboard history (text and pictures; anything copied from a password manager is skipped);
 - reminders;
-- how often you open things from the search, so they show up first;
+- how often you open things from the search and what you searched lately, so they show up first;
+- a list of file and folder names on your drives, with their dates (never what's inside them), so the search can find
+  files anywhere. Windows, program and app-data folders are left out. You can turn this off in Preferences → Search;
 - the overload log;
 - technical logs (`app.log`, `error.log`).
 

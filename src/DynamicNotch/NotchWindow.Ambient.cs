@@ -41,7 +41,7 @@ public partial class NotchWindow
     {
         if (!_ambientWired) { _ambientWired = true; _power.Changed += UpdateAmbient; }
         string key = ThemeKey;
-        bool on = key != "neon" && _mode == Mode.Expanded && !Eco && !_offScreen && !_hidden && RainDev != "off"; // (=off: for measuring)
+        bool on = key != "neon" && _mode == Mode.Expanded && !_launcherOpen && !Eco && !_offScreen && !_hidden && RainDev != "off"; // (=off: for measuring)
         foreach (var (k, a) in _ambients)
             if (k != key || !on) { a.Stop(); a.Visibility = Visibility.Collapsed; }
         if (!on || AmbientFor(key) is not { } mine) return;

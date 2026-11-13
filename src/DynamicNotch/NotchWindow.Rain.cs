@@ -59,7 +59,7 @@ public partial class NotchWindow
     {
         if (_rainPanel == null || _rainIdle == null || _rainBurst == null || _rainBeat == null) return;
         bool live = _cyber && !Eco && !_offScreen && !_hidden && RainDev != "off";
-        bool panel = live && _mode == Mode.Expanded;
+        bool panel = live && _mode == Mode.Expanded && !_launcherOpen; // the search covers it: no rain behind it
         bool idle = live && (_mode is Mode.Idle or Mode.Slim && !_media.IsPlaying && !InGame || RainDev == "idle" && _mode != Mode.Expanded);
 
         if (panel != _rainPanel.Running)

@@ -88,6 +88,34 @@ public sealed class Settings
     public double CompanionSize { get; set; } = 1.0;
     public DateTime? LastDownloadsNag { get; set; }
 
+    // ── the search
+    /// <summary>The key that opens the search: "alt-space", "ctrl-space", "ctrl-alt-space", "win-alt-space" or "off".</summary>
+    public string SearchHotkey { get; set; } = "alt-space";
+    /// <summary>With the notch open and the pointer on it, typing opens the search.</summary>
+    public bool SearchTypeToOpen { get; set; } = true;
+    /// <summary>The magnifier in the control center's header.</summary>
+    public bool SearchButton { get; set; } = true;
+    /// <summary>The empty search: your most-used apps, recent searches, things to try.</summary>
+    public bool SearchFrequent { get; set; } = true;
+    public bool SearchRecent { get; set; } = true;
+    public bool SearchTry { get; set; } = true;
+    /// <summary>Apps taken out of "Frequent" (their Start menu ids).</summary>
+    public List<string> SearchHiddenApps { get; set; } = new();
+    /// <summary>Files anywhere on the PC from Windows' index, and the words inside documents.</summary>
+    public bool SearchWholePc { get; set; } = true;
+    public bool SearchInsideFiles { get; set; } = true;
+    /// <summary>Open windows, and what you copied or kept on the shelf.</summary>
+    public bool SearchWindows { get; set; } = true;
+    public bool SearchClipboard { get; set; } = true;
+    /// <summary>Plain-language commands ("volume 30", "remind me…") and quick answers (sums, time zones…).</summary>
+    public bool SearchCommands { get; set; } = true;
+    /// <summary>What you pick for what you type moves to the top.</summary>
+    public bool SearchLearn { get; set; } = true;
+    /// <summary>The web search at the bottom: "google", "bing", "duckduckgo" or "brave".</summary>
+    public string SearchEngine { get; set; } = "google";
+    /// <summary>The AI assistant offered for questions: "chatgpt", "claude", "perplexity", "copilot" or "off".</summary>
+    public string SearchAssistant { get; set; } = "chatgpt";
+
     public static string Folder =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DynamicNotch");
 

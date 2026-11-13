@@ -22,7 +22,7 @@ internal static class Native
     public const int WM_MOUSEHWHEEL = 0x020E;
     public const int DBT_DEVICEARRIVAL = 0x8000, DBT_DEVICEREMOVECOMPLETE = 0x8004, DBT_DEVTYP_VOLUME = 2;
     public const int HSHELL_FLASH = 0x8006;
-    public const uint MOD_ALT = 0x1, MOD_WIN = 0x8, MOD_NOREPEAT = 0x4000;
+    public const uint MOD_ALT = 0x1, MOD_CONTROL = 0x2, MOD_WIN = 0x8, MOD_NOREPEAT = 0x4000;
 
     public const int VK_LBUTTON = 0x01, VK_RBUTTON = 0x02, VK_CAPITAL = 0x14;
 

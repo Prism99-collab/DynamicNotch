@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.3.0] — 2026-11-13
+
+This one is all about the search.
+
+### Added
+- Files on every drive, not just your user folders. The notch keeps its own list of file names in the background,
+  so this works even on PCs where Windows indexing is off.
+- Words inside your documents, through Windows' index.
+- Open windows, your clipboard history and the shelf show up in results.
+- It learns what you pick and puts it first next time. A grey hint finishes the name you're typing, and Tab takes it.
+- Press ↑ in the empty box to get an earlier search back.
+- Right-click a result (or press →) for more: open with, show in folder, copy the path, run as administrator and more.
+- With your desktop icons hidden, the search shows your desktop first. Type `desktop:` to see only what's on it.
+- A Search page in Preferences: change or turn off the shortcut, pick your web search and AI assistant, remove apps
+  from Frequent, and clear what it has learned.
+
+### Changed
+- Results always come in the same order: apps first, then open windows, the desktop, settings and files.
+- Typing feels much smoother.
+- The search matches whichever theme you use.
+- File results show their type, and the one you're on shows where it lives.
+
 ## [2.1.0] — 2026-11-13
 
 ### Added
