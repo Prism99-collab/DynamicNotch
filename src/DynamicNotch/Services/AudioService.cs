@@ -193,6 +193,48 @@ public sealed class AudioService : IMMNotificationClient
         return paths;
     });
 
+    /// <summary>
+    /// Mutes (or unmutes) one app's own microphone streams, on every microphone, leaving the microphone itself on:
+    /// the call hears nothing, yet the notch can still hear you (to tell you you're talking while muted).
+    /// True if the app had a stream to mute.
+    /// </summary>
+    public static Task<bool> SetAppMicMutedAsync(string path, bool mute) => Task.Run(() =>
+    {
+        bool any = false;
+        try
+        {
+            using var en = new MMDeviceEnumerator();
+            foreach (var dev in en.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
+            {
+                using (dev)
+                {
+                    try
+                    {
+                        var mgr = dev.AudioSessionManager;
+                        mgr.RefreshSessions();
+                        var sessions = mgr.Sessions;
+                        for (int i = 0; i < sessions.Count; i++)
+                        {
+                            using var s = sessions[i];
+                            try
+                            {
+                                uint pid = s.GetProcessID;
+                                if (pid == 0 || pid == Environment.ProcessId) continue;
+                                if (!string.Equals(Interop.Native.ProcessPathById(pid), path, StringComparison.OrdinalIgnoreCase)) continue;
+                                s.SimpleAudioVolume.Mute = mute;
+                                any = true;
+                            }
+                            catch { }
+                        }
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch { }
+        return any;
+    });
+
     /// <summary>The apps playing sound right now on the default output (exe paths). Off the UI thread.</summary>
     public static Task<List<string>> ActiveRenderAppsAsync() => Task.Run(() =>
     {
@@ -272,6 +314,25 @@ public sealed class AudioService : IMMNotificationClient
         if (_out == null) return;
         Muted = !Muted;
         try { _out.AudioEndpointVolume.Mute = Muted; } catch { }
+    }
+
+    /// <summary>How loud the microphone records (Windows' own input level, 0–1).</summary>
+    public float MicVolume
+    {
+        get { try { return _mic?.AudioEndpointVolume.MasterVolumeLevelScalar ?? 0; } catch { return 0; } }
+    }
+
+    public void SetMicVolume(float v)
+    {
+        try { if (_mic != null) _mic.AudioEndpointVolume.MasterVolumeLevelScalar = Math.Clamp(v, 0f, 1f); } catch { }
+    }
+
+    /// <summary>Mutes or unmutes the microphone (rather than flipping it).</summary>
+    public void SetMicMuted(bool muted)
+    {
+        if (_mic == null || MicMuted == muted) return;
+        MicMuted = muted;
+        try { _mic.AudioEndpointVolume.Mute = muted; } catch { }
     }
 
     public void ToggleMic()

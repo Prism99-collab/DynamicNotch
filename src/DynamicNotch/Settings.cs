@@ -88,6 +88,22 @@ public sealed class Settings
     public double CompanionSize { get; set; } = 1.0;
     public DateTime? LastDownloadsNag { get; set; }
 
+    // ── calls (the Calls page)
+    /// <summary>Opening the notch during a call lands on the Calls page.</summary>
+    public bool CallsOpenOnCall { get; set; } = true;
+    /// <summary>Camera, share, hang up and raise hand press the call app's own shortcut (Teams, Zoom, Meet).</summary>
+    public bool CallShortcuts { get; set; } = true;
+    /// <summary>When a call starts: pause the music, quiet the other apps, hold notifications.</summary>
+    public bool CallPauseMusic { get; set; }
+    public bool CallQuietOthers { get; set; }
+    public bool CallFocus { get; set; }
+    /// <summary>Presenter mode also hides the desktop icons.</summary>
+    public bool PresenterHidesIcons { get; set; } = true;
+    /// <summary>A short list of past calls (app, when, how long) on the Calls page.</summary>
+    public bool CallHistory { get; set; } = true;
+    /// <summary>One-click messages for the call's chat.</summary>
+    public List<string> CallReplies { get; set; } = new() { "Be right back", "Can you hear me?", "One sec, I'm muted", "I'll call you back", "Sharing my screen now" };
+
     // ── the search
     /// <summary>The key that opens the search: "alt-space", "ctrl-space", "ctrl-alt-space", "win-alt-space" or "off".</summary>
     public string SearchHotkey { get; set; } = "alt-space";

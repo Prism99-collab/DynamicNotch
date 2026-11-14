@@ -690,6 +690,7 @@ public partial class NotchWindow : Window
         SetMode(Mode.Expanded);
         PlayEntrance();
         _tick.Start();
+        LandOnCallsPage();
         OnPageShown(_page);
         KeepOnTop();
     }
@@ -698,6 +699,7 @@ public partial class NotchWindow : Window
     {
         if (_mode != Mode.Expanded) return;
         EndLauncher(giveBack: false);
+        CloseCallSheet(instant: true);
         UpdateTypeToSearch(false);
         _tick.Stop();
         _sysTimer.Stop();

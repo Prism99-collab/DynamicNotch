@@ -43,23 +43,25 @@ public partial class NotchWindow
             OnCallCheck();
         };
         _callWatch.Start();
-        _audio.MicChanged += () => { if (OnCall) { UpdateCallUi(); if (_mode == Mode.Activity) UpdateActivityContent(); UpdateRim(); UpdateSlimGlow(); UpdatePanelTint(); } };
+        _audio.MicChanged += () => { if (OnCall && _page == CallsPage && _mode == Mode.Expanded) UpdateCallsPage(); if (OnCall) { UpdateCallUi(); if (_mode == Mode.Activity) UpdateActivityContent(); UpdateRim(); UpdateSlimGlow(); UpdatePanelTint(); } };
         _callTick.Tick += (_, _) =>
         {
             if (_mode == Mode.Activity && CurrentActivity == LiveActivity.Call) UpdateActivityContent();
             else if (_secondShown == LiveActivity.Call) { FillSecond(LiveActivity.Call); PlaceSecond(); }
             if (_mode == Mode.Expanded && _page == 0) UpdateCallUi();
+            if (_mode == Mode.Expanded && _page == CallsPage) UpdateCallsPage();
         };
         CallMuteBtn.Click += (_, _) =>
         {
-            _audio.ToggleMic();
+            bool mute = !CallMuted;
+            _ = SetCallMutedAsync(mute);
             UpdateCallUi();
             // a squeeze on the button, and the notch's rim answers in the new state's colour
             var pop = new DoubleAnimation(0.86, 1, TimeSpan.FromMilliseconds(420)) { EasingFunction = new Controls.SpringEase { Damping = 0.5 } };
             if (CallMuteBtn.RenderTransform is not ScaleTransform st) { CallMuteBtn.RenderTransformOrigin = new Point(0.5, 0.5); CallMuteBtn.RenderTransform = st = new ScaleTransform(); }
             st.BeginAnimation(ScaleTransform.ScaleXProperty, pop);
             st.BeginAnimation(ScaleTransform.ScaleYProperty, pop);
-            FlashRim(((SolidColorBrush)(_audio.MicMuted ? Red : Green)).Color);
+            FlashRim(((SolidColorBrush)(mute ? Red : Green)).Color);
         };
         CallBackBtn.Click += async (_, _) => { await BackToCallAsync(); Collapse(); };
         for (int i = 0; i < _callLevel.Length; i++)
@@ -131,7 +133,8 @@ public partial class NotchWindow
         _callTick.Start();
         UpdateCallUi();
         RefreshBase();
-        if (switched) return;
+        if (switched) { BuildCallButtons(); UpdateCallsPage(); return; }
+        OnCallBegan();
         AppLog.Write($"call started: {name}");
         ShowOsd("call", icon == null ? "" : null, null, _cyber && answered ? Loc.T("LINK ESTABLISHED") : "On a call", name, null, art: icon, glyphBrush: Green,
             seconds: 2.6, motion: Motion.Pulse, onClick: () => ExpandTo(0));
@@ -148,6 +151,7 @@ public partial class NotchWindow
         AppLog.Write($"call ended: {call.Name} after {length:hh\\:mm\\:ss}");
         UpdateCallUi();
         RefreshBase();
+        OnCallFinished(call, length);
         ShowOsd("call-end", call.Icon == null ? "" : null, null, $"Call ended · {FormatTimer(length)}", call.Name, null,
             art: call.Icon, seconds: 2.4, prio: Prio.Low);
     }
@@ -166,7 +170,7 @@ public partial class NotchWindow
 
     // ───────────────────────────── what's shown ─────────────────────────────
 
-    Brush CallBrush => _audio.MicMuted ? Red : Green;
+    Brush CallBrush => CallMuted ? Red : Green;
 
     /// <summary>The compact call pill: icon + live dot on the left, voice bars and the timer on the right.</summary>
     void FillCallPill()
@@ -174,7 +178,7 @@ public partial class NotchWindow
         if (_call is not { } call) return;
         var brush = CallBrush;
         ActGlyph.Visibility = call.Icon == null ? Visibility.Visible : Visibility.Collapsed;
-        ActGlyph.Text = _audio.MicMuted ? "" : "";
+        ActGlyph.Text = CallMuted ? "" : "";
         ActGlyph.Foreground = brush;
         CallArtHost.Visibility = call.Icon != null ? Visibility.Visible : Visibility.Collapsed;
         if (call.Icon != null) CallArt.Background = IconBrush(call.Icon);
@@ -203,14 +207,14 @@ public partial class NotchWindow
             var brush = CallBrush;
             CallCardArt.Background = call.Icon != null ? IconBrush(call.Icon) : new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x21));
             CallTitle.Text = call.Name;
-            CallSub.Text = $"{(_audio.MicMuted ? "Muted" : "On a call")} · {FormatTimer(DateTime.UtcNow - call.Started)}";
+            CallSub.Text = $"{(CallMuted ? "Muted" : "On a call")} · {FormatTimer(DateTime.UtcNow - call.Started)}";
             CallCardDot.Fill = brush;
             CallRing.BorderBrush = brush;
             foreach (var r in CallVoice.Children.OfType<Rectangle>()) r.Fill = brush;
-            CallMuteBg.Fill = _audio.MicMuted ? Red : (Brush)FindResource("Tile");
-            CallMuteGlyph.Text = _audio.MicMuted ? "" : "";
-            CallMuteGlyph.Foreground = _audio.MicMuted ? Brushes.Black : Brushes.White;
-            CallMuteBtn.ToolTip = _audio.MicMuted ? "Unmute your microphone" : "Mute your microphone";
+            CallMuteBg.Fill = CallMuted ? Red : (Brush)FindResource("Tile");
+            CallMuteGlyph.Text = CallMuted ? "" : "";
+            CallMuteGlyph.Foreground = CallMuted ? Brushes.Black : Brushes.White;
+            CallMuteBtn.ToolTip = CallMuted ? "Unmute the call" : "Mute the call (the notch still hears you)";
         }
         bool bars = on && !Eco && ((_mode == Mode.Activity && CurrentActivity == LiveActivity.Call) || (_mode == Mode.Expanded && _page == 0));
         if (bars != _callBarsOn) { _callBarsOn = bars; UpdateMeter(); }
@@ -220,7 +224,7 @@ public partial class NotchWindow
     void OnCallMeter()
     {
         if (!_audio.TryGetMicPeak(out float peak)) return;
-        _voice += (Math.Clamp(Math.Sqrt(peak) * 1.5, 0, 1) - _voice) * 0.35;
+        _voice += (Math.Clamp(Math.Sqrt(CallMuted ? 0 : peak) * 1.5, 0, 1) - _voice) * 0.35;
         double t = Environment.TickCount64 / 1000.0;
         if (_mode == Mode.Activity)
         {

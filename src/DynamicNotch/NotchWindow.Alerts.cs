@@ -273,6 +273,7 @@ public partial class NotchWindow
         if (InGame && kind != "battery") return; // nothing pops up in the middle of a game
         if (_focus.IsOn && !force && !FocusAllows(kind)) return;
         if (_hidden && !force) return;
+        if (_presenter && !force && kind is not ("call" or "call-end" or "volume" or "brightness")) return; // presenting: your screen is theirs
         // a file is being dragged into the drop zone: don't yank it away, show this right after
         if (_mode == Mode.Drop) { Enqueue(req); return; }
         if (_mode == Mode.Expanded)

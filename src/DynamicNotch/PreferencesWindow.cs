@@ -45,13 +45,14 @@ public sealed class PreferencesWindow : Window
         _open.Activate();
     }
 
-    enum Sec { General, Appearance, Behaviour, Alerts, Pages, Shortcuts, About, Search }
+    enum Sec { General, Appearance, Behaviour, Alerts, Pages, Shortcuts, About, Search, Calls }
     static readonly (Sec Sec, string Glyph, string Name, string Sub)[] Sections =
     {
         (Sec.General, "", "General", "Language, start-up and power"),
         (Sec.Appearance, "", "Appearance", "Theme, colours and how the notch looks"),
         (Sec.Behaviour, "", "Behaviour", "How the notch reacts to you"),
         (Sec.Search, "\uE721", "Search", "What it finds, how it opens, what it remembers"),
+        (Sec.Calls, "\uE717", "Calls", "The Calls page, and what happens when a call starts"),
         (Sec.Alerts, "", "Alerts", "What the notch tells you, and the smart helpers"),
         (Sec.Pages, "", "Pages", "Choose the pages of the control center"),
         (Sec.Shortcuts, "", "Shortcuts", "Keys and gestures"),
@@ -280,6 +281,7 @@ public sealed class PreferencesWindow : Window
             case Sec.Pages: Pages(); break;
             case Sec.Shortcuts: Shortcuts(); break;
             case Sec.Search: SearchSection(); break;
+            case Sec.Calls: CallsSection(); break;
             case Sec.About: About(); break;
         }
         BeginAnimation(SmoothOffsetProperty, null);
@@ -354,6 +356,15 @@ public sealed class PreferencesWindow : Window
         new(Sec.Search, "\uE81C", "Recent searches", "Shown when the search is empty; ↑ brings them back", () => _s.SearchRecent, v => _s.SearchRecent = v, "empty"),
         new(Sec.Search, "\uE82F", "Suggestions", "A few things to try", () => _s.SearchTry, v => _s.SearchTry = v, "empty"),
 
+        new(Sec.Calls, "\uE717", "Calls page", "Second page of the control center: your call, from the notch", () => !_s.HiddenPages.Contains(6), v => _notch.PrefSetPage(6, v), "page"),
+        new(Sec.Calls, "\uE8A7", "Open on the Calls page", "During a call, the notch opens straight on it", () => _s.CallsOpenOnCall, v => _s.CallsOpenOnCall = v, "page"),
+        new(Sec.Calls, "\uE765", "Call app shortcuts", "Camera, share, raise hand and end, through Teams, Zoom and Meet's own shortcuts", () => _s.CallShortcuts, v => { _s.CallShortcuts = v; _notch.PrefCallsChanged(); }, "page"),
+        new(Sec.Calls, "\uE768", "Pause music when a call starts", "And play it again when the call ends", () => _s.CallPauseMusic, v => _s.CallPauseMusic = v, "start"),
+        new(Sec.Calls, "\uE74F", "Quiet other apps during calls", "Everything else down to a whisper, then back", () => _s.CallQuietOthers, v => _s.CallQuietOthers = v, "start"),
+        new(Sec.Calls, "\uE708", "Focus during calls", "Notifications wait until the call ends", () => _s.CallFocus, v => _s.CallFocus = v, "start"),
+        new(Sec.Calls, "\uE7F4", "Presenter mode hides desktop icons", "A clean desktop while you share your screen", () => _s.PresenterHidesIcons, v => _s.PresenterHidesIcons = v, "start"),
+        new(Sec.Calls, "\uE81C", "Call history", "Your last calls on the Calls page (only on this PC)", () => _s.CallHistory, v => _s.CallHistory = v, "start"),
+        new(Sec.Pages, "\uE717", "Calls", "Your call, from the notch", () => !_s.HiddenPages.Contains(6), v => _notch.PrefSetPage(6, v)),
         new(Sec.Pages, "", "System", "CPU, memory, storage, network and battery", () => !_s.HiddenPages.Contains(1), v => _notch.PrefSetPage(1, v)),
         new(Sec.Pages, "", "Tools", "Timer, snip, terminal, calculator and more", () => !_s.HiddenPages.Contains(2), v => _notch.PrefSetPage(2, v)),
         new(Sec.Pages, "", "Clipboard & Files", "Copy history, the shelf and recent files", () => !_s.HiddenPages.Contains(3), v => _notch.PrefSetPage(3, v)),
@@ -1028,6 +1039,38 @@ public sealed class PreferencesWindow : Window
         learned.Margin = new Thickness(0, 0, 8, 8);
         memory.Children.Add(learned);
         _content.Children.Add(memory);
+    }
+
+    /// <summary>The Calls page: the page, its buttons, what happens when a call starts, your quick replies.</summary>
+    void CallsSection()
+    {
+        Label(Loc.T("The page"));
+        Card(Rows().Where(r => r.Sec == Sec.Calls && r.Group == "page"));
+        Label(Loc.T("When a call starts"));
+        Card(Rows().Where(r => r.Sec == Sec.Calls && r.Group == "start"));
+
+        Label(Loc.T("Quick replies"));
+        _content.Children.Add(new TextBlock { Text = Loc.T("One per line. A click copies it and opens the call's chat."), Foreground = Dim, FontSize = 12, Margin = new Thickness(4, -2, 0, 8), TextWrapping = TextWrapping.Wrap });
+        var box = new TextBox
+        {
+            Text = string.Join(Environment.NewLine, _s.CallReplies), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 96, MaxHeight = 180,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(10, 8, 10, 8), Background = Faint, Foreground = Text,
+            BorderBrush = Edge, BorderThickness = new Thickness(1), CaretBrush = Text, FontSize = 12.5,
+        };
+        box.LostKeyboardFocus += (_, _) =>
+        {
+            var list = box.Text.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).Take(12).ToList();
+            if (list.SequenceEqual(_s.CallReplies)) return;
+            _s.CallReplies = list;
+            _s.Save();
+            Saved();
+        };
+        _content.Children.Add(CardOf(box, new Thickness(0)));
+
+        var clear = PillButton("\uE74D", Loc.T("Clear call history"), () => { _notch.PrefClearCallHistory(); Saved(); }, primary: false);
+        clear.HorizontalAlignment = HorizontalAlignment.Left;
+        clear.Margin = new Thickness(0, 6, 0, 0);
+        _content.Children.Add(clear);
     }
 
     /// <summary>A row of pills, one of them picked (saved at once).</summary>

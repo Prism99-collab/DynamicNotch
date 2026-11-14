@@ -34,6 +34,7 @@ open the control center, then swipe between its pages:
 | Page | |
 |---|---|
 | Home | Now playing, Wi-Fi, Bluetooth, focus, volume and app mixer, brightness |
+| Calls | Mute, camera, share and leave for Discord, Teams, Zoom, Meet and more; a mic check between calls |
 | System | CPU, memory, disk, battery, network and downloads |
 | Tools | Timer, snip, keep awake and quick shortcuts |
 | Clipboard & Files | Shelf, clipboard history, recent downloads and screenshots |

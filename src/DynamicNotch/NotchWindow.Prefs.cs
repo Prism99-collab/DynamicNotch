@@ -34,6 +34,13 @@ public partial class NotchWindow
         EnsureFileIndex();
     }
     internal bool PrefSearchKeyTaken => LauncherKeyTaken;
+
+    /// <summary>A Calls setting changed: the call's buttons follow at once.</summary>
+    internal void PrefCallsChanged()
+    {
+        _settings.Save();
+        if (_call != null) { BuildCallButtons(); UpdateCallsPage(); }
+    }
     internal int PrefHiddenApps => _settings.SearchHiddenApps.Count;
     internal void PrefShowHiddenApps() { _settings.SearchHiddenApps.Clear(); _settings.Save(); }
     internal int PrefRecentSearches => _index.Recent.Count;
@@ -76,30 +83,35 @@ public partial class NotchWindow
 
     // ───────────── optional pages ─────────────
 
-    internal static readonly int[] OptionalPages = { 1, 2, 3, 4 };
+    internal static readonly int[] OptionalPages = { 6, 1, 2, 3, 4 };
 
-    bool PageHidden(int page) => page is > 0 and < 5 && _settings.HiddenPages.Contains(page);
+    bool PageHidden(int page) => (page is > 0 and < 5 || page == CallsPage) && _settings.HiddenPages.Contains(page);
 
     /// <summary>Where a page sits among the ones shown (the strip skips hidden pages).</summary>
     int PagePos(int page)
     {
         int pos = 0;
-        for (int i = 0; i < page; i++) if (!PageHidden(i)) pos++;
+        foreach (int i in PageOrder)
+        {
+            if (i == page) return pos;
+            if (!PageHidden(i)) pos++;
+        }
         return pos;
     }
 
     int PageAtPos(int pos)
     {
-        for (int i = 0, p = 0; i < PageNames.Length; i++)
+        int p = 0;
+        foreach (int i in PageOrder)
         {
             if (PageHidden(i)) continue;
             if (p == pos) return i;
             p++;
         }
-        return PageNames.Length - 1;
+        return PageOrder[^1];
     }
 
-    int VisiblePageCount => Enumerable.Range(0, PageNames.Length).Count(i => !PageHidden(i));
+    int VisiblePageCount => PageOrder.Count(i => !PageHidden(i));
 
     /// <summary>The next shown page in a direction (or the same one at the ends).</summary>
     int StepPage(int dir) => PageAtPos(Math.Clamp(PagePos(_page) + dir, 0, VisiblePageCount - 1));
@@ -114,11 +126,11 @@ public partial class NotchWindow
 
     void ApplyPageVisibility()
     {
-        for (int i = 0; i < PagesStrip.Children.Count && i < PageNames.Length; i++)
+        for (int i = 0; i < PageNames.Length; i++)
         {
             var vis = PageHidden(i) ? Visibility.Collapsed : Visibility.Visible;
-            PagesStrip.Children[i].Visibility = vis;
-            if (i < Dots.Children.Count) Dots.Children[i].Visibility = vis;
+            if (_pageEls[i] != null) _pageEls[i].Visibility = vis;
+            if (i < _dots.Count && _dots[i].Parent is UIElement hit) hit.Visibility = vis;
         }
         CyberArtPages();
         GoToPage(PageHidden(_page) ? 0 : _page, instant: true);

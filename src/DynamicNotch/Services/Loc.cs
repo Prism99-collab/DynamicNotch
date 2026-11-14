@@ -20,6 +20,27 @@ public static class Loc
 
     static readonly Dictionary<string, string> Fr = new()
     {
+        // the Calls page
+        ["Calls"] = "Appels", ["The Calls page, and what happens when a call starts"] = "La page Appels, et ce qui se passe quand un appel commence", ["Calls page"] = "Page Appels",
+        ["Second page of the control center: your call, from the notch"] = "Deuxième page du centre de contrôle : votre appel, depuis l'encoche", ["Open on the Calls page"] = "Ouvrir sur la page Appels", ["During a call, the notch opens straight on it"] = "Pendant un appel, l'encoche s'ouvre directement dessus",
+        ["Call app shortcuts"] = "Raccourcis des apps d'appel", ["Camera, share, raise hand and end, through Teams, Zoom and Meet's own shortcuts"] = "Caméra, partage, main levée et raccrocher, via les raccourcis de Teams, Zoom et Meet", ["Pause music when a call starts"] = "Mettre la musique en pause pendant un appel",
+        ["And play it again when the call ends"] = "Et la relancer à la fin de l'appel", ["Quiet other apps during calls"] = "Baisser les autres apps pendant les appels", ["Everything else down to a whisper, then back"] = "Tout le reste en sourdine, puis comme avant",
+        ["Focus during calls"] = "Concentration pendant les appels", ["Notifications wait until the call ends"] = "Les notifications attendent la fin de l'appel", ["Presenter mode hides desktop icons"] = "Le mode présentateur masque les icônes du bureau",
+        ["A clean desktop while you share your screen"] = "Un bureau propre pendant le partage d'écran", ["Call history"] = "Historique des appels", ["Your last calls on the Calls page (only on this PC)"] = "Vos derniers appels sur la page Appels (sur ce PC seulement)",
+        ["Your call, from the notch"] = "Votre appel, depuis l'encoche", ["The page"] = "La page", ["When a call starts"] = "Quand un appel commence",
+        ["Quick replies"] = "Réponses rapides", ["One per line. A click copies it and opens the call's chat."] = "Une par ligne. Un clic la copie et ouvre la discussion de l'appel.", ["Clear call history"] = "Effacer l'historique des appels",
+        ["Back to call"] = "Retour à l'appel", ["Test mic"] = "Tester le micro", ["Start a call"] = "Lancer un appel",
+        ["Muted"] = "Muet", ["On a call"] = "En appel", ["you talked {0}%"] = "vous avez parlé {0} %",
+        ["camera on"] = "caméra allumée", ["deafened"] = "sourdine totale", ["presenting"] = "présentation",
+        ["No call right now"] = "Aucun appel en cours", ["Last call: {0} · {1} · {2}"] = "Dernier appel : {0} · {1} · {2}", ["Calls from Discord, Teams, Zoom, WhatsApp, Meet… show up here"] = "Les appels Discord, Teams, Zoom, WhatsApp, Meet… s'affichent ici",
+        ["Hear yourself: speak for three seconds"] = "Écoutez-vous : parlez trois secondes", ["Talking…"] = "Vous parlez…", ["Unmute"] = "Réactiver",
+        ["Mute"] = "Muet", ["Camera on"] = "Caméra active", ["Camera"] = "Caméra",
+        ["Share"] = "Partager", ["Hand"] = "Main", ["Deafened"] = "Sourdine",
+        ["Deafen"] = "Sourdine", ["Present"] = "Présenter", ["Quiet others"] = "Baisser le reste",
+        ["Chat"] = "Discussion", ["Hold…"] = "Maintenez…", ["End"] = "Raccrocher",
+        ["Open the Meet tab first"] = "Ouvrez d'abord l'onglet Meet", ["Can't find the call's window"] = "Fenêtre de l'appel introuvable", ["Copied · Ctrl+V to send"] = "Copié · Ctrl+V pour envoyer",
+        ["Listening… say something"] = "J'écoute… dites quelque chose", ["Playing it back…"] = "Lecture…", ["The microphone couldn't be opened"] = "Le micro n'a pas pu être ouvert",
+        ["New Meet"] = "Nouveau Meet",
         // the search
         ["What it finds, how it opens, what it remembers"] = "Ce qu'elle trouve, comment elle s'ouvre, ce qu'elle retient", ["Type to search"] = "Taper pour chercher", ["With the notch open and the pointer on it, just start typing"] = "Encoche ouverte et pointeur dessus : commencez simplement à taper",
         ["Search button"] = "Bouton de recherche", ["The magnifier in the control center's header"] = "La loupe dans l'en-tête du centre de contrôle", ["Commands and answers"] = "Commandes et réponses",
@@ -135,6 +156,27 @@ public static class Loc
 
     static readonly Dictionary<string, string> Ar = new()
     {
+        // the Calls page
+        ["Calls"] = "المكالمات", ["The Calls page, and what happens when a call starts"] = "صفحة المكالمات، وما يحدث عند بدء مكالمة", ["Calls page"] = "صفحة المكالمات",
+        ["Second page of the control center: your call, from the notch"] = "الصفحة الثانية في مركز التحكم: مكالمتك من النوتش", ["Open on the Calls page"] = "الفتح على صفحة المكالمات", ["During a call, the notch opens straight on it"] = "أثناء المكالمة يُفتح النوتش عليها مباشرة",
+        ["Call app shortcuts"] = "اختصارات تطبيقات المكالمات", ["Camera, share, raise hand and end, through Teams, Zoom and Meet's own shortcuts"] = "الكاميرا والمشاركة ورفع اليد والإنهاء عبر اختصارات Teams وZoom وMeet", ["Pause music when a call starts"] = "إيقاف الموسيقى عند بدء مكالمة",
+        ["And play it again when the call ends"] = "وتشغيلها من جديد عند انتهاء المكالمة", ["Quiet other apps during calls"] = "خفض التطبيقات الأخرى أثناء المكالمات", ["Everything else down to a whisper, then back"] = "كل شيء آخر يصبح همسًا ثم يعود",
+        ["Focus during calls"] = "التركيز أثناء المكالمات", ["Notifications wait until the call ends"] = "تنتظر الإشعارات حتى نهاية المكالمة", ["Presenter mode hides desktop icons"] = "وضع العرض يخفي أيقونات سطح المكتب",
+        ["A clean desktop while you share your screen"] = "سطح مكتب نظيف أثناء مشاركة الشاشة", ["Call history"] = "سجل المكالمات", ["Your last calls on the Calls page (only on this PC)"] = "آخر مكالماتك في صفحة المكالمات (على هذا الحاسوب فقط)",
+        ["Your call, from the notch"] = "مكالمتك من النوتش", ["The page"] = "الصفحة", ["When a call starts"] = "عند بدء مكالمة",
+        ["Quick replies"] = "ردود سريعة", ["One per line. A click copies it and opens the call's chat."] = "رد في كل سطر. النقر ينسخه ويفتح دردشة المكالمة.", ["Clear call history"] = "مسح سجل المكالمات",
+        ["Back to call"] = "العودة إلى المكالمة", ["Test mic"] = "اختبار الميكروفون", ["Start a call"] = "بدء مكالمة",
+        ["Muted"] = "مكتوم", ["On a call"] = "في مكالمة", ["you talked {0}%"] = "تحدثت {0}%",
+        ["camera on"] = "الكاميرا تعمل", ["deafened"] = "صمت تام", ["presenting"] = "عرض",
+        ["No call right now"] = "لا توجد مكالمة الآن", ["Last call: {0} · {1} · {2}"] = "آخر مكالمة: {0} · {1} · {2}", ["Calls from Discord, Teams, Zoom, WhatsApp, Meet… show up here"] = "مكالمات Discord وTeams وZoom وWhatsApp وMeet… تظهر هنا",
+        ["Hear yourself: speak for three seconds"] = "اسمع نفسك: تحدث ثلاث ثوانٍ", ["Talking…"] = "تتحدث…", ["Unmute"] = "إلغاء الكتم",
+        ["Mute"] = "كتم", ["Camera on"] = "الكاميرا تعمل", ["Camera"] = "الكاميرا",
+        ["Share"] = "مشاركة", ["Hand"] = "يد", ["Deafened"] = "صمت تام",
+        ["Deafen"] = "صمت تام", ["Present"] = "عرض", ["Quiet others"] = "خفض الباقي",
+        ["Chat"] = "دردشة", ["Hold…"] = "استمر بالضغط…", ["End"] = "إنهاء",
+        ["Open the Meet tab first"] = "افتح علامة تبويب Meet أولًا", ["Can't find the call's window"] = "تعذّر العثور على نافذة المكالمة", ["Copied · Ctrl+V to send"] = "تم النسخ · Ctrl+V للإرسال",
+        ["Listening… say something"] = "أستمع… قل شيئًا", ["Playing it back…"] = "أعيد التشغيل…", ["The microphone couldn't be opened"] = "تعذّر فتح الميكروفون",
+        ["New Meet"] = "Meet جديد",
         // the search
         ["What it finds, how it opens, what it remembers"] = "ما يجده، وكيف يُفتح، وما يتذكره", ["Type to search"] = "اكتب للبحث", ["With the notch open and the pointer on it, just start typing"] = "والنوتش مفتوح والمؤشر فوقه، ابدأ الكتابة فقط",
         ["Search button"] = "زر البحث", ["The magnifier in the control center's header"] = "العدسة في رأس مركز التحكم", ["Commands and answers"] = "الأوامر والإجابات",

@@ -17,7 +17,13 @@ namespace DynamicNotch;
 /// <summary>Swipeable pages: Home, System, Tools, Clipboard &amp; Files, Smart and Settings.</summary>
 public partial class NotchWindow
 {
-    static readonly string[] PageNames = { "", "System", "Tools", "Clipboard & Files", "Colors", "Settings" };
+    static readonly string[] PageNames = { "", "System", "Tools", "Clipboard & Files", "Colors", "Settings", "Calls" };
+    /// <summary>The order pages come in, left to right (each keeps its own number: Calls is 6, shown second).</summary>
+    static readonly int[] PageOrder = { 0, 6, 1, 2, 3, 4, 5 };
+    readonly UIElement[] _pageEls = new UIElement[7];
+
+    /// <summary>A page's own panel in the strip.</summary>
+    UIElement PageElement(int page) => _pageEls[page];
     const double PageWidth = 440;
 
     int _page;
@@ -54,7 +60,14 @@ public partial class NotchWindow
 
     void WirePages()
     {
-        // page dots
+        // the Calls page goes second; each page remembers its own panel
+        var made = PagesStrip.Children.Cast<UIElement>().ToList();
+        for (int i = 0; i < made.Count && i < 6; i++) _pageEls[i] = made[i];
+        _pageEls[CallsPage] = BuildCallsPage();
+        PagesStrip.Children.Insert(1, _pageEls[CallsPage]);
+
+        // page dots (one per page, in the order they come)
+        var hits = new Border[PageNames.Length];
         for (int i = 0; i < PageNames.Length; i++)
         {
             int idx = i;
@@ -62,8 +75,9 @@ public partial class NotchWindow
             var hit = new Border { Background = Brushes.Transparent, Padding = new Thickness(3, 5, 3, 5), Child = dot, Cursor = Cursors.Hand };
             hit.MouseLeftButtonUp += (_, e) => { GoToPage(idx); e.Handled = true; };
             _dots.Add(dot);
-            Dots.Children.Add(hit);
+            hits[i] = hit;
         }
+        foreach (int i in PageOrder) Dots.Children.Add(hits[i]);
         UpdateDots(animate: false);
         ApplyPageVisibility(); // pages switched off in Preferences
 
@@ -120,6 +134,7 @@ public partial class NotchWindow
         if (PageHidden(page)) page = PageHidden(_page) ? 0 : _page; // switched off in Preferences
         bool changed = page != _page;
         if (changed) HideTip();
+        if (changed && _page == CallsPage && _call != null) _leftCallsPage = true; // you moved on: the next opening stays where you are
         _page = page;
         _pageX.Configure(SpringStyle.Page);
         _pageX.Active = true;
@@ -161,6 +176,7 @@ public partial class NotchWindow
         if (page == 3) { RenderClipboard(); _shelfTab = _shelf.Count > 0; RenderShelfOrRecent(); } // the shelf first when something is kept
         if (page == 4) OnColorsShown();
         if (page == 5) { SyncSettingsPage(); SyncSmartPage(); }
+        if (page == CallsPage) OnCallsShown();
     }
 
     void OnPagerDown(object sender, MouseButtonEventArgs e)

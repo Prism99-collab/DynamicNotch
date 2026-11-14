@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.5.0] — 2026-11-14
+
+Calls get their own page.
+
+### Added
+- A Calls page, right after Home. During a call: a big mute button, your app's buttons (camera, share, raise hand,
+  captions and more), the call's own volume, and quick replies you can paste into the chat.
+- Mute only the call: the other apps can still hear your mic. Hold the button while muted to talk for a moment.
+- A red leave button: hold it to hang up, whatever app you're in.
+- A small live wave of your voice. It ignores fans and keyboard, so you can tell at a glance if your mic works or
+  is left open. The notch also tells you if your mic is silent or picking up steady noise.
+- Between calls: a mic check. Live plays your voice back as you talk; Replay plays it after you pause. It tells you
+  if you're too quiet or too loud, and fixes it in one click.
+- Esc closes any sheet on the page.
+
 ## [2.4.0] — 2026-11-14
 
 The search is faster, smarter and smoother.
