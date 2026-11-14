@@ -48,6 +48,8 @@ It looks through your apps, settings, open windows, clipboard history and the fi
 Apps come first, then everything else. It also remembers what you pick, so the thing you want tends to be on top
 next time. Right-click any result for more options, like opening the folder it's in or copying its path.
 
+You can narrow files down in plain words: `pdf invoice`, `pictures today`, `videos last month`, `big videos`.
+
 It understands short instructions too:
 
 ```

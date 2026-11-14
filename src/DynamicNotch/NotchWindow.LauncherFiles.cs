@@ -18,26 +18,13 @@ namespace DynamicNotch;
 public partial class NotchWindow
 {
     readonly FileIndex _fileIndex = new();
-    List<FileIndex.Hit> _fiItems = new();
-    string? _fiAsked;
     bool _filesStarted;
 
-    void WireFileIndex()
-    {
-        _fileIndex.Results += (q, items) => Dispatcher.InvokeAsync(() =>
-        {
-            if (!_launcherOpen || !string.Equals(_fiAsked, q, StringComparison.Ordinal)) return;
-            _fiItems = items;
-            if (_actionsFor == null) Search(merge: true);
-        });
-        EnsureFileIndex();
-    }
+    void WireFileIndex() => EnsureFileIndex();
 
     /// <summary>Starts the list of names (once) when "Files across the PC" is on. It only works while you're not gaming or saving battery.</summary>
     /// <summary>How many tiles (about 77 pixels each, with the button's padding) fit across the results area.</summary>
     int TilesPerRow => Math.Max(3, (int)(((_launchBody?.ActualWidth ?? 0) is > 100 and var w ? w : ExpandedSize.Width - 36) / 77));
-
-    bool Started(FileIndex f) { EnsureFileIndex(); return f.Ready; }
 
     void EnsureFileIndex()
     {

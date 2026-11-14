@@ -123,7 +123,8 @@ public partial class NotchWindow
             }
             else if (animate || fresh < 12) ArriveRow(el, tt, fresh++);
         }
-        if (animate) _launchScroll?.ScrollToTop();
+        _listHeight = y;
+        if (animate) ScrollTo(0, jump: true);
         PaintSelection(glide: !animate);
     }
 
@@ -231,11 +232,11 @@ public partial class NotchWindow
         if (h.Entry is { Kind: LauncherIndex.Kind.File or LauncherIndex.Kind.Folder } fe && !fe.Target.StartsWith("shell:")) plate.ToolTip = fe.Target; // the whole path, on hover
         var parts = new RowParts { Plate = plate, Title = title, Detail = detail, Look = LookOf(h), Slot = slot, SlotText = slotText };
         // the line's place in the list changes as you type: the handlers read it from the plate
-        plate.MouseEnter += (_, _) =>
+        plate.MouseEnter += (_, _) => { _hovered = parts; PaintSlots(); };
+        plate.MouseMove += (_, e) =>
         {
-            _hovered = parts;
-            if (plate.Tag is int i && i != _launchSel) { _launchSel = i; PaintSelection(scroll: false); }
-            else PaintSlots();
+            TrackPointer(e);
+            if (PointerMoving && plate.Tag is int i && i != _launchSel) { _launchSel = i; PaintSelection(scroll: false); }
         };
         plate.MouseLeave += (_, _) => { if (ReferenceEquals(_hovered, parts)) { _hovered = null; PaintSlots(); } };
         plate.MouseLeftButtonUp += (_, e) => { if (plate.Tag is int i) { e.Handled = true; Run(i, reveal: Keyboard.Modifiers.HasFlag(ModifierKeys.Control)); } };
@@ -313,39 +314,23 @@ public partial class NotchWindow
             _selBar.BorderThickness = skin.SelEdgeWidth;
             if (_selBrackets != null) _selBrackets.Visibility = _cyber ? Visibility.Visible : Visibility.Collapsed;
             var (y, h) = _elY.TryGetValue(picked, out var at) ? at : (VisualTreeHelper.GetOffset(picked).Y, picked.ActualHeight);
-            var tt = (TranslateTransform)_selBar.RenderTransform;
             bool wasHidden = _selBar.Visibility != Visibility.Visible;
             _selBar.Visibility = Visibility.Visible;
-            if (wasHidden || !glide && Math.Abs(tt.Y - y) > 200)
-            {
-                tt.BeginAnimation(TranslateTransform.YProperty, null);
-                _selBar.BeginAnimation(HeightProperty, null);
-                tt.Y = y;
-                _selBar.Height = h;
-            }
-            else
-            {
-                tt.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(y, TimeSpan.FromMilliseconds(120)) { EasingFunction = Out });
-                _selBar.BeginAnimation(HeightProperty, new DoubleAnimation(h, TimeSpan.FromMilliseconds(120)) { EasingFunction = Out });
-            }
-            if (skin.Scan != null && _selScan != null && !wasHidden)
+            BarTo(y, h, jump: wasHidden || !glide && Math.Abs(_barY - y) > 200);
+            bool moved = _paintedSel != _launchSel;
+            _paintedSel = _launchSel;
+            if (skin.Scan != null && _selScan != null && !wasHidden && moved)
             {
                 // a thin scan sweeps across the bar when it lands
                 var st = (ScaleTransform)_selScan.RenderTransform;
                 st.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200)) { EasingFunction = Out });
                 _selScan.BeginAnimation(OpacityProperty, new DoubleAnimation(0.9, 0, TimeSpan.FromMilliseconds(320)));
             }
-            if (scroll)
-            {
-                // the line and, above it, its section's label
-                if (_launchSel == 0) _launchScroll?.ScrollToTop();
-                else picked.BringIntoView(new Rect(0, -22, Math.Max(1, picked.ActualWidth), Math.Max(1, picked.ActualHeight) + 22));
-            }
+            if (scroll) KeepInView(y, h); // the line and, above it, its section's label
+            if (moved && skin.Arrive == Arrival.Rise) _selBar.BeginAnimation(OpacityProperty, new DoubleAnimation(0.55, 1, TimeSpan.FromMilliseconds(260))); // a soft glow as it lands
         }
         ShowPathOnPicked(picked);
         PaintSlots();
-        if (Skin.Arrive == Arrival.Rise && picked != null && _selBar.Visibility == Visibility.Visible)
-            _selBar.BeginAnimation(OpacityProperty, new DoubleAnimation(0.55, 1, TimeSpan.FromMilliseconds(260))); // a soft glow as it lands
         var hit = _launchSel < _hits.Count ? _hits[_launchSel] : null;
         if (hit == null) { SetFoot(""); return; }
         if (_actionsFor != null) { SetFoot("↵ run  ·  ← back"); return; }
@@ -356,6 +341,8 @@ public partial class NotchWindow
         SetFoot(string.Join("  ·  ", tips));
     }
 
+    int _paintedSel = -1;
+
     /// <summary>The list's layer: the sliding bar behind the lines.</summary>
     Grid BuildListLayer()
     {
@@ -365,6 +352,8 @@ public partial class NotchWindow
             Fill = Frozen(CyCyan), RenderTransform = new ScaleTransform(0, 1), RenderTransformOrigin = new Point(0, 0.5),
         };
         var inside = new Grid();
+        _selFlash = new Border { Opacity = 0, IsHitTestVisible = false };
+        inside.Children.Add(_selFlash);
         inside.Children.Add(_selScan);
         _selBrackets = new System.Windows.Shapes.Path
         {
@@ -394,6 +383,18 @@ public partial class NotchWindow
     {
         if (_iconCache.TryGetValue(target, out var known)) { box.Background = IconBrush(known); return; }
         box.Background = Frozen(Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF));
+        EnsureIconThread();
+        IconQueue.Add((target, img => Dispatcher.InvokeAsync(() =>
+        {
+            _iconCache[target] = img;
+            if (img == null) return;
+            box.Background = IconBrush(img);
+            box.BeginAnimation(OpacityProperty, new DoubleAnimation(0.2, 1, TimeSpan.FromMilliseconds(140)));
+        })));
+    }
+
+    static void EnsureIconThread()
+    {
         if (_iconThread == null)
         {
             // one quiet thread reads icons from the shell, one after another
@@ -409,13 +410,6 @@ public partial class NotchWindow
             _iconThread.SetApartmentState(ApartmentState.STA);
             _iconThread.Start();
         }
-        IconQueue.Add((target, img => Dispatcher.InvokeAsync(() =>
-        {
-            _iconCache[target] = img;
-            if (img == null) return;
-            box.Background = IconBrush(img);
-            box.BeginAnimation(OpacityProperty, new DoubleAnimation(0.2, 1, TimeSpan.FromMilliseconds(140)));
-        })));
     }
 
     /// <summary>For the empty search's tiles: the same cache, the same quiet thread.</summary>
@@ -430,19 +424,6 @@ public partial class NotchWindow
     // ───────────────────────────── typing ─────────────────────────────
 
     int _searchAsked, _searchDone;
-
-    /// <summary>
-    /// A key was typed: the letter shows at once, and the search runs right after (at a lower priority than input), once
-    /// for a burst of keys. Enter, Tab and the arrows wait for it, so they always act on what's typed.
-    /// </summary>
-    void QueueSearch()
-    {
-        int v = ++_searchAsked;
-        TypePulse();
-        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, () => { if (v == _searchAsked && _searchDone != v) Search(); });
-    }
-
-    void SearchNowIfBehind() { if (_searchDone != _searchAsked) Search(); }
 
     /// <summary>Neon: each key makes the underline and the prompt blink, like a terminal taking input.</summary>
     void TypePulse()
@@ -471,9 +452,9 @@ public partial class NotchWindow
         _launchScanLine.BeginAnimation(OpacityProperty, fade);
     }
 
-    readonly Dictionary<string, (DateTime When, long Size)> _fileFacts = new(StringComparer.OrdinalIgnoreCase);
+    readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime When, long Size)> _fileFacts = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>A file's date and size, read once per search session (not on every key).</summary>
+    /// <summary>A file's date and size, read once per search session (not on every key); safe on any thread.</summary>
     (DateTime When, long Size) FileFacts(string path, bool folder)
     {
         if (_fileFacts.TryGetValue(path, out var f)) return f;

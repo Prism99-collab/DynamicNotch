@@ -42,12 +42,10 @@ public partial class NotchWindow
     /// What the typed words ask the notch to do, as result lines. Returns the text the normal search should look for
     /// (for "open spotify" that's "spotify": the app's own line is the answer, with its icon).
     /// </summary>
-    string AddTaskHits(string q, out bool understood, out Hit? soft)
+    string AddTaskHits(string q, IReadOnlyList<Intent> list, out bool understood, out Hit? soft)
     {
         understood = false;
         soft = null;
-        var now = DateTime.Now;
-        var list = LauncherIntent.Parse(q, now);
         if (list.Count == 0) return q;
 
         if (list.Count == 1)

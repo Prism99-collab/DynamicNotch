@@ -30,6 +30,9 @@ public sealed class WindowsSearch
     /// <summary>Also look for the words inside documents (not only in file names).</summary>
     public volatile bool Inside = true;
 
+    /// <summary>Also look by name (off once the notch's own list of names is ready: it's faster and covers every drive).</summary>
+    public volatile bool NamesToo = true;
+
     /// <summary>Ask (replacing any question not answered yet).</summary>
     public void Query(string query)
     {
@@ -104,7 +107,7 @@ public sealed class WindowsSearch
 
         // by name: every word starts a word of the file's name
         string byName = string.Join(" AND ", words.Select(w => $"CONTAINS(System.FileName, '\"{Esc(w)}*\"')"));
-        Read($"SELECT TOP 24 System.ItemUrl, System.ItemNameDisplay, System.ItemType, System.DateModified, System.Size FROM SystemIndex " +
+        if (NamesToo) Read($"SELECT TOP 24 System.ItemUrl, System.ItemNameDisplay, System.ItemType, System.DateModified, System.Size FROM SystemIndex " +
              $"WHERE SCOPE='file:' AND {byName} AND {Skip} ORDER BY System.DateModified DESC", false, found, seen);
 
         // by what's inside, for three letters or more: the documents that best fit (not code or data files)

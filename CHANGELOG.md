@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.4.0] — 2026-11-14
+
+The search is faster, smarter and smoother.
+
+### Added
+- Filters in plain words: `pdf invoice`, `pictures today`, `videos last month`, `excel last week`, `big videos`,
+  `.psd`. Results show under the filter's name.
+- Words in any order (`notch dynamic`), accents don't matter (`resume` finds `résumé`), and a few capitals find
+  a name (`ic` finds `InvoiceCalc`).
+
+### Changed
+- Typing is instant: results are worked out in the background and files show up on every key, not after a pause.
+- System and game files (`.dll`, `.sys`, caches, game data) never show up.
+- Your own folders and recent files come before old, deeply buried ones.
+- The highlight and the list move on springs, the search folds away when it closes, and Enter flashes the line.
+- On a new PC, files on every drive can be found within seconds of installing.
+- The first time you open the search after starting the PC, it's ready straight away.
+
 ## [2.3.0] — 2026-11-13
 
 This one is all about the search.

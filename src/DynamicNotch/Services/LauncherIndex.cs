@@ -15,8 +15,10 @@ public sealed class LauncherIndex
 
     public sealed record Entry(string Name, string Target, Kind Kind, string? Detail)
     {
-        /// <summary>Lower-cased name and its words, for matching (made once).</summary>
-        public string Key { get; } = Name.ToLowerInvariant();
+        /// <summary>The name folded for matching: lower case, no accents (made once).</summary>
+        public string Key { get; } = TextFold.Fold(Name);
+        /// <summary>Its initials, word starts and CamelCase humps alike ("InvoiceCalc" → "ic").</summary>
+        public string Initials { get; } = TextFold.Initials(System.IO.Path.GetFileNameWithoutExtension(Name));
     }
 
     List<Entry> _entries = new();
@@ -151,8 +153,7 @@ public sealed class LauncherIndex
                     into.Add(new Entry(d.Name, d.FullName, Kind.Folder, label));
                     if (depth < 1) Walk(d.FullName, label + " › " + d.Name, depth + 1, into);
                 }
-                else if (!e.Name.EndsWith(".crdownload", StringComparison.OrdinalIgnoreCase) && !e.Name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)
-                    && !e.Name.EndsWith(".part", StringComparison.OrdinalIgnoreCase) && !e.Name.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase))
+                else if (!FileIndex.IsJunk(e.Name, false))
                     into.Add(new Entry(e.Name, e.FullName, Kind.File, label));
             }
         }
@@ -195,8 +196,12 @@ public sealed class LauncherIndex
     public void Used(Entry e)
     {
         string k = e.Kind + "|" + e.Target;
-        _usage[k] = (_usage.TryGetValue(k, out var u) ? u.Count + 1 : 1, DateTime.UtcNow);
-        var snapshot = _usage.ToDictionary(p => p.Key, p => new[] { p.Value.Count, (int)(p.Value.Last - DateTime.UnixEpoch).TotalMinutes });
+        Dictionary<string, int[]> snapshot;
+        lock (_usage)
+        {
+            _usage[k] = (_usage.TryGetValue(k, out var u) ? u.Count + 1 : 1, DateTime.UtcNow);
+            snapshot = _usage.ToDictionary(p => p.Key, p => new[] { p.Value.Count, (int)(p.Value.Last - DateTime.UnixEpoch).TotalMinutes });
+        }
         _ = Task.Run(() =>
         {
             try { Directory.CreateDirectory(Settings.Folder); File.WriteAllText(UsageFile, JsonSerializer.Serialize(snapshot)); } catch { }
@@ -206,14 +211,15 @@ public sealed class LauncherIndex
     /// <summary>0 for never, rising with how often and how recently it was opened.</summary>
     public double Habit(Entry e)
     {
-        if (!_usage.TryGetValue(e.Kind + "|" + e.Target, out var u)) return 0;
+        (int Count, DateTime Last) u;
+        lock (_usage) if (!_usage.TryGetValue(e.Kind + "|" + e.Target, out u)) return 0;
         double days = (DateTime.UtcNow - u.Last).TotalDays;
         return Math.Log(1 + u.Count) * 18 + Math.Max(0, 14 - days);
     }
 
     /// <summary>What you open most, for the empty search.</summary>
     public IEnumerable<Entry> Favourites(int n, ICollection<string>? hidden = null) =>
-        _entries.Where(e => e.Kind == Kind.App && (hidden == null || !hidden.Contains(e.Target))).Select(e => (e, h: Habit(e))).Where(x => x.h > 0).OrderByDescending(x => x.h).Take(n).Select(x => x.e);
+        _entries.Where(e => e.Kind == Kind.App && (hidden == null || !hidden.Contains(e.Target))).Select(e => (e, h: Habit(e))).ToList().Where(x => x.h > 0).OrderByDescending(x => x.h).Take(n).Select(x => x.e);
 
     void LoadUsage()
     {
@@ -248,6 +254,7 @@ public sealed class LauncherIndex
         if (q.Length == 0) return;
         string key = e.Kind + "|" + e.Target;
         var now = DateTime.UtcNow;
+        lock (_picks)
         for (int len = 1; len <= Math.Min(q.Length, 24); len++)
         {
             string p = q[..len];
@@ -255,6 +262,7 @@ public sealed class LauncherIndex
             map[key] = (map.TryGetValue(key, out var v) ? Math.Min(v.Count + 1, 50) : 1, now);
             if (map.Count > 4) map.Remove(map.OrderBy(x => x.Value.Last).First().Key); // a few per start is plenty
         }
+        lock (_picks)
         if (_picks.Count > MaxPrefixes)
             foreach (var old in _picks.OrderBy(x => x.Value.Values.Max(v => v.Last)).Take(_picks.Count - MaxPrefixes).Select(x => x.Key).ToList())
                 _picks.Remove(old);
@@ -265,8 +273,12 @@ public sealed class LauncherIndex
     public double PickBoost(string query, Entry e)
     {
         string q = query.Trim().ToLowerInvariant();
-        if (q.Length == 0 || !_picks.TryGetValue(q.Length > 24 ? q[..24] : q, out var map)) return 0;
-        if (!map.TryGetValue(e.Kind + "|" + e.Target, out var v)) return 0;
+        (int Count, DateTime Last) v;
+        lock (_picks)
+        {
+            if (q.Length == 0 || !_picks.TryGetValue(q.Length > 24 ? q[..24] : q, out var map)) return 0;
+            if (!map.TryGetValue(e.Kind + "|" + e.Target, out v)) return 0;
+        }
         double fresh = Math.Max(0.4, 1 - (DateTime.UtcNow - v.Last).TotalDays / 45);
         return (180 + 60 * Math.Min(v.Count, 4) / 4.0) * fresh;
     }
@@ -289,8 +301,8 @@ public sealed class LauncherIndex
     /// <summary>Back to knowing nothing about you: no picks, no counts (Frequent starts over).</summary>
     public void ForgetLearned()
     {
-        _picks.Clear();
-        _usage.Clear();
+        lock (_picks) _picks.Clear();
+        lock (_usage) _usage.Clear();
         SavePicks();
         _ = Task.Run(() => { try { File.Delete(UsageFile); } catch { } });
     }
@@ -304,7 +316,7 @@ public sealed class LauncherIndex
         if (v != _picksVersion) return;
         var data = new PicksData
         {
-            Picks = _picks.ToDictionary(p => p.Key, p => p.Value.ToDictionary(x => x.Key, x => new[] { x.Value.Count, (int)(x.Value.Last - DateTime.UnixEpoch).TotalMinutes })),
+            Picks = SnapshotPicks(),
             Recent = _recent.ToList(),
         };
         await Task.Run(() =>
@@ -318,6 +330,12 @@ public sealed class LauncherIndex
             }
             catch { }
         });
+    }
+
+    Dictionary<string, Dictionary<string, int[]>> SnapshotPicks()
+    {
+        lock (_picks)
+            return _picks.ToDictionary(p => p.Key, p => p.Value.ToDictionary(x => x.Key, x => new[] { x.Value.Count, (int)(x.Value.Last - DateTime.UnixEpoch).TotalMinutes }));
     }
 
     void LoadPicks()
@@ -346,14 +364,15 @@ public sealed class LauncherIndex
     /// </summary>
     public static double Score(string query, Entry e)
     {
-        string q = query.ToLowerInvariant().Trim(), k = e.Key;
+        string q = TextFold.Fold(query.Trim()), k = e.Key; // accents don't matter: "resume" finds "Résumé"
         if (q.Length == 0) return 0;
         double s;
         if (k == q) s = 1000;
-        else if (k.StartsWith(q)) s = 800 - Math.Min(100, k.Length - q.Length);
+        else if (k.StartsWith(q, StringComparison.Ordinal)) s = 800 - Math.Min(100, k.Length - q.Length);
         else if (WordStart(k, q)) s = 650 - Math.Min(100, k.Length);
-        else if (Initials(k).StartsWith(q) && q.Length >= 2) s = 600;
-        else if (k.Contains(q)) s = 450 - k.IndexOf(q, StringComparison.Ordinal);
+        else if (q.Length >= 2 && (e.Initials.StartsWith(q, StringComparison.Ordinal) || Initials(k).StartsWith(q, StringComparison.Ordinal))) s = 600; // "vsc", "ic" (InvoiceCalc)
+        else if (k.Contains(q, StringComparison.Ordinal)) s = 450 - k.IndexOf(q, StringComparison.Ordinal);
+        else if (q.Contains(' ') && AllWords(k, e.Initials, q) is > 0 and var all) s = all; // words in any order: "notch dynamic"
         else if (e.Kind == Kind.Setting && e.Detail != null && e.Detail.Contains(q)) s = 420;
         else if (q.Length >= 3 && !q.Contains(' ') && InOrder(k, q)) s = 200 - Math.Min(100, k.Length); // loose letters: single words only
         else if (q.Length >= 4 && e.Kind is Kind.App or Kind.Setting && Near(k, q)) s = 330; // a typo: "spotfy", "dicord"
@@ -361,6 +380,19 @@ public sealed class LauncherIndex
         // apps and settings matter more than files of the same name
         s += e.Kind switch { Kind.App => 60, Kind.Setting => 30, Kind.Folder => 5, _ => 0 };
         return s;
+    }
+
+    /// <summary>Every word typed is in the name (any order): 520 when each starts a word, 400 when they're only inside.</summary>
+    static double AllWords(string k, string initials, string q)
+    {
+        bool starts = true;
+        foreach (var w in q.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (k.StartsWith(w, StringComparison.Ordinal) || WordStart(k, w)) continue;
+            if (k.Contains(w, StringComparison.Ordinal) || initials.StartsWith(w, StringComparison.Ordinal)) { starts = false; continue; }
+            return 0;
+        }
+        return starts ? 520 : 400;
     }
 
     static bool WordStart(string k, string q)

@@ -62,6 +62,7 @@ public partial class NotchWindow
         LoadReminders();
         WireWindowsSearch();
         WireFileIndex();
+        WarmLauncher();
         Deactivated += (_, _) => { if (_launcherOpen) CloseLauncher(giveBack: false); };
         AddSearchButton();
     }
@@ -118,8 +119,6 @@ public partial class NotchWindow
         if (_settings.SearchWindows) LoadOpenWindows();
         _wsItems = new();
         _wsAsked = _wsAnswered = null;
-        _fiItems = new();
-        _fiAsked = null;
         _desktopHidden = DesktopIcons.Shown == false || Environment.GetEnvironmentVariable("DYNAMICNOTCH_DESKTOP") == "hidden"; // (=hidden: development, to see it without touching the desktop)
         _desktopItems = null;
         _recallPos = -1;
@@ -127,6 +126,8 @@ public partial class NotchWindow
         _mainHits = null;
         _rows.Clear();
         _labels.Clear();
+        _barFresh = true;
+        _paintedSel = -1;
         _fileFacts.Clear();
         _index.Refresh();
         StyleLauncher();
@@ -168,12 +169,7 @@ public partial class NotchWindow
         if (!_launcherOpen) return;
         _launcherOpen = false;
         UpdateRain(); UpdateAmbient();
-        if (_launch != null)
-        {
-            _launch.BeginAnimation(OpacityProperty, null);
-            _launch.Opacity = 0;
-            _launch.Visibility = Visibility.Collapsed;
-        }
+        FoldAway();
         SetActivatable(false);
         // the keyboard goes back to the app you were typing in
         if (giveBack && _launchPrevFg != IntPtr.Zero && IsWindow(_launchPrevFg)) SetForegroundWindow(_launchPrevFg);
@@ -285,6 +281,7 @@ public partial class NotchWindow
         body.Children.Add(_launchScroll);
         _launchScroll.ScrollChanged += (_, e) => { if (e.VerticalChange > 0 && e.VerticalOffset + e.ViewportHeight >= e.ExtentHeight - 40) RenderRest(); };
         AttachScrollHints(body);
+        _launchScroll.PreviewMouseWheel += OnResultsWheel;
         body.Children.Add(new ScrollViewer { Content = _launchStarters, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false });
         Grid.SetRow(body, 1);
         root.Children.Add(body);
@@ -305,7 +302,7 @@ public partial class NotchWindow
         Grid.SetRowSpan(_launch, 3);
         Panel.SetZIndex(_launch, 40);
         Expanded.Children.Add(_launch);
-        _index.Changed += () => Dispatcher.InvokeAsync(() => { if (_launcherOpen && _actionsFor == null) Search(merge: true); }); // never pulls you out of a second level
+        _index.Changed += () => Dispatcher.InvokeAsync(RefreshPlan); // never pulls you out of a second level
     }
 
     Color LaunchAccent => _cyber ? CyCyan : _accent == Colors.White ? Color.FromRgb(0x0A, 0x84, 0xFF) : _accent;
@@ -316,30 +313,30 @@ public partial class NotchWindow
 
     bool _measureSearch; // development: each search's time goes to the log
 
+    /// <summary>
+    /// Searches right now (for everything but typing, which goes through <see cref="QueueSearch"/>): works the plan out on
+    /// the spot, or, for <paramref name="merge"/> (more results arrived), draws the last plan again with them.
+    /// </summary>
     void Search(bool merge)
     {
-        if (!_measureSearch) { SearchCore(merge); return; }
-        var sw = Stopwatch.StartNew();
-        SearchCore(merge);
-        double build = sw.Elapsed.TotalMilliseconds;
-        _launchList?.UpdateLayout();
-        AppLog.Write($"search '{_launchBox?.Text}' {(merge ? "merge " : "")}{build:0.0} ms, with layout {sw.Elapsed.TotalMilliseconds:0.0} ms, {_hits.Count} lines");
+        string q = _launchBox?.Text ?? "";
+        var plan = merge && _lastPlan != null && _lastPlan.Query == q ? _lastPlan : ComputePlan(q, _searchAsked);
+        ApplyPlanTimed(plan, merge);
     }
 
     /// <summary>
-    /// Builds the results for what's typed. Things it understood (a task, an answer) come first; then sections (apps,
-    /// files, open windows, settings, what you copied…), the best section first, each sorted by how well it fits, with
-    /// what you usually pick lifted to the top; the web last. <paramref name="merge"/>: files from Windows' index just
-    /// arrived, so the list is redrawn in place, keeping the line you're on.
+    /// Draws a worked-out plan. Things it understood (a task, an answer) come first; then sections in a fixed order (apps,
+    /// open windows, the desktop, settings, files, what you copied), the best first in each, what you usually pick lifted
+    /// to the top; the web last. With a filter ("pdf last week") only the files that pass it, under the filter's name.
+    /// <paramref name="merge"/>: more results arrived, so the list is redrawn in place, keeping the line you're on.
     /// </summary>
-    void SearchCore(bool merge)
+    void ApplyPlan(SearchPlan plan, bool merge)
     {
         if (_launchBox == null || _launchList == null || _launchStarters == null || _launchHint == null || _launchScroll == null) return;
         _searchDone = _searchAsked;
+        _lastPlan = plan;
         if (!merge) _renderAll = false;
-        var lap = Stopwatch.StartNew(); var laps = new List<string>();
-        void Lap(string n) { if (_measureSearch) { laps.Add($"{n} {lap.Elapsed.TotalMilliseconds:0.0}"); lap.Restart(); } }
-        string q = _launchBox.Text;
+        string q = plan.Query;
         if (!_recalling) _recallPos = -1;
         // files arriving while you type never take the line you're on from under Enter
         string? keepKey = merge && _pickedByKeys && _launchSel < _hits.Count ? _hits[_launchSel].Key : null;
@@ -368,14 +365,14 @@ public partial class NotchWindow
             DesktopResults(q.TrimStart()[8..].Trim());
             return;
         }
+        EnsureFileIndex();
 
         // 1. something to do, said in your own words ("remind me…", "volume 30 and dark mode", "close spotify")
-        string find = q;
         bool understood = false;
         Hit? soft = null;
-        if (_settings.SearchCommands) find = AddTaskHits(q, out understood, out soft);
+        if (_settings.SearchCommands) AddTaskHits(q, plan.Intents, out understood, out soft);
         // 2. an answer the notch works out itself: a sum, a conversion, the time somewhere, a date, the battery...
-        if (_settings.SearchCommands && (NotchFact(q) ?? LauncherIntent.Fact(q, DateTime.Now) ?? LauncherAnswers.For(q)) is { } a)
+        if (_settings.SearchCommands && (NotchFact(q) ?? plan.Fact) is { } a)
         {
             understood = true;
             if (a.Url != null)
@@ -385,7 +382,9 @@ public partial class NotchWindow
                     a.Copy.Length == 0 ? () => Nudge() : a.Secret ? () => CopySecret(a.Copy) : () => CopyAnswer(a.Copy), Swatch: a.Color, Big: true, Key: "answer"));
         }
         int understoodCount = _hits.Count;
-        Lap("tasks");
+        string terms = plan.Terms;
+        var filter = understood ? null : plan.Filter;
+        string lower = q.Trim().ToLowerInvariant();
 
         // 3. everything else that fits, scored, one section per kind
         var pool = new Dictionary<string, (Hit Hit, double Score)>(StringComparer.OrdinalIgnoreCase);
@@ -394,74 +393,58 @@ public partial class NotchWindow
             string key = h.Key ?? h.Title;
             if (!pool.TryGetValue(key, out var had) || had.Score < s) pool[key] = (h, s);
         }
-        string lower = q.Trim().ToLowerInvariant();
-        if (!understood)
+        if (!understood && filter == null)
             foreach (var c in Commands(q))
                 Offer(c with { Section = "Notch", Key = "cmd|" + c.Title }, c.Title.Equals(q.Trim(), StringComparison.OrdinalIgnoreCase) ? 1000 : c.Title.ToLowerInvariant().StartsWith(lower) ? 700 : 300);
 
-        Lap("commands");
-        // apps, settings, folders and files the notch knows (scored first, lines made only for the best)
-        var scored = new List<(LauncherIndex.Entry e, double s)>();
-        foreach (var e in _index.Entries)
-        {
-            double s = LauncherIndex.Score(find, e);
-            if (s <= 0) continue;
-            scored.Add((e, s + DesktopLift(e) + _index.Habit(e) + (_settings.SearchLearn ? _index.PickBoost(q, e) : 0)));
-        }
-        Lap("score " + _index.Entries.Count);
-        foreach (var (e, s) in scored.OrderByDescending(x => x.s).Take(48)) Offer(EntryHit(e, find), s);
-        Lap("lines " + Math.Min(48, scored.Count));
+        // apps, settings, places, and the files the notch knows by heart (worked out off screen)
+        foreach (var (e, s) in plan.Entries) Offer(EntryHit(e, terms.Length > 0 ? terms : null), s);
+        // files on every drive (worked out off screen, every key)
+        foreach (var (e, s, item) in plan.Files) Offer(EntryHit(e, terms.Length > 0 ? terms : null, item), s);
 
-        // files anywhere on the PC, from Windows' index (asked in the background; what's known so far is shown)
-        if (!understood && find.Trim().Length >= 2 && _ws.Available && _settings.SearchWholePc)
+        // what's inside documents, from Windows' index (asked in the background; names come from the notch's own list
+        // once it's ready, so Windows is only asked for names before that)
+        if (!understood && terms.Trim().Length >= 2 && _ws.Available && _settings.SearchWholePc && (_settings.SearchInsideFiles || !_fileIndex.Ready))
         {
             _ws.Inside = _settings.SearchInsideFiles;
-            if (!string.Equals(_wsAsked, find, StringComparison.Ordinal)) { _wsAsked = find; _ws.Query(find); }
+            _ws.NamesToo = !_fileIndex.Ready;
+            if (!string.Equals(_wsAsked, terms, StringComparison.Ordinal)) { _wsAsked = terms; _ws.Query(terms); }
             foreach (var item in _wsItems)
             {
-                if (IsShortcut(item.Path) && !OnDesktop(item.Path)) continue; // shortcuts are the apps' own lines (on the desktop they're what you see)
+                if (IsShortcut(item.Path) && !OnDesktop(item.Path)) continue;
+                if (FileIndex.IsJunk(item.Name, item.Folder)) continue;
+                if (filter != null && !filter.Allows(item.Name, item.Folder, item.Modified)) continue;
                 var e = new LauncherIndex.Entry(item.Name, item.Path, item.Folder ? LauncherIndex.Kind.Folder : LauncherIndex.Kind.File, ParentName(item.Path));
-                double s = LauncherIndex.Score(find, e);
-                bool inside = s <= 0 && item.ByContent && string.Equals(_wsAnswered, find, StringComparison.Ordinal);
+                double s = LauncherIndex.Score(terms, e);
+                bool inside = s <= 0 && item.ByContent && string.Equals(_wsAnswered, terms, StringComparison.Ordinal);
                 if (s <= 0 && !inside) continue; // an older answer that no longer fits
                 if (inside) s = 170;
                 if (!item.Folder && DateTime.Now - item.Modified < TimeSpan.FromDays(14)) s += 30; // recent work first
-                Offer(EntryHit(e, find, item, inside ? lower : null), s + DesktopLift(e) + _index.Habit(e) + (_settings.SearchLearn ? _index.PickBoost(q, e) : 0));
-            }
-        }
-
-        // every drive, from the notch's own list of names (works on any PC, indexing on or off)
-        if (!understood && find.Trim().Length >= 2 && _settings.SearchWholePc && Started(_fileIndex))
-        {
-            if (!string.Equals(_fiAsked, find, StringComparison.Ordinal)) { _fiAsked = find; _fileIndex.Query(find); }
-            foreach (var f in _fiItems)
-            {
-                if (IsShortcut(f.Path) && !OnDesktop(f.Path)) continue;
-                var e = new LauncherIndex.Entry(f.Name, f.Path, f.Folder ? LauncherIndex.Kind.Folder : LauncherIndex.Kind.File, ParentName(f.Path));
-                double s = LauncherIndex.Score(find, e);
-                if (s <= 0) continue; // an older answer that no longer fits
-                if (!f.Folder && DateTime.Now - f.Modified < TimeSpan.FromDays(14)) s += 30;
-                Offer(EntryHit(e, find, new WindowsSearch.Item(f.Path, f.Name, f.Folder, f.Modified, -1, false)), s + DesktopLift(e) + _index.Habit(e) + (_settings.SearchLearn ? _index.PickBoost(q, e) : 0));
+                Offer(EntryHit(e, terms, item, inside ? terms.Trim() : null), s + DesktopLift(e) + _index.Habit(e) + (_settings.SearchLearn ? _index.PickBoost(q, e) : 0));
             }
         }
 
         // what's already open, and what you copied or kept
-        if (!understood && find.Trim().Length >= 2)
+        if (!understood && filter == null && terms.Trim().Length >= 2)
         {
-            if (_settings.SearchWindows) OfferWindows(find, pool.Values.Select(x => x.Hit.Entry).Where(e => e?.Kind == LauncherIndex.Kind.App).ToList()!, Offer);
-            if (_settings.SearchClipboard) OfferKept(find, Offer);
+            if (_settings.SearchWindows) OfferWindows(terms, pool.Values.Select(x => x.Hit.Entry).Where(e => e?.Kind == LauncherIndex.Kind.App).ToList()!, Offer);
+            if (_settings.SearchClipboard) OfferKept(terms, Offer);
         }
 
         // with a clear match, letters-in-order guesses ("tcno account switcher" for "notch") are only noise
         if (pool.Count > 0 && pool.Values.Max(x => x.Score) >= 600)
             foreach (var weak in pool.Where(x => x.Value.Score < 260).Select(x => x.Key).ToList()) pool.Remove(weak);
 
-        Lap("files+windows+kept");
+        // a filter: every file under the filter's own name ("PDF · last week")
+        if (filter != null)
+            foreach (var k in pool.Keys.ToList())
+                pool[k] = (pool[k].Hit with { Section = filter.Label }, pool[k].Score);
+
         // sections in a fixed order of importance: apps first, then what's open, the desktop, settings, the notch's
         // own commands, files, what you copied; inside each, the best first; a few lines per kind
         var sections = pool.Values
             .GroupBy(x => x.Hit.Section ?? "")
-            .Select(g => (Name: g.Key, Lines: g.OrderByDescending(x => x.Score).Take(SectionCap(g.Key)).ToList()))
+            .Select(g => (Name: g.Key, Lines: g.OrderByDescending(x => x.Score).Take(filter != null ? 30 : SectionCap(g.Key)).ToList()))
             .Select(g => (g.Name, g.Lines, Best: g.Lines[0].Score))
             .OrderBy(g => SectionRank(g.Name))
             .ThenByDescending(g => g.Best)
@@ -470,12 +453,12 @@ public partial class NotchWindow
         // a web search that only might be meant ("youtube music" is also an app) goes after a strong match, else first
         if (soft != null && best < 790) { _hits.Insert(understoodCount, soft); understoodCount++; soft = null; }
 
-        // a real question ("how do I…", "why is the sky blue?") with nothing on the PC to match: ChatGPT, already asked, first
+        // a real question ("how do I…", "why is the sky blue?") with nothing on the PC to match: the assistant, already asked, first
         string query = q.Trim();
         bool question = query.EndsWith('?') || query.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length >= 4
             || System.Text.RegularExpressions.Regex.IsMatch(query, @"^(?:how|what|why|who|when|where|which|can|could|should|is|are|do|does|explain|write|summari[sz]e|help|tell me|give me|make me)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         var (aiName, aiUrl) = Assistant(_settings.SearchAssistant);
-        Hit? ask = !understood && query.Length >= 3 && aiUrl != null
+        Hit? ask = !understood && filter == null && query.Length >= 3 && aiUrl != null
             ? new Hit($"Ask {aiName} “{query}”", "Opens in your browser, already asked", "", null,
                 () => OpenTarget(aiUrl + Uri.EscapeDataString(query)), Section: "Web", Key: "web|ask")
             : null;
@@ -484,21 +467,22 @@ public partial class NotchWindow
         foreach (var s in sections)
             foreach (var line in s.Lines) _hits.Add(line.Hit);
 
+        // a filter that found nothing says so plainly
+        if (filter != null && pool.Count == 0)
+            _hits.Add(new Hit($"No {filter.Label.ToLowerInvariant()}{(terms.Length > 0 ? $" called “{terms}”" : "")}", _fileIndex.Ready ? "Try fewer words, or another date" : "Still reading your drives, a moment…", "", null, () => Nudge(), Key: "nothing"));
+
         // 4. always a way out: the web
         if (soft != null) _hits.Add(soft with { Section = "Web" });
         var (engine, engineUrl) = Engine(_settings.SearchEngine);
-        if (!understood)
+        if (!understood && (filter == null || pool.Count == 0))
             _hits.Add(new Hit($"Search the web for “{query}”", "With " + engine, "", null,
                 () => OpenTarget(engineUrl + Uri.EscapeDataString(query)), Section: "Web", Key: "web|search"));
         if (ask != null) _hits.Add(ask);
 
         _launchSel = 0;
         if (keepKey != null && _hits.FindIndex(h => h.Key == keepKey) is >= 0 and var at) _launchSel = at;
-        Lap("sort");
         RenderHits(animate: !merge);
-        Lap("draw");
         UpdateGhost();
-        if (_measureSearch) AppLog.Write("  laps: " + string.Join(", ", laps));
     }
 
     internal static (string Name, string? Url) Assistant(string key) => key switch
@@ -929,6 +913,7 @@ public partial class NotchWindow
         var h = _hits[index];
         string typed = _launchBox.Text;
         var picked = _actionsFor?.Entry ?? h.Entry;
+        FlashPicked();
         if (reveal && h.Reveal != null) { CloseLauncher(giveBack: false); h.Reveal(); }
         else h.Run();
         // it did something (the search closed): remember what was typed, and what it meant
