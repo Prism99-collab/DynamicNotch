@@ -53,6 +53,10 @@ public partial class NotchWindow
         }
         _crtActive = true;
         CrtPlace(w, h);
+        // the shape itself switches off like a tube: the height drops at once, the width follows a beat later
+        _sh.Configure(0.11, 1.0);
+        _sw.Configure(0.36, 0.95);
+        _sr.Configure(0.30, 1.0);
 
         // the picture squashes toward its middle line
         if (Expanded.RenderTransform is ScaleTransform st)

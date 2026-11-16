@@ -150,9 +150,7 @@ public partial class NotchWindow
             if ((DateTime.UtcNow - _lastToast.At).TotalSeconds > 2) _notificationSound.Play();
             _lastToast = (t.App, DateTime.UtcNow);
             PalReact(Controls.Companion.Act.Point, 2.8); // the companion points up at it
-            ShowOsd("toast:" + t.App, t.Icon == null ? "" : null, null, t.Title, string.IsNullOrEmpty(t.Body) ? t.App : t.Body, null,
-                art: t.Icon, seconds: 4, prio: Prio.High, onClick: () => OpenApp(t.Aumid),
-                motion: SoundsLikeFailure(t.Title + " " + t.Body) ? Motion.Tremble : Motion.Auto); // "Sign-in failed" shivers instead of pulsing
+            ShowToast(t); // told the short way, in the app's colour (NotchWindow.AlertStory)
         };
     }
 
@@ -340,6 +338,7 @@ public partial class NotchWindow
         CyberSkinSoon(); // the pop-up's colours and art in the theme
         OsdSub.Text = r.Subtitle ?? "";
         if (freshAlert) CyberAlertIn(); // the cyber skin's entrance: scan wipe, hologram icon, decoding line
+        if (freshAlert && !_cyber && !r.Level.HasValue) OsdWordsIn(!string.IsNullOrEmpty(r.Subtitle));
         OsdSub.Visibility = string.IsNullOrEmpty(r.Subtitle) ? Visibility.Collapsed : Visibility.Visible;
         OsdRight.Text = r.Right ?? "";
 
@@ -359,6 +358,8 @@ public partial class NotchWindow
         }
 
         TintOsd(r.Level.HasValue ? null : AccentFor(r));
+        // the number or count on the side wears the pop-up's colour
+        OsdRight.Foreground = _osdAccent is { } ac && !r.Level.HasValue ? Frozen(Lighten(ac, 0.25)) : Frozen(Color.FromArgb(0xD0, 0xFF, 0xFF, 0xFF));
 
         _osdTimer.Stop();
         _osdTimer.Interval = TimeSpan.FromSeconds(r.Seconds);
@@ -382,7 +383,7 @@ public partial class NotchWindow
     {
         if (r.Battery is { } b) return b.Charging ? Color.FromRgb(0x30, 0xD1, 0x58) : b.Level <= 0.2 ? Color.FromRgb(0xFF, 0x45, 0x3A) : null;
         if (r.GlyphBrush is SolidColorBrush s && s.Color != Colors.White) return s.Color;
-        if (r.Art != null) return IconHelper.Accent(r.Art);
+        if (r.Art != null) return IconHelper.Accent(r.Art) is { } ic ? Vivid(ic) : null;
         return null;
     }
 

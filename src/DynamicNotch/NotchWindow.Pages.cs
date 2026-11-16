@@ -63,6 +63,11 @@ public partial class NotchWindow
         // the Calls page goes second; each page remembers its own panel
         var made = PagesStrip.Children.Cast<UIElement>().ToList();
         for (int i = 0; i < made.Count && i < 6; i++) _pageEls[i] = made[i];
+        // the System page is built in code now: it takes the old one's place
+        int sys = PagesStrip.Children.IndexOf(made[1]);
+        PagesStrip.Children.RemoveAt(sys);
+        _pageEls[1] = BuildVitalsPage();
+        PagesStrip.Children.Insert(sys, _pageEls[1]);
         _pageEls[CallsPage] = BuildCallsPage();
         PagesStrip.Children.Insert(1, _pageEls[CallsPage]);
 
@@ -169,9 +174,10 @@ public partial class NotchWindow
     {
         if (_mode != Mode.Expanded) return;
         CyberPage();
-        if (page == 1) { OnSystemShown(); _ = SampleSystemAsync(); _sysTimer.Start(); } else _sysTimer.Stop();
+        if (page == 1) OnVitalsShown(); else VitalsHidden();
         UpdateCallUi(); // the call card's voice bars run only on Home
         if (page == 0) RefreshClockAndProgress();
+        MicLive(page == 0);
         if (page == 2) UpdateTimerUi();
         if (page == 3) { RenderClipboard(); _shelfTab = _shelf.Count > 0; RenderShelfOrRecent(); } // the shelf first when something is kept
         if (page == 4) OnColorsShown();

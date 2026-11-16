@@ -384,9 +384,15 @@ public partial class NotchWindow
             // split off: start tucked against the pill's edge, then slide out with a springy pop
             SecondBubble.Visibility = Visibility.Visible;
             SecondBubble.UpdateLayout();
-            double target = SecondTargetX();
+            // the notch may still be shrinking (it was just closed): aim beside where it will end up, and wait for
+            // it to get there, so the island never flies out past the big shape and snaps back
+            bool shrinking = Pill.ActualWidth - _sw.Target > 20;
+            var lag = TimeSpan.FromMilliseconds(shrinking ? 230 : 0);
+            double target = -(_sw.Target / 2 + 10 + 9 + SecondBubble.ActualWidth / 2);
             double from = -(_sw.Target / 2 - SecondBubble.ActualWidth / 2);
-            var slide = new DoubleAnimation(from, target, TimeSpan.FromMilliseconds(620)) { EasingFunction = new SpringEase { Damping = 0.66 } };
+            SecondShift.BeginAnimation(TranslateTransform.XProperty, null);
+            SecondShift.X = from;
+            var slide = new DoubleAnimation(from, target, TimeSpan.FromMilliseconds(560)) { EasingFunction = new SpringEase { Damping = 0.7 }, BeginTime = lag };
             _secondSliding = true;
             slide.Completed += (_, _) =>
             {
@@ -396,11 +402,12 @@ public partial class NotchWindow
                 SecondShift.X = SecondTargetX();
             };
             SecondShift.BeginAnimation(TranslateTransform.XProperty, slide);
-            IslandNeck(SecondNeck, SecondBubble.Height, splitting: true);
-            var pop = new DoubleAnimation(0.55, 1, TimeSpan.FromMilliseconds(520)) { EasingFunction = new SpringEase { Damping = 0.6 } };
+            if (shrinking) { SecondNeck.BeginAnimation(HeightProperty, null); SecondNeck.Height = 0; After(230, () => { if (_secondShown != LiveActivity.None) IslandNeck(SecondNeck, SecondBubble.Height, splitting: true); }); }
+            else IslandNeck(SecondNeck, SecondBubble.Height, splitting: true);
+            var pop = new DoubleAnimation(0.55, 1, TimeSpan.FromMilliseconds(500)) { EasingFunction = new SpringEase { Damping = 0.66 }, BeginTime = lag };
             SecondScale.BeginAnimation(ScaleTransform.ScaleXProperty, pop);
             SecondScale.BeginAnimation(ScaleTransform.ScaleYProperty, pop);
-            Fade(SecondBubble, 1, 200);
+            SecondBubble.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200)) { BeginTime = lag });
         }
         else if (second == LiveActivity.None && wasShown && !(_mode is Mode.Media or Mode.Activity) || _hidden && wasShown && second == LiveActivity.None)
         {

@@ -240,7 +240,8 @@ public partial class NotchWindow
         MicTile.Visibility = _audio.HasMic ? Visibility.Visible : Visibility.Collapsed;
         MicTile.IsOn = _audio.MicMuted;
         MicTile.Glyph = _audio.MicMuted ? "" : "";
-        MicTile.Label = _audio.MicMuted ? "Muted" : "Mic on";
+        MicTile.Label = _audio.MicMuted ? "Muted" : Loc.T("Live");
+        MicLive(true);
 
         var mode = _power.Mode;
         PowerTile.IsOn = mode != PowerMode.Balanced;

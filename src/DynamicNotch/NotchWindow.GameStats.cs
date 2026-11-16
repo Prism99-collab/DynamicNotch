@@ -24,13 +24,14 @@ public partial class NotchWindow
 
     internal static readonly (string Name, string Hex)[] StatColors =
     {
-        ("White", "#E6FFFFFF"), ("Cyan", "#54C1E6"), ("Green", "#30D158"), ("Yellow", "#FEE801"),
-        ("Orange", "#FF9F0A"), ("Pink", "#FF2E88"), ("Purple", "#BF5AF2"), ("Red", "#FF453A"),
+        ("White", "#E6FFFFFF"), ("Cyan", "#3CD5FF"), ("Green", "#30D158"), ("Yellow", "#FEE801"),
+        ("Orange", "#FF9F0A"), ("Pink", "#FF2EB8"), ("Purple", "#BF5AF2"), ("Red", "#FF453A"),
     };
 
     bool AnyGameStat => _settings.FpsCpu || _settings.FpsGpu || _settings.FpsCpuTemp || _settings.FpsGpuTemp;
 
-    Color StatColor(string? hex) => Hex(hex) ?? Color.FromArgb(0xE6, 0xFF, 0xFF, 0xFF);
+    // the older, duller cyan and pink some settings still hold become the current ones
+    Color StatColor(string? hex) => Hex(hex switch { "#54C1E6" => "#3CD5FF", "#FF2E88" => "#FF2EB8", _ => hex }) ?? Color.FromArgb(0xE6, 0xFF, 0xFF, 0xFF);
 
     void BuildGameStats()
     {

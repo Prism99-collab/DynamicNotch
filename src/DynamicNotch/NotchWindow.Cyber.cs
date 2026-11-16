@@ -12,7 +12,7 @@ namespace DynamicNotch;
 /// Neon theme (the yellow button beside the lock, or Settings): the notch becomes a piece of street-tech HUD.
 ///  • shape: hard 45° cuts instead of round corners, asymmetric, with a step in its bottom edge; the ears go angular;
 ///  • a yellow frame along its sides and bottom, cyan circuit traces, hazard stripes, a ruler, a part-number tag;
-///  • the palette of the neon title card: night #00060E, yellow #FEE801, olive #9A9F17, cyan #54C1E6, teal #39C4B6;
+///  • the palette of the neon title card: night #00060E, yellow #FEE801, olive #9A9F17, cyan #3CD5FF, teal #2FE0C6;
 ///    the condensed Bahnschrift that ships with Windows for all text, the clock in yellow;
 ///  • motion: a glitch burst on every change (signal slices, a cyan ghost of the frame, a jolt), a scan line
 ///    sweeping down when it opens, titles that decode letter by letter.
@@ -22,7 +22,7 @@ namespace DynamicNotch;
 public partial class NotchWindow
 {
     static readonly Color CyYellow = Color.FromRgb(0xFE, 0xE8, 0x01), CyOlive = Color.FromRgb(0x9A, 0x9F, 0x17),
-        CyCyan = Color.FromRgb(0x54, 0xC1, 0xE6), CyTeal = Color.FromRgb(0x39, 0xC4, 0xB6), CyNight = Color.FromRgb(0x00, 0x06, 0x0E);
+        CyCyan = Color.FromRgb(0x3C, 0xD5, 0xFF), CyTeal = Color.FromRgb(0x2F, 0xE0, 0xC6), CyNight = Color.FromRgb(0x00, 0x06, 0x0E);
     static readonly FontFamily CyFont = new("Bahnschrift, Segoe UI");
     static readonly Brush CyYellowBrush = Frozen(CyYellow), CyCyanBrush = Frozen(CyCyan);
     const string Scramble = "#$%&@<>/\\|=+*01?!ZX";
@@ -88,7 +88,7 @@ public partial class NotchWindow
                 {
                     // the game pill with sample readings (development only: nothing is saved)
                     _settings.FpsCpu = _settings.FpsGpu = _settings.FpsGpuTemp = _settings.FpsCpuTemp = true;
-                    _settings.FpsGpuColor = "#54C1E6";
+                    _settings.FpsGpuColor = "#3CD5FF";
                     GameFps.Text = "144";
                     SetMode(Mode.Game);
                     ShowGameStats(new Services.StrainService.Reading(32, 97, 50, 71, 64));

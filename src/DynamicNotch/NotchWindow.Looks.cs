@@ -370,20 +370,20 @@ public partial class NotchWindow
         Jelly(1.2);
     }
 
-    /// <summary>A drop of liquid settling: a short squash and stretch from the top edge.</summary>
+    /// <summary>A drop of liquid settling: a short squash and stretch from the top edge, in step with the shape's spring.</summary>
     void Jelly(double strength = 1)
     {
         if (_look?.Jelly != true || Eco || _mode == Mode.Game) return;
-        var a = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(520) };
-        a.KeyFrames.Add(new EasingDoubleKeyFrame(1 + 0.035 * strength, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(120)), new SineEase { EasingMode = EasingMode.EaseOut }));
-        a.KeyFrames.Add(new EasingDoubleKeyFrame(1 - 0.015 * strength, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(280)), new SineEase { EasingMode = EasingMode.EaseInOut }));
-        a.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(520)), new SineEase { EasingMode = EasingMode.EaseInOut }));
+        var a = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(430) };
+        a.KeyFrames.Add(new EasingDoubleKeyFrame(1 + 0.035 * strength, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(100)), new SineEase { EasingMode = EasingMode.EaseOut }));
+        a.KeyFrames.Add(new EasingDoubleKeyFrame(1 - 0.015 * strength, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(230)), new SineEase { EasingMode = EasingMode.EaseInOut }));
+        a.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(430)), new SineEase { EasingMode = EasingMode.EaseInOut }));
         a.FillBehavior = FillBehavior.Stop;
         _jelly.BeginAnimation(ScaleTransform.ScaleYProperty, a);
-        var b = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(520) };
-        b.KeyFrames.Add(new EasingDoubleKeyFrame(1 - 0.02 * strength, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(120)), new SineEase { EasingMode = EasingMode.EaseOut }));
-        b.KeyFrames.Add(new EasingDoubleKeyFrame(1 + 0.008 * strength, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(280)), new SineEase { EasingMode = EasingMode.EaseInOut }));
-        b.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(520)), new SineEase { EasingMode = EasingMode.EaseInOut }));
+        var b = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(430) };
+        b.KeyFrames.Add(new EasingDoubleKeyFrame(1 - 0.02 * strength, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(100)), new SineEase { EasingMode = EasingMode.EaseOut }));
+        b.KeyFrames.Add(new EasingDoubleKeyFrame(1 + 0.008 * strength, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(230)), new SineEase { EasingMode = EasingMode.EaseInOut }));
+        b.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(430)), new SineEase { EasingMode = EasingMode.EaseInOut }));
         b.FillBehavior = FillBehavior.Stop;
         _jelly.BeginAnimation(ScaleTransform.ScaleXProperty, b);
     }
@@ -397,7 +397,7 @@ public partial class NotchWindow
         if (to is Mode.Expanded or Mode.Osd || from == Mode.Expanded) Jelly(to == Mode.Expanded ? 1 : 0.6);
         if (_look.Particles && to is Mode.Expanded or Mode.Osd) Bloom();
         if (_look.Aurora && to == Mode.Expanded && !Eco)
-            _aurora!.BeginAnimation(OpacityProperty, new DoubleAnimation(0.4, 1, TimeSpan.FromMilliseconds(700)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+            _aurora!.BeginAnimation(OpacityProperty, new DoubleAnimation(0.4, 1, TimeSpan.FromMilliseconds(560)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
     }
 
     /// <summary>

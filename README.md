@@ -35,7 +35,7 @@ open the control center, then swipe between its pages:
 |---|---|
 | Home | Now playing, Wi-Fi, Bluetooth, focus, volume and app mixer, brightness |
 | Calls | Mute, camera, share and leave for Discord, Teams, Zoom, Meet and more; a mic check between calls |
-| System | CPU, memory, disk, battery, network and downloads |
+| System | CPU, GPU, memory and network at a glance, the apps using the most, connection, battery and disk |
 | Tools | Timer, snip, keep awake and quick shortcuts |
 | Clipboard & Files | Shelf, clipboard history, recent downloads and screenshots |
 | Smart | Battery, connection and break reminders, meeting mode |

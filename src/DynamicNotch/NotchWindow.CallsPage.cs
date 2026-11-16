@@ -46,7 +46,7 @@ public partial class NotchWindow
         var s = Skin;
         return s.Key switch
         {
-            "neon" => new CallLook(CyCyan, Color.FromArgb(0x1C, CyCyan.R, CyCyan.G, CyCyan.B), Color.FromArgb(0x55, CyCyan.R, CyCyan.G, CyCyan.B), Color.FromArgb(0xB0, CyCyan.R, CyCyan.G, CyCyan.B), 0, CyFont, true),
+            "neon" => new CallLook(CyCyan, Color.FromArgb(0xA6, 0x06, 0x12, 0x1E), Color.FromArgb(0x80, CyCyan.R, CyCyan.G, CyCyan.B), Color.FromArgb(0xC8, CyCyan.R, CyCyan.G, CyCyan.B), 0, CyFont, true),
             "liquid" => new CallLook(s.Accent, Color.FromArgb(0x1E, 0x7F, 0xE7, 0xD9), Color.FromArgb(0x40, 0xA7, 0x8B, 0xFA), s.Label, 12, UiText, false),
             "crystal" => new CallLook(s.Accent, Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF), Color.FromArgb(0x3A, 0xFF, 0xFF, 0xFF), s.Label, 10, UiText, false),
             "abyss" => new CallLook(s.Accent, Color.FromArgb(0x1A, 0x2E, 0xE6, 0xD6), Color.FromArgb(0x38, 0x2E, 0xE6, 0xD6), s.Label, 9, UiText, false),

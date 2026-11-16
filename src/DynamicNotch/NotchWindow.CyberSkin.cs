@@ -37,16 +37,21 @@ public partial class NotchWindow
     {
         public readonly Dictionary<DependencyProperty, (object Before, object Mine)> Props = new();
         public SizeChangedEventHandler? Cut;
+        // a cut card's edge, drawn into its background so the cuts get an edge too
+        public double EdgeThick;
+        public Size CutSize;
+        public Brush? Fill, Drawn;
+        public (double W, double H, Brush? Edge, Brush? Fill) Built;
     }
     static readonly ConditionalWeakTable<DependencyObject, Skinned> _skinned = new();
     bool _skinQueued;
 
-    static readonly Color CyRed = Color.FromRgb(0xFF, 0x2A, 0x4F), CyMagenta = Color.FromRgb(0xFF, 0x2E, 0x88);
+    static readonly Color CyRed = Color.FromRgb(0xFF, 0x2A, 0x4F), CyMagenta = Color.FromRgb(0xFF, 0x2E, 0xB8);
     static readonly Dictionary<int, Color> CyPalette = new()
     {
-        [0x30D158] = Color.FromRgb(0x39, 0xC4, 0xB6), [0x34C759] = Color.FromRgb(0x39, 0xC4, 0xB6),
-        [0x0A84FF] = Color.FromRgb(0x54, 0xC1, 0xE6), [0x64D2FF] = Color.FromRgb(0x54, 0xC1, 0xE6), [0x8E8CFF] = Color.FromRgb(0x54, 0xC1, 0xE6),
-        [0x5E5CE6] = Color.FromRgb(0x39, 0xC4, 0xB6),
+        [0x30D158] = Color.FromRgb(0x2F, 0xE0, 0xC6), [0x34C759] = Color.FromRgb(0x2F, 0xE0, 0xC6),
+        [0x0A84FF] = Color.FromRgb(0x3C, 0xD5, 0xFF), [0x64D2FF] = Color.FromRgb(0x3C, 0xD5, 0xFF), [0x8E8CFF] = Color.FromRgb(0x3C, 0xD5, 0xFF),
+        [0x5E5CE6] = Color.FromRgb(0x2F, 0xE0, 0xC6),
         [0xFF9F0A] = Color.FromRgb(0xFE, 0xE8, 0x01), [0xFFD60A] = Color.FromRgb(0xFE, 0xE8, 0x01), [0xFFC40A] = Color.FromRgb(0xFE, 0xE8, 0x01),
         [0xFFE15A] = Color.FromRgb(0xFE, 0xE8, 0x01),
         [0xFF453A] = CyRed, [0xFF3B30] = CyRed,
@@ -120,11 +125,15 @@ public partial class NotchWindow
     {
         if (!_skinOn || _skinQueued || _mode == Mode.Game) return;
         _skinQueued = true;
-        Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
-        {
-            _skinQueued = false;
-            if (_skinOn && _mode != Mode.Game) Walk(Root, true, full: false);
-        });
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, SkinCatchUp);
+    }
+
+    /// <summary>The catch-up walk waits for the notch to stop moving: walking the whole tree mid-motion would cost frames.</summary>
+    void SkinCatchUp()
+    {
+        if (_animating) { After(90, SkinCatchUp); return; }
+        _skinQueued = false;
+        if (_skinOn && _mode != Mode.Game) Walk(Root, true, full: false);
     }
 
     /// <param name="full">false for the quiet catch-up passes: what's collapsed is skipped (it's caught when it shows, by its Loaded or the next pass)</param>
@@ -185,6 +194,8 @@ public partial class NotchWindow
                 Recolor(b, Border.BackgroundProperty);
                 Recolor(b, Border.BorderBrushProperty);
                 if (_skinCuts) CutCorners(b);
+                // the app may have given it a new fill or edge since: the drawn edge catches up
+                if (_skinCuts && _skinned.TryGetValue(b, out var sk) && sk.Cut != null) sk.Cut(b, null!);
                 break;
             case Panel p:
                 Recolor(p, Panel.BackgroundProperty);
@@ -291,20 +302,88 @@ public partial class NotchWindow
         double lim = Math.Min(w, h) / 2.6;
         double C(double r) => r <= 0 ? 0 : Math.Min(Math.Max(3, r * 0.75), Math.Min(10, lim));
         double a = C(tl), bb = C(tr), c = C(br), d = C(bl);
-        var g = new StreamGeometry();
-        using (var ctx = g.Open())
+        // the same size as last time and still our clip: nothing to rebuild (the catch-up passes call this often)
+        var sc = _skinned.GetOrCreateValue(b);
+        bool clipOurs = sc.Props.TryGetValue(ClipProperty, out var cr) && ReferenceEquals(b.ReadLocalValue(ClipProperty), cr.Mine);
+        if (!clipOurs || sc.CutSize != new Size(w, h))
         {
-            ctx.BeginFigure(new Point(0, a), true, true);
-            ctx.LineTo(new Point(a, 0), false, false);
-            ctx.LineTo(new Point(w - bb, 0), false, false);
-            ctx.LineTo(new Point(w, bb), false, false);
-            ctx.LineTo(new Point(w, h - c), false, false);
-            ctx.LineTo(new Point(w - c, h), false, false);
-            ctx.LineTo(new Point(d, h), false, false);
-            ctx.LineTo(new Point(0, h - d), false, false);
+            var g = new StreamGeometry();
+            using (var ctx = g.Open())
+            {
+                ctx.BeginFigure(new Point(0, a), true, true);
+                ctx.LineTo(new Point(a, 0), false, false);
+                ctx.LineTo(new Point(w - bb, 0), false, false);
+                ctx.LineTo(new Point(w, bb), false, false);
+                ctx.LineTo(new Point(w, h - c), false, false);
+                ctx.LineTo(new Point(w - c, h), false, false);
+                ctx.LineTo(new Point(d, h), false, false);
+                ctx.LineTo(new Point(0, h - d), false, false);
+            }
+            g.Freeze();
+            Put(b, ClipProperty, g);
+            sc.CutSize = new Size(w, h);
         }
-        g.Freeze();
-        Put(b, ClipProperty, g);
+        // a card without an edge is done here
+        if (sc.EdgeThick == 0 && (b.BorderBrush is not { } eb0 || IsClear(eb0) || b.BorderThickness.Left <= 0)) return;
+        CutEdge(b, w, h, a, bb, c, d);
+    }
+
+    /// <summary>
+    /// A clipped card loses its edge along the cuts. Its edge is drawn instead into its background, following the
+    /// cuts: a crisp line (plain white edges become neon cyan) and a faint glow just inside it. Only cards that had
+    /// an edge; their own fill and edge brushes are used as they are, so the app's hover colours keep working.
+    /// </summary>
+    static void CutEdge(Border b, double w, double h, double tl, double tr, double br, double bl)
+    {
+        var s = _skinned.GetOrCreateValue(b);
+        if (s.EdgeThick == 0)
+        {
+            var t = b.BorderThickness;
+            if (!(t.Left > 0 && t.Left <= 2 && t.Left == t.Top && t.Top == t.Right && t.Right == t.Bottom) || b.BorderBrush is not { } eb || IsClear(eb)) return;
+            s.EdgeThick = t.Left;
+            var pad = b.Padding;
+            Put(b, Border.BorderThicknessProperty, new Thickness(0));
+            Put(b, Border.PaddingProperty, new Thickness(pad.Left + t.Left, pad.Top + t.Top, pad.Right + t.Right, pad.Bottom + t.Bottom));
+        }
+        var bg = b.Background;
+        if (s.Drawn != null && ReferenceEquals(bg, s.Drawn)) bg = s.Fill; else s.Fill = bg;
+        var edge = b.BorderBrush;
+        if (edge == null) return;
+        if (s.Drawn != null && s.Built == (w, h, edge, bg) && ReferenceEquals(b.Background, s.Drawn)) return; // nothing changed
+
+        var pen = NeonEdge(edge);
+        var shape = Controls.NeonFrame.Outline(w, h, tl, tr, br, bl, 0);
+        var line = Controls.NeonFrame.Outline(w, h, tl, tr, br, bl, 0.5);
+        var group = new DrawingGroup();
+        if (bg != null) group.Children.Add(new GeometryDrawing(bg, null, shape));
+        var glow = new DrawingGroup { Opacity = 0.16, ClipGeometry = shape };
+        glow.Children.Add(new GeometryDrawing(null, new Pen(pen, 5), line));
+        group.Children.Add(glow);
+        group.Children.Add(new GeometryDrawing(null, new Pen(pen, 1) { LineJoin = PenLineJoin.Miter }, line));
+        var brush = new DrawingBrush(group)
+        {
+            Stretch = Stretch.None, AlignmentX = AlignmentX.Left, AlignmentY = AlignmentY.Top,
+            ViewboxUnits = BrushMappingMode.Absolute, Viewbox = new Rect(0, 0, w, h),
+            ViewportUnits = BrushMappingMode.Absolute, Viewport = new Rect(0, 0, w, h),
+        };
+        if (brush.CanFreeze) brush.Freeze(); // brushes the app animates stay live inside it
+        s.Drawn = brush;
+        s.Built = (w, h, edge, bg);
+        Put(b, Border.BackgroundProperty, brush);
+    }
+
+    static bool IsClear(Brush b) => b is SolidColorBrush { Color.A: < 10 } || b.Opacity < 0.04;
+
+    /// <summary>The edge, a little brighter: faint white edges become neon cyan, faint coloured ones stronger.</summary>
+    static Brush NeonEdge(Brush edge)
+    {
+        if (edge is not SolidColorBrush s || (!s.IsFrozen && s.HasAnimatedProperties)) return edge;
+        var c = s.Color;
+        int max = Math.Max(c.R, Math.Max(c.G, c.B)), min = Math.Min(c.R, Math.Min(c.G, c.B));
+        if (max - min < 0x28 && min > 0x90 && c.A <= 0x80)
+            return Frozen(Color.FromArgb((byte)Math.Min(0xB0, c.A * 2 + 0x30), CyCyan.R, CyCyan.G, CyCyan.B));
+        if (c.A < 0x90) return Frozen(Color.FromArgb((byte)Math.Min(0xC8, c.A * 1.6), c.R, c.G, c.B));
+        return edge;
     }
 
     static readonly Regex Numbers = new(@"-?\d+(\.\d+)?", RegexOptions.Compiled);

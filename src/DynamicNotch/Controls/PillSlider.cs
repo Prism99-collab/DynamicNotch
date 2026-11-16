@@ -95,7 +95,7 @@ public sealed class PillSlider : Grid
     }
 
     static readonly Brush KnobYellow = Frozen(new SolidColorBrush(Color.FromRgb(0xFE, 0xE8, 0x01)));
-    static readonly Brush CyTrack = Frozen(new SolidColorBrush(Color.FromArgb(0x40, 0x54, 0xC1, 0xE6)));
+    static readonly Brush CyTrack = Frozen(new SolidColorBrush(Color.FromArgb(0x40, 0x3C, 0xD5, 0xFF)));
     static readonly Brush WhiteTrack = Frozen(new SolidColorBrush(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF)));
     static Brush Frozen(Brush b) { b.Freeze(); return b; }
 

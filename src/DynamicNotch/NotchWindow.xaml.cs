@@ -548,9 +548,9 @@ public partial class NotchWindow : Window
         // Opening, it trails the width and overshoots a touch; closing, it tucks in first.
         switch (style)
         {
-            case SpringStyle.Open: _sh.Configure(0.54, 0.72); break;
-            case SpringStyle.Pop: _sh.Configure(0.46, 0.66); break;
-            case SpringStyle.Close: _sh.Configure(0.28, 1.0); break;
+            case SpringStyle.Open: _sh.Configure(0.45, 0.74); break;
+            case SpringStyle.Pop: _sh.Configure(0.39, 0.68); break;
+            case SpringStyle.Close: _sh.Configure(0.24, 1.0); break;
             default: _sh.Configure(style); break;
         }
         _sw.Target = w;
@@ -628,21 +628,23 @@ public partial class NotchWindow : Window
         var old = _activePanel;
         _activePanel = panel;
 
-        if (old != null)
+        if (old != null && ReferenceEquals(old, Expanded) && !_cyber && !Eco) RetractExpanded(); // Neon: the tube switches off instead
+        else if (old != null)
         {
-            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(110));
+            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(90));
             fade.Completed += (_, _) => { if (_activePanel != old) old.Visibility = Visibility.Collapsed; };
             old.BeginAnimation(OpacityProperty, fade);
         }
 
-        if (panel != null)
+        if (panel != null && ReferenceEquals(panel, Expanded) && !Eco) { PourExpanded(old == null ? 20 : 50); }
+        else if (panel != null)
         {
             panel.Visibility = Visibility.Visible;
             var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-            var begin = TimeSpan.FromMilliseconds(old == null ? 60 : 110);
-            panel.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(240)) { BeginTime = begin, EasingFunction = ease });
+            var begin = TimeSpan.FromMilliseconds(old == null ? 40 : 80);
+            panel.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)) { BeginTime = begin, EasingFunction = ease });
             var st = (ScaleTransform)panel.RenderTransform;
-            var scale = new DoubleAnimation(0.92, 1, TimeSpan.FromMilliseconds(380)) { BeginTime = begin, EasingFunction = new SpringEase { Damping = 0.7 } };
+            var scale = new DoubleAnimation(0.93, 1, TimeSpan.FromMilliseconds(300)) { BeginTime = begin, EasingFunction = new SpringEase { Damping = 0.72 } };
             st.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
             st.BeginAnimation(ScaleTransform.ScaleYProperty, scale);
         }

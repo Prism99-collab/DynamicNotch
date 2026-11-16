@@ -37,7 +37,7 @@ public partial class NotchWindow
     {
         new("Original · the notch decides", null, null, null, null),
         new("Synth", "#FF2E88", "#7B2CFF", "#FF2E88", "#FF8BC4"),
-        new("Neon Night", "#FEE801", "#39C4B6", "#54C1E6", "#FEE801"),
+        new("Neon Night", "#FEE801", "#2FE0C6", "#3CD5FF", "#FEE801"),
         new("Ocean", "#3FA9F5", "#0B5ED7", "#64D2FF", "#BFE9FF"),
         new("Sunset", "#FF7A45", "#FF2D55", "#FFB86B", "#FFD6A5"),
         new("Terminal", "#00FF66", "#00B140", "#00FF66", "#7DFFAE"),

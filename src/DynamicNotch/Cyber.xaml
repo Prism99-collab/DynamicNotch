@@ -7,10 +7,10 @@
     -->
 
     <SolidColorBrush x:Key="CyYellow" Color="#FEE801" />
-    <SolidColorBrush x:Key="CyCyan" Color="#54C1E6" />
+    <SolidColorBrush x:Key="CyCyan" Color="#3CD5FF" />
     <SolidColorBrush x:Key="CyNight" Color="#00060E" />
-    <SolidColorBrush x:Key="CyEdge" Color="#4054C1E6" />
-    <SolidColorBrush x:Key="CyPlate" Color="#0C1D27" />
+    <SolidColorBrush x:Key="CyEdge" Color="#703CD5FF" />
+    <SolidColorBrush x:Key="CyPlate" Color="#091721" />
 
     <!-- media controls, small icons: an octagon lights up under the pointer -->
     <Style x:Key="CyCircleButton" TargetType="Button">
@@ -25,7 +25,7 @@
                             <ScaleTransform />
                         </Grid.RenderTransform>
                         <Path x:Name="Hover" Stretch="Fill" Data="M3,0 L7,0 L10,3 L10,7 L7,10 L3,10 L0,7 L0,3 Z"
-                              Fill="#1854C1E6" Stroke="#FEE801" StrokeThickness="1" Opacity="0" />
+                              Fill="#183CD5FF" Stroke="#FEE801" StrokeThickness="1" Opacity="0" />
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -63,11 +63,11 @@
                         </Border>
                         <Rectangle x:Name="Bar" Width="2" HorizontalAlignment="Left" Margin="0,5" Fill="#FEE801" Opacity="0" />
                         <Path x:Name="Corner" Width="6" Height="6" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                              Data="M6,0 L6,6 L0,6 Z" Fill="#54C1E6" Opacity="0" />
+                              Data="M6,0 L6,6 L0,6 Z" Fill="#3CD5FF" Opacity="0" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#1A54C1E6" />
+                            <Setter TargetName="Bd" Property="Background" Value="#1A3CD5FF" />
                             <Setter TargetName="Bar" Property="Opacity" Value="1" />
                             <Setter TargetName="Corner" Property="Opacity" Value="0.8" />
                         </Trigger>
@@ -99,7 +99,7 @@
                             <TextBlock x:Name="Icon" Text="{TemplateBinding Glyph}" FontFamily="{StaticResource IconFont}" FontSize="16"
                                        Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Grid>
-                        <TextBlock Text="{TemplateBinding Label}" FontSize="10.5" Foreground="#B054C1E6" Margin="0,5,0,0"
+                        <TextBlock Text="{TemplateBinding Label}" FontSize="10.5" Foreground="#B03CD5FF" Margin="0,5,0,0"
                                    HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="64" />
                     </StackPanel>
                     <ControlTemplate.Triggers>
@@ -144,7 +144,7 @@
                             <TextBlock x:Name="Icon" Text="{TemplateBinding Glyph}" FontFamily="{StaticResource IconFont}" FontSize="16"
                                        Foreground="{TemplateBinding TintBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Grid>
-                        <TextBlock Text="{TemplateBinding Label}" FontSize="10" Foreground="#B054C1E6" Margin="0,4,0,0"
+                        <TextBlock Text="{TemplateBinding Label}" FontSize="10" Foreground="#B03CD5FF" Margin="0,4,0,0"
                                    HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="66" />
                     </StackPanel>
                     <ControlTemplate.Triggers>
@@ -277,7 +277,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ScrollBar">
-                    <Grid Background="#1454C1E6">
+                    <Grid Background="#143CD5FF">
                         <Track x:Name="PART_Track" IsDirectionReversed="True">
                             <Track.Thumb>
                                 <Thumb>

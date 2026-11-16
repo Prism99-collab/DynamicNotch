@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.6.0] — 2026-11-16
+
+A new System page, smarter notifications, and a notch that moves faster.
+
+### Added
+- A new System page. One line tells you how your PC is doing and why ("Working hard", which app is busiest), with
+  the parts that matter in bold. Four tiles show CPU, GPU, memory and network as big numbers with the minute's peak.
+  Click a tile to see the three apps using the most of it, and close one from there (click ✕ twice).
+- The mic tile on Home shows when your mic is live, and a ring lights up while you talk.
+- Sign-in codes: a notification with a code shows just the code. One click copies it, and it never goes into
+  your clipboard history.
+
+### Changed
+- Notifications get to the point: who sent it and what they said, nothing repeated. Several from the same app add
+  up instead of replacing each other, and each stays as long as it takes to read.
+- Pop-ups wear the app's own colour (Discord blue, WhatsApp green and so on), and their text slides in.
+- Opening and closing feel quicker. The content pours out of the notch when it opens and is drawn back in when it
+  closes. Neon switches off like an old TV.
+- Neon looks sharper: brighter colours, crisp edges that follow every cut corner, and a soft glow that's easy on
+  the eyes. Battery saver turns the glow off.
+- The side pill waits for the notch to finish closing before it pops out.
+
 ## [2.5.0] — 2026-11-14
 
 Calls get their own page.

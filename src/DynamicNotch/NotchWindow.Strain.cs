@@ -151,7 +151,7 @@ public partial class NotchWindow
         if (!AnyGameStat) ShowGameStats(null);
     }
 
-    internal string? PrefFpsColor(bool cpu) => cpu ? _settings.FpsCpuColor : _settings.FpsGpuColor;
+    internal string? PrefFpsColor(bool cpu) => (cpu ? _settings.FpsCpuColor : _settings.FpsGpuColor) switch { "#54C1E6" => "#3CD5FF", "#FF2E88" => "#FF2EB8", var c => c }; // older presets read as the current ones
 
     internal double PrefFpsScale => _settings.FpsScale;
 

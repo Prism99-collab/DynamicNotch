@@ -180,7 +180,7 @@ public partial class App : Application
             g.FillPolygon(black, pts);
             using var yellow = new Drawing.Pen(Drawing.Color.FromArgb(0xFE, 0xE8, 0x01), 4) { LineJoin = Drawing.Drawing2D.LineJoin.Miter };
             g.DrawPolygon(yellow, pts);
-            using var cyan = new Drawing.SolidBrush(Drawing.Color.FromArgb(0x54, 0xC1, 0xE6));
+            using var cyan = new Drawing.SolidBrush(Drawing.Color.FromArgb(0x3C, 0xD5, 0xFF));
             g.FillRectangle(cyan, 12, 30, 22, 4);
             using var dot = new Drawing.SolidBrush(Drawing.Color.FromArgb(0xFE, 0xE8, 0x01));
             g.FillRectangle(dot, 44, 28, 7, 7);
