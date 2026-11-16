@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.7.0] — 2026-11-16
+
+A better-looking search.
+
+### Added
+- A preview beside the results: pictures, videos and documents show their thumbnail, text files their first lines,
+  folders how many items they hold, apps whether they're running and where they're installed.
+- Files in the list show their real thumbnail instead of a plain icon.
+- The best match sits on top as a bigger card.
+
+### Changed
+- The notch fits the results: a short list makes it shorter.
+- The keys you can press are shown at the bottom and change with what's picked.
+- Sharper icons at any display scaling.
+
 ## [2.6.0] — 2026-11-16
 
 A new System page, smarter notifications, and a notch that moves faster.

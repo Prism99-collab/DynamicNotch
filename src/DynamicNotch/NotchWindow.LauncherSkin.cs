@@ -168,5 +168,7 @@ public partial class NotchWindow
             : Frozen(s.Line);
         if (_selScan != null && s.Scan is { } scan) _selScan.Fill = Frozen(scan);
         if (_scrollThumb != null) _scrollThumb.Background = Frozen(Color.FromArgb(0x70, s.Accent.R, s.Accent.G, s.Accent.B));
+        StylePane();
+        _keysShown = null;
     }
 }

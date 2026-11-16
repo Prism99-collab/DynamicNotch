@@ -41,7 +41,7 @@ public partial class NotchWindow
     Grid? _launchLayer;
 
     static string RowKey(Hit h) => h.Key ?? "t|" + h.Title + "|" + h.Detail;
-    static string LookOf(Hit h) => $"{h.Big}|{h.Glyph}|{h.IconPath}|{h.Swatch}|{h.Preview}";
+    static string LookOf(Hit h, bool top = false) => $"{h.Big}|{h.Glyph}|{h.IconPath}|{h.Swatch}|{h.Preview}|{top}";
 
     // ───────────────────────────── the list ─────────────────────────────
 
@@ -53,6 +53,9 @@ public partial class NotchWindow
         var before = _rows.Count == 0 ? new Dictionary<string, double>() : new Dictionary<string, double>(_keyY); // a fresh opening glides nothing
 
         bool labels = _actionsFor != null || _hits.Select(h => h.Section).Where(s => s != null).Distinct().Count() > 1;
+        SetPane(_actionsFor == null && _hits.Any(Previewable)); // the preview, when there's something to show in it
+        // the best match as a bigger card on top (not for what's big already: a task, an answer)
+        bool topCard = _actionsFor == null && _hits.Count > 1 && !_hits[0].Big && _hits[0].Section != "Web";
         var next = new List<(UIElement El, string Key, bool Fresh)>();
         var usedRows = new HashSet<string>();
         var usedLabels = new HashSet<string>();
@@ -63,6 +66,19 @@ public partial class NotchWindow
         for (int i = 0; i < upTo; i++)
         {
             var h = _hits[i];
+            bool top = topCard && i == 0;
+            if (top && labels)
+            {
+                next.Add((Label("Top hit", back: false, usedLabels), "lbl|top", !before.ContainsKey("lbl|top")));
+                section = null; // the line after it gets its own section's label
+                string tk = RowKey(h);
+                usedRows.Add(tk);
+                bool tFresh = !_rows.TryGetValue(tk, out var tp) || tp.Look != LookOf(h, true) || !before.ContainsKey(tk);
+                if (tp == null || tp.Look != LookOf(h, true)) _rows[tk] = tp = BuildRow(h, true);
+                UpdateRow(tp, h, i);
+                next.Add((tp.Plate, tk, tFresh));
+                continue;
+            }
             if (labels && _actionsFor == null && h.Section != null && h.Section != section)
             {
                 string lk = "lbl|" + h.Section;
@@ -71,8 +87,8 @@ public partial class NotchWindow
             section = h.Section;
             string key = RowKey(h);
             if (!usedRows.Add(key)) key += "|" + i; // two lines that look alike stay two lines
-            bool isFresh = !_rows.TryGetValue(key, out var parts) || parts.Look != LookOf(h) || !before.ContainsKey(key);
-            if (parts == null || parts.Look != LookOf(h)) _rows[key] = parts = BuildRow(h);
+            bool isFresh = !_rows.TryGetValue(key, out var parts) || parts.Look != LookOf(h, top) || !before.ContainsKey(key);
+            if (parts == null || parts.Look != LookOf(h, top)) _rows[key] = parts = BuildRow(h, top);
             UpdateRow(parts, h, i);
             next.Add((parts.Plate, key, isFresh));
         }
@@ -126,6 +142,7 @@ public partial class NotchWindow
         _listHeight = y;
         if (animate) ScrollTo(0, jump: true);
         PaintSelection(glide: !animate);
+        FitLauncher();
     }
 
     static readonly IEasingFunction Out = new CubicEase { EasingMode = EasingMode.EaseOut };
@@ -165,7 +182,7 @@ public partial class NotchWindow
         t = new TextBlock
         {
             Text = _cyber ? text.ToUpperInvariant() : text, FontSize = 9.5, Foreground = Frozen(back ? Skin.Accent : Skin.Label),
-            Margin = new Thickness(8, 7, 0, 3), FontWeight = back ? FontWeights.SemiBold : FontWeights.Normal,
+            Margin = new Thickness(8, 6, 0, 2), FontWeight = back ? FontWeights.SemiBold : FontWeights.Normal,
             FontFamily = _cyber ? CyFont : UiText,
         };
         if (back) { t.Cursor = Cursors.Hand; t.MouseLeftButtonUp += (_, e) => { e.Handled = true; LeaveActions(); }; }
@@ -176,10 +193,10 @@ public partial class NotchWindow
 
     // ───────────────────────────── one line ─────────────────────────────
 
-    RowParts BuildRow(Hit h)
+    RowParts BuildRow(Hit h, bool top = false)
     {
-        var grid = new Grid { Height = h.Big ? 36 : 28 };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
+        var grid = new Grid { Height = top ? 42 : h.Big ? 36 : 28 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(top ? 40 : 30) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
@@ -190,13 +207,15 @@ public partial class NotchWindow
                 BorderBrush = Frozen(Color.FromArgb(0x50, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(1) };
         else if (h.IconPath != null)
         {
-            var box = new Border { Width = 20, Height = 20, CornerRadius = new CornerRadius(4) };
+            double size = top ? 28 : 20;
+            var box = new Border { Width = size, Height = size, CornerRadius = new CornerRadius(_cyber ? 0 : top ? 6 : 4) };
             IconInto(box, h.IconPath);
             if (h.Preview != null) ShowThumb(box, h.Preview); // a picture shows itself
+            else if (ThumbFile(h) is { } tf) RowThumb(box, tf); // so does a video, a PDF, a document
             lead = box;
         }
         else
-            lead = new TextBlock { Text = h.Glyph ?? "", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 13, VerticalAlignment = VerticalAlignment.Center,
+            lead = new TextBlock { Text = h.Glyph ?? "", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = top ? 18 : 13, VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center, Foreground = Frozen(Skin.Glyph) };
         lead.HorizontalAlignment = HorizontalAlignment.Left;
         lead.VerticalAlignment = VerticalAlignment.Center;
@@ -205,12 +224,29 @@ public partial class NotchWindow
 
         var title = new TextBlock
         {
-            FontSize = h.Big ? 16 : 12.5, FontWeight = h.Big ? FontWeights.SemiBold : FontWeights.Normal,
+            FontSize = h.Big ? 16 : top ? 14 : 12.5, FontWeight = h.Big || top ? FontWeights.SemiBold : FontWeights.Normal,
             VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(4, 0, 8, 0),
-            FontFamily = _cyber && h.Big ? CyFont : UiText, Foreground = _cyber && h.Big ? Frozen(CyYellow) : Brushes.White,
+            FontFamily = _cyber && (h.Big || top) ? CyFont : UiText, Foreground = _cyber && (h.Big || top) ? Frozen(CyYellow) : Brushes.White,
         };
-        Grid.SetColumn(title, 1);
-        grid.Children.Add(title);
+        if (top)
+        {
+            // the top hit says what it is under its name
+            var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            words.Children.Add(title);
+            string kind = KindWord(h);
+            words.Children.Add(new TextBlock
+            {
+                Text = _cyber ? kind.ToUpperInvariant() : kind, FontSize = 10, Margin = new Thickness(4, 0, 8, 0), TextTrimming = TextTrimming.CharacterEllipsis,
+                Foreground = _cyber ? Frozen(Color.FromArgb(0xC0, CyCyan.R, CyCyan.G, CyCyan.B)) : DimBrush, FontFamily = _cyber ? CyFont : UiText,
+            });
+            Grid.SetColumn(words, 1);
+            grid.Children.Add(words);
+        }
+        else
+        {
+            Grid.SetColumn(title, 1);
+            grid.Children.Add(title);
+        }
         var detail = new TextBlock { FontSize = 10, Foreground = DimBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0), MaxWidth = h.Big ? 330 : 200, TextTrimming = TextTrimming.CharacterEllipsis };
         var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         if (TypeTag(h) is { } tag) right.Children.Add(tag);
@@ -294,6 +330,9 @@ public partial class NotchWindow
             p.Shown = h.Highlight;
         }
         if (p.Detail.Text != h.Detail) p.Detail.Text = h.Detail;
+        // with the preview open the details are in it: the line keeps its room for the name
+        var dv = _paneOn ? Visibility.Collapsed : Visibility.Visible;
+        if (p.Detail.Visibility != dv) p.Detail.Visibility = dv;
         p.Hit = h;
     }
 
@@ -332,13 +371,8 @@ public partial class NotchWindow
         ShowPathOnPicked(picked);
         PaintSlots();
         var hit = _launchSel < _hits.Count ? _hits[_launchSel] : null;
-        if (hit == null) { SetFoot(""); return; }
-        if (_actionsFor != null) { SetFoot("↵ run  ·  ← back"); return; }
-        var tips = new List<string> { "↵ open" };
-        if (hit.Reveal != null) tips.Add("Ctrl+↵ folder");
-        if (hit.Actions != null) tips.Add("→ more");
-        if (_ghost != null || hit.Complete != null) tips.Add("Tab complete");
-        SetFoot(string.Join("  ·  ", tips));
+        KeysFor(hit);
+        ShowPreview(hit);
     }
 
     int _paintedSel = -1;
@@ -375,7 +409,7 @@ public partial class NotchWindow
     // ───────────────────────────── icons, off the UI thread ─────────────────────────────
 
     readonly ConcurrentDictionary<string, ImageSource?> _iconCache = new(StringComparer.OrdinalIgnoreCase);
-    static readonly BlockingCollection<(string Path, Action<ImageSource?> Done)> IconQueue = new();
+    static readonly BlockingCollection<(string Path, Action<ImageSource?> Done, int Thumb)> IconQueue = new(); // Thumb: a thumbnail of that size, not the icon
     static Thread? _iconThread;
 
     /// <summary>The icon now if it's known; else a soft placeholder, and the icon fades in when it's read.</summary>
@@ -384,13 +418,13 @@ public partial class NotchWindow
         if (_iconCache.TryGetValue(target, out var known)) { box.Background = IconBrush(known); return; }
         box.Background = Frozen(Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF));
         EnsureIconThread();
-        IconQueue.Add((target, img => Dispatcher.InvokeAsync(() =>
+        IconQueue.Add((target, (ImageSource? img) => Dispatcher.InvokeAsync(() =>
         {
             _iconCache[target] = img;
             if (img == null) return;
             box.Background = IconBrush(img);
             box.BeginAnimation(OpacityProperty, new DoubleAnimation(0.2, 1, TimeSpan.FromMilliseconds(140)));
-        })));
+        }), 0));
     }
 
     static void EnsureIconThread()
@@ -400,10 +434,10 @@ public partial class NotchWindow
             // one quiet thread reads icons from the shell, one after another
             _iconThread = new Thread(() =>
             {
-                foreach (var (path, done) in IconQueue.GetConsumingEnumerable())
+                foreach (var (path, done, thumb) in IconQueue.GetConsumingEnumerable())
                 {
                     ImageSource? img = null;
-                    try { img = IconHelper.ForPath(path); } catch { }
+                    try { img = thumb > 0 ? IconHelper.ShellThumb(path, thumb) : IconHelper.ForPath(path); } catch { }
                     done(img);
                 }
             }) { IsBackground = true, Priority = ThreadPriority.BelowNormal, Name = "Launcher icons" };
@@ -507,7 +541,7 @@ public partial class NotchWindow
         var p = picked == null ? null : _rows.Values.FirstOrDefault(r => ReferenceEquals(r.Plate, picked));
         if (_pathShown != null && !ReferenceEquals(_pathShown, p) && _pathShown.Hit != null) _pathShown.Detail.Text = _pathShown.Hit.Detail;
         _pathShown = null;
-        if (_actionsFor != null || p?.Hit?.Entry is not { Kind: LauncherIndex.Kind.File or LauncherIndex.Kind.Folder } e || e.Target.StartsWith("shell:")) return;
+        if (_paneOn || _actionsFor != null || p?.Hit?.Entry is not { Kind: LauncherIndex.Kind.File or LauncherIndex.Kind.Folder } e || e.Target.StartsWith("shell:")) return;
         if (System.IO.Path.GetDirectoryName(e.Target.TrimEnd('\\')) is not { Length: > 0 } dir) return;
         p.Detail.Text = CompactPath(dir, 40);
         _pathShown = p;

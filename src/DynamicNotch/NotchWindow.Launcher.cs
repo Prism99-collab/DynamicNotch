@@ -137,8 +137,12 @@ public partial class NotchWindow
         TakeForeground();
         Activate();
 
+        _launchWantH = 0;
+        _paneOn = true; SetPane(false); // a fresh opening: no preview until there are results for it
+        _keysShown = null;
         _launch.Visibility = Visibility.Visible;
         _launch.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140)));
+        OpenStaged();
         _launchScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.94, 1, TimeSpan.FromMilliseconds(220)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
         _launchBox.Text = seed ?? "";
         _launchBox.CaretIndex = _launchBox.Text.Length;
@@ -168,6 +172,8 @@ public partial class NotchWindow
     {
         if (!_launcherOpen) return;
         _launcherOpen = false;
+        _launchWantH = 0;
+        if (_mode == Mode.Expanded) ApplyShape(); // the open notch gets its own size back
         UpdateRain(); UpdateAmbient();
         FoldAway();
         SetActivatable(false);
@@ -236,10 +242,11 @@ public partial class NotchWindow
         var root = new Grid { Margin = new Thickness(18, 10, 18, 8) };
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(40) });
         root.RowDefinitions.Add(new RowDefinition());
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(20) });
 
         // the search line: a prompt, what you type, a hint on the right
-        var line = new Grid();
+        var line = new Grid { RenderTransform = new TranslateTransform() };
+        _launchLineRow = line;
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
         line.ColumnDefinitions.Add(new ColumnDefinition());
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -274,6 +281,8 @@ public partial class NotchWindow
 
         // the results (or, while empty, what you use most and a few things to try)
         var body = _launchBody = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        body.ColumnDefinitions.Add(new ColumnDefinition());
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _launchList = new StackPanel();
         _launchStarters = new StackPanel();
         // as many results as there are, scrolled by the keys (or the wheel); the picked one is kept in view
@@ -282,13 +291,19 @@ public partial class NotchWindow
         _launchScroll.ScrollChanged += (_, e) => { if (e.VerticalChange > 0 && e.VerticalOffset + e.ViewportHeight >= e.ExtentHeight - 40) RenderRest(); };
         AttachScrollHints(body);
         _launchScroll.PreviewMouseWheel += OnResultsWheel;
-        body.Children.Add(new ScrollViewer { Content = _launchStarters, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false });
+        var starters = new ScrollViewer { Content = _launchStarters, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
+        Grid.SetColumnSpan(starters, 2);
+        body.Children.Add(starters);
+        var pane = BuildPane(); // the picked line, shown big on the right
+        Grid.SetColumn(pane, 1);
+        body.Children.Add(pane);
         Grid.SetRow(body, 1);
         root.Children.Add(body);
 
         _launchFoot = new TextBlock { FontSize = 9.5, Foreground = DimBrush, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-        Grid.SetRow(_launchFoot, 2);
-        root.Children.Add(_launchFoot);
+        var foot = BuildFoot(); // the keys you can press, riding the notch's bottom edge
+        Grid.SetRow(foot, 2);
+        root.Children.Add(foot);
 
         _launchScanLine = new Border
         {
@@ -298,7 +313,9 @@ public partial class NotchWindow
         };
         Grid.SetRowSpan(_launchScanLine, 3);
         root.Children.Add(_launchScanLine);
-        _launch = new Border { Child = root, Visibility = Visibility.Collapsed, Opacity = 0, RenderTransform = _launchScale };
+        _launch = new Border { Child = root, Visibility = Visibility.Collapsed, Opacity = 0, RenderTransform = _launchScale, UseLayoutRounding = true };
+        // icons are drawn from big artwork: scaled down smoothly and on whole pixels, they stay crisp at any display scaling
+        RenderOptions.SetBitmapScalingMode(_launch, BitmapScalingMode.HighQuality);
         Grid.SetRowSpan(_launch, 3);
         Panel.SetZIndex(_launch, 40);
         Expanded.Children.Add(_launch);
@@ -349,6 +366,8 @@ public partial class NotchWindow
             _launchScroll.Visibility = Visibility.Collapsed;
             ((UIElement?)_launchStarters.Parent ?? _launchStarters).Visibility = Visibility.Visible; _launchStarters.Visibility = Visibility.Visible;
             RenderStarters();
+            SetPane(false);
+            FitLauncher();
             SetGhost(null);
             var tips = new List<string>();
             if (_settings.SearchRecent && _index.Recent.Count > 0) tips.Add("↑ brings back what you searched");
@@ -661,7 +680,7 @@ public partial class NotchWindow
         return m;
     }
 
-    void SetFoot(string text) { if (_launchFoot != null) _launchFoot.Text = text; }
+    void SetFoot(string text) => FootText(text);
 
     // ───────────────────────────── the grey completion ─────────────────────────────
 

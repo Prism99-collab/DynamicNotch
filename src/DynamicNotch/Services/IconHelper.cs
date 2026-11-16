@@ -101,14 +101,22 @@ public static class IconHelper
         return result;
     }
 
-    static BitmapSource? Large(string path, int px)
+    static BitmapSource? Large(string path, int px) => Shell(path, px, 0x1 | 0x4);
+
+    /// <summary>
+    /// What Explorer shows for a file in its big views: a picture's or a video's frame, a PDF's or a document's first
+    /// page, when Windows has a thumbnail for that kind of file; null otherwise (then its icon is used). Call it off the UI thread.
+    /// </summary>
+    public static ImageSource? ShellThumb(string path, int px) => OnSta(() => Shell(path, px, 0x1 | 0x8)); // SIIGBF_BIGGERSIZEOK | SIIGBF_THUMBNAILONLY
+
+    static BitmapSource? Shell(string path, int px, int flags)
     {
         IntPtr hbm = IntPtr.Zero;
         try
         {
             SHCreateItemFromParsingName(path, IntPtr.Zero, typeof(IShellItemImageFactory).GUID, out var factory);
             // SIIGBF_BIGGERSIZEOK | SIIGBF_ICONONLY: the app's own icon art, never a stretched small one
-            if (factory.GetImage(new NativeSize { Cx = px, Cy = px }, 0x1 | 0x4, out hbm) != 0 || hbm == IntPtr.Zero) return null;
+            if (factory.GetImage(new NativeSize { Cx = px, Cy = px }, flags, out hbm) != 0 || hbm == IntPtr.Zero) return null;
             if (GetObject(hbm, Marshal.SizeOf<BITMAP>(), out var bm) == 0 || bm.Bits == IntPtr.Zero || bm.BitsPixel != 32) return null;
 
             int w = bm.Width, h = Math.Abs(bm.Height), stride = w * 4;

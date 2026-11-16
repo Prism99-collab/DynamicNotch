@@ -208,6 +208,6 @@ public partial class NotchWindow
     {
         if (_iconCache.ContainsKey(target)) return;
         EnsureIconThread();
-        IconQueue.Add((target, img => _iconCache[target] = img));
+        IconQueue.Add((target, img => _iconCache[target] = img, 0));
     }
 }

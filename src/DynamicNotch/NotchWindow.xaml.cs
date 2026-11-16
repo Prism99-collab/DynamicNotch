@@ -496,7 +496,9 @@ public partial class NotchWindow : Window
         double w, h, r;
         switch (_mode)
         {
-            case Mode.Expanded: w = ExpandedSize.Width; h = ExpandedSize.Height; r = ExpandedRadius; break;
+            case Mode.Expanded:
+                // the search fits the notch to its results
+                w = ExpandedSize.Width; h = _launcherOpen && _launchWantH > 0 ? _launchWantH : ExpandedSize.Height; r = ExpandedRadius; break;
             case Mode.Drop:
                 // the file is right over it: the receptacle swells to welcome it
                 w = DropSize.Width + (_dropHot ? 16 : 0); h = DropSize.Height + (_dropHot ? 6 : 0); r = DropRadius; break;
@@ -542,6 +544,7 @@ public partial class NotchWindow : Window
             else { w += 14; h += 4; r += 2; style = SpringStyle.Peek; }
         }
 
+        if (_mode == Mode.Expanded && _sh.Value > 120 && Math.Abs(_sw.Value - w) < 2) style = SpringStyle.Page; // already open, only its height changes (the search): quick and calm
         _sw.Configure(style);
         _sr.Configure(style);
         // jelly: height has its own timing, so the shape stretches like a drop instead of scaling like a box.
@@ -601,6 +604,7 @@ public partial class NotchWindow : Window
         Pill.Height = Math.Max(3, _sh.Value);
         Radius = _sr.Value;
         if (_pageX.Active) PagesShift.X = _pageX.Value;
+        FollowLauncherEdge();
         _leanShift.X = _lean.Value;
 
         if (!done) return;
