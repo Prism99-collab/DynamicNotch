@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [2.7.1] — 2026-11-16
+
+New Neon backgrounds.
 
 ### Changed
 - New Neon backgrounds, one for every page, drifting slowly while the panel is open.
