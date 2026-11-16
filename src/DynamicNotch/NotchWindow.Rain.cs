@@ -61,6 +61,7 @@ public partial class NotchWindow
         bool live = _cyber && !Eco && !_offScreen && !_hidden && RainDev != "off";
         bool panel = live && _mode == Mode.Expanded && !_launcherOpen; // the search covers it: no rain behind it
         bool idle = live && (_mode is Mode.Idle or Mode.Slim && !_media.IsPlaying && !InGame || RainDev == "idle" && _mode != Mode.Expanded);
+        CyberArtDrift(_cyber && !Eco && !_offScreen && !_hidden && _mode == Mode.Expanded && !_launcherOpen); // the page's picture drifts while it's seen
 
         if (panel != _rainPanel.Running)
         {

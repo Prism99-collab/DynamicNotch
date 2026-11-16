@@ -8,8 +8,8 @@ using System.Windows.Media.Imaging;
 namespace DynamicNotch;
 
 /// <summary>
-/// Neon only: a faded picture behind each page of the control center. The app ships with a set for the first
-/// five pages; yours win: the notch looks in %APPDATA%\DynamicNotch\Backgrounds for page1.*, page2.* … page6.*
+/// Neon only: a faded picture behind each page of the control center. The app ships with one for every page;
+/// yours win: the notch looks in %APPDATA%\DynamicNotch\Backgrounds for page1.*, page2.* … page7.*
 /// (png, jpg, bmp, webp) first. Replace or add a file and it shows the next time the theme comes on; a page with
 /// neither stays clean.
 /// They sit on their own strip behind the pages and slide with them (the same transform), drawn once and reused
@@ -25,7 +25,10 @@ public partial class NotchWindow
     static readonly string[] ArtExtensions = { ".png", ".jpg", ".jpeg", ".bmp", ".webp" };
     Grid? _artHost;
     Border _artA = null!, _artB = null!, _artFront = null!;
-    readonly ImageBrush?[] _art = new ImageBrush?[6];
+    readonly ImageBrush?[] _art = new ImageBrush?[7];
+    readonly ScaleTransform _artZoom = new(1.07, 1.07);
+    readonly TranslateTransform _artPan = new();
+    bool _artDrifting;
     const double ArtLevel = 0.15;
 
     void CyberArt(bool on)
@@ -43,7 +46,8 @@ public partial class NotchWindow
             if (_artHost == null)
             {
                 // behind everything in the open panel, header and dots included: the picture covers the whole page
-                _artHost = new Grid { IsHitTestVisible = false };
+                // a touch larger than the page, so it can drift slowly without showing an edge
+                _artHost = new Grid { IsHitTestVisible = false, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new TransformGroup { Children = { _artZoom, _artPan } } };
                 Grid.SetRowSpan(_artHost, 3);
                 _artA = new Border { Opacity = 0, CacheMode = new BitmapCache() };
                 _artB = new Border { Opacity = 0, CacheMode = new BitmapCache() };
@@ -76,6 +80,30 @@ public partial class NotchWindow
     }
 
     void CyberArtPages() => CyberArtShow();
+
+    /// <summary>
+    /// The picture drifts, very slowly, while the panel is open: it feels alive without anything to look at. Only the
+    /// finished picture moves (nothing is drawn again), 30 times a second, and only while it's on screen.
+    /// </summary>
+    void CyberArtDrift(bool on)
+    {
+        if (_artHost == null) on = false;
+        if (on == _artDrifting) return;
+        _artDrifting = on;
+        if (!on)
+        {
+            _artPan.BeginAnimation(TranslateTransform.XProperty, null);
+            _artPan.BeginAnimation(TranslateTransform.YProperty, null);
+            return;
+        }
+        var ease = new SineEase { EasingMode = EasingMode.EaseInOut };
+        var x = new DoubleAnimation(-14, 14, TimeSpan.FromSeconds(23)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease };
+        var y = new DoubleAnimation(-5, 5, TimeSpan.FromSeconds(17)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease };
+        Timeline.SetDesiredFrameRate(x, 30);
+        Timeline.SetDesiredFrameRate(y, 30);
+        _artPan.BeginAnimation(TranslateTransform.XProperty, x);
+        _artPan.BeginAnimation(TranslateTransform.YProperty, y);
+    }
 
     /// <summary>The picture for a page, decoded at twice the page's size (sharp, and a few MB at most), or nothing.</summary>
     static ImageBrush? LoadArt(int page)

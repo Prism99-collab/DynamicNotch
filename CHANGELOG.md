@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- New Neon backgrounds, one for every page, drifting slowly while the panel is open.
+
 ## [2.7.0] — 2026-11-16
 
 A better-looking search.
