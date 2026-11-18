@@ -17,8 +17,13 @@ public static class TextFold
         if (c < 128) return c is >= 'A' and <= 'Z' ? (char)(c + 32) : c;
         char f = Table[c];
         if (f != '\0') return f;
+        // half of an emoji (and other characters made of two): kept as it is, it has no accent to take off.
+        // Normalizing it alone throws, and a window title cut in the middle of an emoji once broke the whole search.
+        if (char.IsSurrogate(c)) { Table[c] = c; return c; }
         char lower = char.ToLowerInvariant(c);
-        string d = lower.ToString().Normalize(NormalizationForm.FormD);
+        string d;
+        try { d = lower.ToString().Normalize(NormalizationForm.FormD); }
+        catch (ArgumentException) { d = lower.ToString(); }
         f = d.Length > 0 && CharUnicodeInfo.GetUnicodeCategory(d[0]) != UnicodeCategory.NonSpacingMark ? d[0] : lower;
         Table[c] = f;
         return f;

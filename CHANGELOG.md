@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.11.2] — 2026-11-18
+
+A fix for the search.
+
+### Fixed
+- Search results could stop opening when one of your open windows had an emoji cut off in its title. They open again,
+  and one odd result can no longer break the rest.
+
 ## [2.11.1] — 2026-11-18
 
 A better memory, and cleaner pictures.

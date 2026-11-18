@@ -469,8 +469,9 @@ public partial class NotchWindow
         // what's already open, and what you copied or kept
         if (!understood && filter == null && terms.Trim().Length >= 2)
         {
-            if (_settings.SearchWindows) OfferWindows(terms, pool.Values.Select(x => x.Hit.Entry).Where(e => e?.Kind == LauncherIndex.Kind.App).ToList()!, Offer);
-            if (_settings.SearchClipboard) OfferKept(terms, Offer);
+            // each kind of result on its own: one that fails (a strange window title, say) can't take the others down
+            if (_settings.SearchWindows) try { OfferWindows(terms, pool.Values.Select(x => x.Hit.Entry).Where(e => e?.Kind == LauncherIndex.Kind.App).ToList()!, Offer); } catch (Exception ex) { AppLog.Write("search windows: " + ex.Message); }
+            if (_settings.SearchClipboard) try { OfferKept(terms, Offer); } catch (Exception ex) { AppLog.Write("search clipboard: " + ex.Message); }
         }
 
         // with a clear match, letters-in-order guesses ("tcno account switcher" for "notch") are only noise
