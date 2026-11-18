@@ -133,6 +133,7 @@ public partial class NotchWindow
         _chatHost = new Grid { ClipToBounds = true };
         Grid.SetRow(_chatHost, 1);
         _chatRoot.Children.Add(_chatHost);
+        WireChatDrop(_chatHost);
         _chatStack = new StackPanel { Margin = new Thickness(2, 10, 10, 10) };
         _chatScroll = ChatScroller(_chatStack);
         _chatHost.Children.Add(_chatScroll);
@@ -334,7 +335,8 @@ public partial class NotchWindow
             string role = m?["role"]?.ToString() ?? "";
             string content = m?["content"] is JsonValue v && v.TryGetValue(out string? c) ? c : "";
             if (role == "user" && m?["auto"] != null) continue; // a picture the AI took for itself
-            if (role == "user") ChatUser(m?["shown"]?.ToString() ?? content, animate: false, attached: m?["file"]?.ToString(), pictureCount: m?["pictures"] is JsonValue pv && pv.TryGetValue(out int pc) ? pc : 0);
+            if (role == "user") ChatUser(m?["shown"]?.ToString() ?? content, animate: false, attached: m?["file"]?.ToString(), pictureCount: m?["pictures"] is JsonValue pv && pv.TryGetValue(out int pc) ? pc : 0,
+                at: DateTime.TryParse(m?["at"]?.ToString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var when) ? when : null);
             else if (role == "assistant")
             {
                 if (m?["tool_calls"] is JsonArray calls)
@@ -541,117 +543,6 @@ public partial class NotchWindow
     }
 
     // ───────────────────────────── the key: set up by anyone, in the chat ─────────────────────────────
-
-    /// <summary>A card that walks through getting a key, with its own box to paste it in.</summary>
-    void ChatSetupCard(string? problem = null)
-    {
-        if (_chatStack == null) return;
-        _chatAwaitingKey = true;
-        var acc = ChatAccent;
-        var card = new StackPanel();
-        card.Children.Add(new TextBlock { Text = _cyber ? "LINK THE AI // ONE-TIME SETUP" : "Connect the AI (one time)", FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = _cyber ? Frozen(CyYellow) : Brushes.White, FontFamily = _cyber ? CyFont : UiText });
-        card.Children.Add(new TextBlock { Text = "It runs on Google's Gemini: a free key gives thousands of requests a day. (An OpenRouter key works too.)", FontSize = 11, Foreground = DimBrush, Margin = new Thickness(0, 2, 0, 6), TextWrapping = TextWrapping.Wrap });
-        void Step(string n, string text, UIElement? extra = null)
-        {
-            var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
-            row.ColumnDefinitions.Add(new ColumnDefinition());
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.Children.Add(new TextBlock { Text = n, FontSize = 11, FontWeight = FontWeights.Bold, Foreground = Frozen(acc), VerticalAlignment = VerticalAlignment.Center });
-            var t = new TextBlock { Text = text, FontSize = 11.5, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetColumn(t, 1);
-            row.Children.Add(t);
-            if (extra != null) { Grid.SetColumn(extra, 2); row.Children.Add(extra); }
-            card.Children.Add(row);
-        }
-        var open = ChatChip("Open", "");
-        open.Click += (_, _) => { try { Process.Start(new ProcessStartInfo("https://aistudio.google.com/apikey") { UseShellExecute = true }); } catch { } };
-        Step("1", "Open Google AI Studio and sign in with Google (free)", open);
-        Step("2", "Click “Create API key”, then copy it");
-        Step("3", "Paste it below, press Enter");
-
-        var field = new Grid { Margin = new Thickness(0, 6, 0, 0) };
-        field.ColumnDefinitions.Add(new ColumnDefinition());
-        field.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _keyBox = new PasswordBox
-        {
-            Height = 26, FontSize = 12, Padding = new Thickness(6, 3, 6, 3), Foreground = Brushes.White, CaretBrush = Frozen(acc),
-            Background = Frozen(Color.FromArgb(0x40, 0x00, 0x00, 0x00)), BorderBrush = Frozen(A(acc, 0x80)), BorderThickness = new Thickness(1), VerticalContentAlignment = VerticalAlignment.Center,
-            ToolTip = "Your Google AI Studio key (AQ.… or AIza…), or an OpenRouter key (sk-or-v1-…)",
-        };
-        var placeholder = new TextBlock { Text = "AQ.… or AIza…", FontSize = 12, Foreground = DimBrush, IsHitTestVisible = false, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
-        _keyBox.PasswordChanged += (_, _) => placeholder.Visibility = _keyBox.Password.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
-        var status = new TextBlock { FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 0), Visibility = Visibility.Collapsed };
-        var save = ChatChip("Save", "");
-        save.Margin = new Thickness(6, 0, 0, 0);
-        async void Submit()
-        {
-            string raw = _keyBox!.Password.Trim();
-            string? key = KeyIn(raw);
-            status.Visibility = Visibility.Visible;
-            if (key == null)
-            {
-                status.Foreground = Frozen(Warn);
-                status.Text = raw.Contains("...") || raw.Contains('…')
-                    ? "That's a shortened key (from a list of keys). Copy the whole key: in Google AI Studio, click it to see it in full."
-                    : "That isn't a key: a Google key starts with AQ. or AIza (an OpenRouter key starts with sk-or-v1-).";
-                Bump(1);
-                return;
-            }
-            status.Foreground = DimBrush;
-            string who = OpenRouter.KindOf(key) == "openrouter" ? "OpenRouter" : "Google";
-            status.Text = $"Checking with {who}…";
-            _keyBox.IsEnabled = false;
-            bool? ok = await OpenRouter.CheckKey(key);
-            _keyBox.IsEnabled = true;
-            if (ok == false)
-            {
-                status.Foreground = Frozen(Warn);
-                status.Text = $"{who} says this key isn't valid (deleted, or not copied whole). Create a new one and paste it here.";
-                _keyBox.Focus();
-                Bump(1);
-                return;
-            }
-            if (!OpenRouter.SaveKey(key)) { status.Foreground = Frozen(Warn); status.Text = "Couldn't save the key on this PC."; return; }
-            _settings.AiProvider = OpenRouter.KindOf(key) ?? "gemini";
-            _settings.Save();
-            OpenRouter.Choose(_settings.AiProvider);
-            if (OpenRouter.IsGemini) await OpenRouter.GeminiModels();
-            _chatAwaitingKey = false;
-            _keyBox = null;
-            RenderSession();
-            ChatNote("", ok == true ? $"Connected · {ModelName(ChatModel)}" : $"Saved ({who} couldn't be reached to check it: it's checked on your first message)", tone: ok == true ? Ok : Warn);
-            _launchBox?.Focus();
-            if (_chatPending is { } q) { _chatPending = null; SendChat(q); }
-        }
-        save.Click += (_, _) => Submit();
-        _keyBox.PreviewKeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Enter) { e.Handled = true; Submit(); }
-            else if (e.Key == Key.Escape) { e.Handled = true; LeaveChat(); }
-        };
-        var boxHost = new Grid();
-        boxHost.Children.Add(_keyBox);
-        boxHost.Children.Add(placeholder);
-        field.Children.Add(boxHost);
-        Grid.SetColumn(save, 1);
-        field.Children.Add(save);
-        card.Children.Add(field);
-        card.Children.Add(status);
-        if (problem != null) { status.Text = problem; status.Foreground = Frozen(Warn); status.Visibility = Visibility.Visible; }
-        card.Children.Add(new TextBlock { Text = "Kept on this PC, encrypted for your Windows account; only ever sent to the AI's own provider.", FontSize = 10, Foreground = DimBrush, Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap });
-
-        var border = new Border
-        {
-            Child = card, Padding = new Thickness(10, 8, 10, 9), Margin = new Thickness(0, 4, 0, 4), CornerRadius = new CornerRadius(_cyber ? 0 : 10),
-            Background = Frozen(A(acc, 0x12)), BorderBrush = Frozen(A(acc, 0x55)), BorderThickness = new Thickness(1),
-        };
-        _chatStack.Children.Add(border);
-        Arrive(border);
-        StyleChatLine();
-        ChatKeys();
-        Dispatcher.BeginInvoke(DispatcherPriority.Input, () => { _keyBox?.Focus(); Keyboard.Focus(_keyBox); });
-    }
 
     /// <summary>A Google (AIza…) or OpenRouter (sk-or-…) key in what was pasted (quotes, spaces, "Bearer", text around it are fine).</summary>
     string? KeyIn(string text)
@@ -922,9 +813,13 @@ public partial class NotchWindow
     void StyleEsc()
     {
         if (_launchEsc == null) return;
-        if (!_chatMode) { _launchEsc.Text = "esc"; _launchEsc.Foreground = DimBrush; _launchEsc.ToolTip = null; return; }
+        if (!_chatMode) { _launchEsc.Text = "esc"; _launchEsc.Foreground = DimBrush; _launchEsc.FontWeight = FontWeights.Normal; _launchEsc.ToolTip = null; ChatTypeGlow(false); return; }
+        bool typed = _launchBox?.Text.Trim().Length > 0;
         _launchEsc.Text = _chatBusy ? "■ stop" : _chatView == ChatView.History ? "back" : "send ↵";
-        _launchEsc.Foreground = Frozen(_chatBusy ? Warn : A(ChatAccent, 0xE0));
+        // send lights up only when there's something to send
+        _launchEsc.Foreground = Frozen(_chatBusy ? Warn : _chatView == ChatView.History || typed ? A(ChatAccent, 0xF0) : Color.FromArgb(0x60, 0xFF, 0xFF, 0xFF));
+        _launchEsc.FontWeight = typed && !_chatBusy && _chatView == ChatView.Chat ? FontWeights.SemiBold : FontWeights.Normal;
+        ChatTypeGlow(typed && _chatView == ChatView.Chat);
         _launchEsc.ToolTip = _chatBusy ? "Stop the answer  ·  Esc" : null;
     }
 
@@ -1174,9 +1069,9 @@ public partial class NotchWindow
             foreach (var jpeg in pictures) parts.Add(new JsonObject { ["type"] = "image_url", ["image_url"] = new JsonObject { ["url"] = DataUri(jpeg) } });
             body = parts;
         }
-        session.Messages.Add(new JsonObject { ["role"] = "user", ["content"] = body, ["shown"] = text, ["file"] = attachedName, ["pictures"] = pictures.Count > 0 ? pictures.Count : null });
+        session.Messages.Add(new JsonObject { ["role"] = "user", ["content"] = body, ["shown"] = text, ["file"] = attachedName, ["pictures"] = pictures.Count > 0 ? pictures.Count : null, ["at"] = DateTime.Now.ToString("o") });
         foreach (var w in _chatStack?.Children.OfType<FrameworkElement>().Where(x => x.Tag as string == "welcome").ToList() ?? new()) _chatStack!.Children.Remove(w); // the welcome makes way
-        ChatUser(text, attached: attachedName, pictures: pictures);
+        ChatUser(text, attached: attachedName, pictures: pictures, at: DateTime.Now);
         UpdateChatHeader();
 
         _chatBusy = true;
@@ -1258,7 +1153,7 @@ public partial class NotchWindow
                     // the question stays unanswered: taken back, so it can simply be asked again
                     if (round == 0 && session.Messages.Count > 0 && session.Messages[^1]?["role"]?.ToString() == "user") session.Messages.RemoveAt(session.Messages.Count - 1);
                     if (turn.Error.Contains("/key")) { OpenRouter.ForgetKey(); _chatPending = text; ChatSetupCard($"{OpenRouter.ProviderName} didn't accept the saved key: paste a new one."); }
-                    else ChatNote("\uE7BA", turn.Error, tone: Warn, action: turn.Error.StartsWith("Today's 50") ? ("Add credit", () => OpenLink("https://openrouter.ai/settings/credits")) : turn.Error.StartsWith("Today's free Google") ? null : round == 0 ? ("Try again", () => SendChat(text)) : null);
+                    else ChatProblem(turn.Error, turn.Error.StartsWith("Today's 50") ? ("Add credit", () => OpenLink("https://openrouter.ai/settings/credits")) : turn.Error.StartsWith("Today's free Google") ? null : round == 0 ? ("Try again", () => SendChat(text)) : null);
                     break;
                 }
                 if (turn.Calls.Count == 0)
@@ -1466,7 +1361,7 @@ public partial class NotchWindow
         public void Thinking(bool on, string word) { OnWord?.Invoke(word); OnThinking?.Invoke(on); }
     }
 
-    void ChatUser(string text, bool animate = true, string? attached = null, IReadOnlyList<byte[]>? pictures = null, int pictureCount = 0)
+    void ChatUser(string text, bool animate = true, string? attached = null, IReadOnlyList<byte[]>? pictures = null, int pictureCount = 0, DateTime? at = null)
     {
         if (_chatStack == null) return;
         var acc = ChatAccent;
@@ -1478,20 +1373,25 @@ public partial class NotchWindow
         Inline(para.Inlines, text);
         doc.Blocks.Add(para);
         if (attached != null)
-            doc.Blocks.Add(new Paragraph(new Run("\uE723  " + attached) { FontFamily = (FontFamily)FindResource("IconFont") }) { Margin = new Thickness(0, 4, 0, 0), FontSize = 10.5, Foreground = Frozen(A(acc, 0xD0)) });
+        {
+            var file = new Paragraph { Margin = new Thickness(0, 5, 0, 0), FontSize = 10.5, Foreground = Frozen(A(acc, 0xE0)) };
+            file.Inlines.Add(new Run("\uE8A5  ") { FontFamily = (FontFamily)FindResource("IconFont") });
+            file.Inlines.Add(new Run(attached));
+            doc.Blocks.Add(file);
+        }
         // a bubble as wide as its text (a selectable box would otherwise take the whole row)
         var face = new Typeface(doc.FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
         var measured = new FormattedText(text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, face, 12.5, Brushes.White, VisualTreeHelper.GetDpi(this).PixelsPerDip);
         double want = measured.WidthIncludingTrailingWhitespace;
         if (attached != null) want = Math.Max(want, 24 + attached.Length * 6);
-        if (pictures is { Count: > 0 }) want = Math.Max(want, pictures.Count * 64);
+        if (pictures is { Count: > 0 }) want = Math.Max(want, pictures.Count * 70);
         box.Width = Math.Min(296, Math.Ceiling(want) + 10);
         FrameworkElement content = box;
         if (pictures is { Count: > 0 } || pictureCount > 0)
         {
             var stack = new StackPanel();
-            var row = new WrapPanel { Margin = new Thickness(0, 0, 0, 5) };
-            if (pictures != null) foreach (var jpeg in pictures) row.Children.Add(Thumb(jpeg, 56));
+            var row = new WrapPanel { Margin = new Thickness(0, 1, 0, 6) };
+            if (pictures != null) foreach (var jpeg in pictures) row.Children.Add(PictureTile(jpeg));
             else row.Children.Add(new TextBlock { Text = pictureCount == 1 ? "\uEB9F  picture" : $"\uEB9F  {pictureCount} pictures", FontSize = 10.5, Foreground = Frozen(A(acc, 0xD0)), FontFamily = (FontFamily)FindResource("IconFont") });
             stack.Children.Add(row);
             stack.Children.Add(box);
@@ -1503,12 +1403,62 @@ public partial class NotchWindow
             CornerRadius = _cyber ? new CornerRadius(0) : new CornerRadius(12, 12, 3, 12), Background = Frozen(new LinearGradientBrush(A(acc, _cyber ? (byte)0x24 : (byte)0x48), A(AiSecond, _cyber ? (byte)0x16 : (byte)0x30), 0)),
             BorderBrush = Frozen(A(acc, _cyber ? (byte)0x80 : (byte)0x30)), BorderThickness = new Thickness(1),
         };
+        // a soft light along its top edge, and a faint glow of its colour around it
+        if (!Eco && !_cyber) bubble.Effect = new System.Windows.Media.Effects.DropShadowEffect { Color = acc, BlurRadius = 12, ShadowDepth = 0, Opacity = 0.22 };
+        var sheen = new Border
+        {
+            Height = 1, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(_cyber ? 0 : 8, 0, _cyber ? 0 : 8, 0), IsHitTestVisible = false,
+            Background = Frozen(new LinearGradientBrush(Color.FromArgb(0x00, 0xFF, 0xFF, 0xFF), Color.FromArgb(0x50, 0xFF, 0xFF, 0xFF), 0) { GradientStops = { new GradientStop(Color.FromArgb(0x00, 0xFF, 0xFF, 0xFF), 0), new GradientStop(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF), 0.5), new GradientStop(Color.FromArgb(0x00, 0xFF, 0xFF, 0xFF), 1) } }),
+        };
+        var face2 = new Grid { HorizontalAlignment = HorizontalAlignment.Right };
+        face2.Children.Add(bubble);
+        face2.Children.Add(sheen);
+        var column = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right };
+        column.Children.Add(face2);
+        // when you sent it, small under it
+        if (at is { } sent)
+            column.Children.Add(new TextBlock
+            {
+                Text = sent.Date == DateTime.Today ? sent.ToString("HH:mm") : sent.ToString("d MMM, HH:mm"), FontSize = 9, HorizontalAlignment = HorizontalAlignment.Right,
+                Foreground = Frozen(Color.FromArgb(0x60, 0xFF, 0xFF, 0xFF)), Margin = new Thickness(0, 3, 4, 0), FontFamily = _cyber ? CyFont : UiText,
+            });
         var root = new Grid { Margin = new Thickness(36, 10, 0, 2), Tag = "user", Background = Brushes.Transparent };
-        root.Children.Add(bubble);
+        root.Children.Add(column);
         root.Children.Add(Actions(root, HorizontalAlignment.Right, ("\uE8C8", "Copy", () => CopyText(text, "Copied")), ("\uE70F", "Edit", () => EditMessage(text))));
         _chatStack.Children.Add(root);
         if (animate) Arrive(root, fromRight: true);
         FollowChat(force: true);
+    }
+
+    /// <summary>A picture you sent, as a rounded tile; a click opens it big.</summary>
+    FrameworkElement PictureTile(byte[] jpeg)
+    {
+        var img = new System.Windows.Media.Imaging.BitmapImage();
+        img.BeginInit();
+        img.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+        img.DecodePixelHeight = 128;
+        img.StreamSource = new System.IO.MemoryStream(jpeg);
+        img.EndInit();
+        img.Freeze();
+        double w = Math.Clamp(64.0 * img.PixelWidth / Math.Max(1, img.PixelHeight), 48, 112);
+        var tile = new Border
+        {
+            Width = w, Height = 64, Margin = new Thickness(0, 0, 6, 0), CornerRadius = new CornerRadius(_cyber ? 0 : 9), Cursor = Cursors.Hand,
+            Background = new ImageBrush(img) { Stretch = Stretch.UniformToFill }, BorderBrush = Frozen(Color.FromArgb(0x50, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(1),
+            ToolTip = "Open the picture",
+        };
+        tile.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            try
+            {
+                string file = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "DynamicNotch-picture-" + (uint)jpeg.GetHashCode() + ".jpg");
+                if (!System.IO.File.Exists(file)) System.IO.File.WriteAllBytes(file, jpeg);
+                OpenLink(file);
+            }
+            catch { }
+        };
+        return tile;
     }
 
     ChatBubble ChatAssistant(bool animate = true)
@@ -1609,53 +1559,6 @@ public partial class NotchWindow
         "run_powershell" or "do_on_pc" or "manage_window" or "use_app" or "clipboard" or "pc_status" or "undo_last" => _cyber ? Color.FromRgb(0x00, 0xFF, 0xA3) : Color.FromRgb(0x5A, 0xE0, 0x9A),
         _ => A(ChatAccent, 0xC0),
     };
-
-    sealed class StepView
-    {
-        public required TextBlock State, Label;
-        public required Color Accent;
-        public StackPanel? Extras;
-        public void AddExtra(UIElement e) => Extras?.Children.Add(e);
-        public void Done(bool ok, string? note)
-        {
-            State.BeginAnimation(OpacityProperty, null);
-            State.Opacity = 1;
-            State.Text = ok ? "" : "";
-            State.Foreground = Frozen(ok ? Ok : Warn);
-            if (note != null) Label.Text += "  ·  " + note;
-        }
-    }
-
-    /// <summary>A step the AI takes on the PC: what it does, then ✓ or ✕.</summary>
-    StepView ChatStep(string name, string args, bool animate = true)
-    {
-        var acc = ChatAccent;
-        var row = new Grid { Margin = new Thickness(12, 4, 18, 0), Tag = "step" };
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
-        row.ColumnDefinitions.Add(new ColumnDefinition());
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
-        var extras = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        Grid.SetColumn(extras, 2);
-        row.Children.Add(extras);
-        row.Children.Add(new TextBlock { Text = ToolGlyph(name), FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 10.5, Foreground = Frozen(StepTone(name)), VerticalAlignment = VerticalAlignment.Center });
-        var label = new TextBlock { Text = ToolLabel(name, args), FontSize = 11, Foreground = Frozen(Color.FromArgb(0xB8, 0xFF, 0xFF, 0xFF)), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, FontFamily = _cyber ? CyFont : UiText };
-        Grid.SetColumn(label, 1);
-        row.Children.Add(label);
-        var state = new TextBlock { Text = "", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 10, Foreground = Frozen(acc), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
-        if (animate && !Eco)
-        {
-            var spin = new DoubleAnimation(0.3, 1, TimeSpan.FromMilliseconds(500)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever };
-            Timeline.SetDesiredFrameRate(spin, 30);
-            state.BeginAnimation(OpacityProperty, spin);
-        }
-        Grid.SetColumn(state, 3);
-        row.Children.Add(state);
-        _chatStack!.Children.Add(row);
-        if (animate) Arrive(row);
-        FollowChat();
-        return new StepView { State = state, Label = label, Accent = acc, Extras = extras };
-    }
 
     /// <summary>A line from the notch itself: stopped, an error, a setting changed.</summary>
     TextBlock ChatNote(string glyph, string text, Color? tone = null, (string Label, Action Act)? action = null)

@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.10.0] — 2026-11-18
+
+A better-looking AI chat.
+
+### Changed
+- What the AI does shows as a live timeline: each step lights up while it works, then shows how it went and how long it took.
+- Asking for your OK is a proper card, with a clear risk badge and what will run.
+- When it can't answer, a card says why, and when free requests come back.
+- Connecting the AI the first time is quicker: one button, a Paste button, and a check mark when it works.
+- Attached pictures and files show as small previews you can remove one by one, and you can drop files straight onto the chat.
+- Send lights up when there's something to send, and your messages show when you sent them.
+
 ## [2.9.0] — 2026-11-18
 
 The AI can now use your apps, not just open them.

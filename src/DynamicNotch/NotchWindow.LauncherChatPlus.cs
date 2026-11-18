@@ -132,31 +132,6 @@ public partial class NotchWindow
         }
     }
 
-    /// <summary>What goes with the next message (a file, pictures), as one chip with a ✕.</summary>
-    void ShowAttachments()
-    {
-        ClearAttachNote();
-        if (_chatStack == null || _chatAttach == null && _chatPictures.Count == 0) return;
-        var acc = ChatAccent;
-        var line = new StackPanel { Orientation = Orientation.Horizontal };
-        foreach (var jpeg in _chatPictures) line.Children.Add(Thumb(jpeg, 30));
-        line.Children.Add(new TextBlock { Text = "", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 10.5, Foreground = Frozen(acc), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(_chatPictures.Count > 0 ? 6 : 0, 1, 6, 0) });
-        var parts = new List<string>();
-        if (_chatAttach is { } f) parts.Add($"{f.Name} · {f.Text.Length / 1000.0:0.#}k characters");
-        if (_chatPictures.Count > 0) parts.Add(_chatPictures.Count == 1 ? "1 picture" : $"{_chatPictures.Count} pictures");
-        line.Children.Add(new TextBlock { Text = string.Join(" · ", parts) + " · with your next message", FontSize = 10.5, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center });
-        var x = new TextBlock { Text = "", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 9, Foreground = DimBrush, Cursor = Cursors.Hand, Margin = new Thickness(8, 1, 0, 0), VerticalAlignment = VerticalAlignment.Center, ToolTip = "Remove" };
-        x.MouseLeftButtonUp += (_, e) => { e.Handled = true; _chatAttach = null; _chatPictures.Clear(); ClearAttachNote(); _launchBox?.Focus(); };
-        line.Children.Add(x);
-        var chip = new Border { CornerRadius = new CornerRadius(_cyber ? 0 : 9), Padding = new Thickness(6, 4, 6, 4), Background = Frozen(A(acc, 0x20)), BorderBrush = Frozen(A(acc, 0x70)), BorderThickness = new Thickness(1), Child = line };
-        var row = new Grid { Margin = new Thickness(0, 8, 0, 0), HorizontalAlignment = HorizontalAlignment.Right };
-        row.Children.Add(chip);
-        _attachNote = row;
-        _chatStack.Children.Add(row);
-        Arrive(row, fromRight: true);
-        FollowChat(force: true);
-    }
-
     FrameworkElement Thumb(byte[] jpeg, double height)
     {
         var img = new BitmapImage();
@@ -209,6 +184,7 @@ public partial class NotchWindow
             var copy = m.DeepClone().AsObject();
             copy.Remove("shown");
             copy.Remove("auto");
+            copy.Remove("at");
             copy.Remove("file");
             copy.Remove("pictures");
             if (copy["content"] is JsonArray parts && !keepPictures.Contains(i))
