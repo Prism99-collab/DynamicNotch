@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.9.0] — 2026-11-18
+
+The AI can now use your apps, not just open them.
+
+### Added
+- The AI works inside any app: it reads the buttons and boxes on screen, clicks, types, uses shortcuts, and checks
+  with a picture that it worked. "Call Sam on Discord" or "play lofi on Spotify" now really happen.
+- Next-step buttons under answers, and Shorter / More detail when you hover one.
+- Battery and PC answers come with live ring meters.
+- A new welcome page: a greeting that comes alive, and ideas that fit your PC and your day.
+- Chat history grouped by day, with an icon for what each chat was about.
+- Preferences show where your chats are kept and how much room they take, with an option to delete old ones.
+
+### Changed
+- The chat uses less CPU while it answers, and none while you're in another app. Chat files are smaller.
+
 ## [2.8.0] — 2026-11-18
 
 The search can talk now. Press Tab (or pick Ask AI) and you get a chat that can look things up, find your files and do

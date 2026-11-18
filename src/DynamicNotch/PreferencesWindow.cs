@@ -1312,8 +1312,24 @@ public sealed class PreferencesWindow : Window
         }
 
         // ── kept chats
+        Choice(Loc.T("Keep chats for"), new[] { ("0", Loc.T("Newest 60")), ("90", Loc.T("3 months")), ("30", Loc.T("1 month")), ("7", Loc.T("1 week")) },
+            () => _s.AiKeepDays.ToString(), v => { _s.AiKeepDays = int.Parse(v); Services.ChatStore.KeepDays = _s.AiKeepDays; Services.ChatStore.Trim(); Saved(); });
         Label(Loc.T("Your chats"));
-        int n = Services.ChatStore.Count;
+        var (n, bytes) = Services.ChatStore.Usage();
+        var where = new TextBlock
+        {
+            Text = string.Format(Loc.T("{0} chats · {1} · pictures are never saved"), n, Services.SystemMonitor.Bytes(bytes)) + "\n" + Services.ChatStore.Folder,
+            FontSize = 11.5, Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 0, 0, 6),
+        };
+        _content.Children.Add(where);
+        var openFolder = PillButton("\uE838", Loc.T("Open the folder"), () =>
+        {
+            System.IO.Directory.CreateDirectory(Services.ChatStore.Folder);
+            Open(Services.ChatStore.Folder);
+        }, primary: false);
+        openFolder.HorizontalAlignment = HorizontalAlignment.Left;
+        openFolder.Margin = new Thickness(0, 0, 0, 6);
+        _content.Children.Add(openFolder);
         Button wipe = null!;
         bool armed = false;
         wipe = PillButton("\uE74D", n == 0 ? Loc.T("No chats kept") : string.Format(Loc.T("Delete all chats ({0})"), n), () =>

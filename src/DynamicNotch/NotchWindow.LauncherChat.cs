@@ -298,6 +298,9 @@ public partial class NotchWindow
 
     ChatSession NewSession() => new() { Model = ChatModel };
 
+    /// <summary>Is the chat on screen (in the notch, or its own window, not minimised)?</summary>
+    bool ChatOnScreen => _launcherOpen && _chatMode || _pop is { IsVisible: true, WindowState: not WindowState.Minimized };
+
     void StartSession(ChatSession? s)
     {
         _chatCancel?.Cancel();
@@ -330,6 +333,7 @@ public partial class NotchWindow
         {
             string role = m?["role"]?.ToString() ?? "";
             string content = m?["content"] is JsonValue v && v.TryGetValue(out string? c) ? c : "";
+            if (role == "user" && m?["auto"] != null) continue; // a picture the AI took for itself
             if (role == "user") ChatUser(m?["shown"]?.ToString() ?? content, animate: false, attached: m?["file"]?.ToString(), pictureCount: m?["pictures"] is JsonValue pv && pv.TryGetValue(out int pc) ? pc : 0);
             else if (role == "assistant")
             {
@@ -374,26 +378,166 @@ public partial class NotchWindow
         _ => id.Contains('/') ? id[(id.IndexOf('/') + 1)..].Replace(":free", " (free)") : id,
     };
 
+    bool HasGearToShow()
+    {
+        try { return _devices.Devices.Count > 0 || _bt.ConnectedDevices.Any(b => b.Battery != null) || _power.HasBattery && !_power.PluggedIn; }
+        catch { return false; }
+    }
+
+    /// <summary>What to offer on an empty chat: what fits this person's PC and day right now, not a fixed list.</summary>
+    string[] WelcomeIdeas()
+    {
+        if (!_settings.AiTools) return new[] { "Explain this simply", "Write a short reply email", "Plan my day", "Translate to French" };
+        var ideas = new List<string>();
+        try
+        {
+            int toasts; lock (_recentToasts) toasts = _recentToasts.Count;
+            if (toasts > 0) ideas.Add("What did I miss?");
+            var low = _devices.Devices.Where(d => d.Level is < 25).Select(d => d.Kind == Services.DeviceKind.Mouse ? "mouse" : "headset").FirstOrDefault()
+                ?? _bt.ConnectedDevices.Where(b => b.Battery is < 25).Select(b => b.Name).FirstOrDefault();
+            if (low != null) ideas.Add($"How long will my {low} last?");
+            if (_call != null) ideas.Add("Who am I in a call with?");
+            else if (_history.Count > 0) ideas.Add("My last call");
+            if (_reminders.Count > 0) ideas.Add("What's next today?");
+            if (_media.Title.Length > 0) ideas.Add(_media.IsPlaying ? "What's this song about?" : "Play my music");
+            if (_files.Items.Any()) ideas.Add("Summarise my latest download");
+            ideas.Add("What's using my PC?");
+            ideas.Add("My day so far");
+            if (_settings.AiWeb) ideas.Add("Today's top news");
+            ideas.Add("Remind me to stretch in 30 min");
+            ideas.Add("Find the last PDF I opened");
+        }
+        catch { ideas = new() { "My day so far", "What's using my PC?", "Today's top news", "Remind me to stretch in 30 min" }; }
+        return ideas.Distinct().Take(6).ToArray();
+    }
+
+    /// <summary>
+    /// The empty chat: the AI's mark, alive in the middle (it orbits and breathes, with soft rings going out like a
+    /// signal), a greeting for the time of day, and what it could do for you right now as cards, each with its icon in
+    /// the colour of what it touches (the notch, the PC, the web, files). A click puts the words in the box.
+    /// </summary>
     void ChatWelcome()
     {
-        var box = new StackPanel { Margin = new Thickness(2, 10, 0, 0), Tag = "welcome" };
-        box.Children.Add(new TextBlock { Text = _cyber ? "READY // ASK OR ORDER" : "What can I do for you?", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = _cyber ? Frozen(CyYellow) : Brushes.White, FontFamily = _cyber ? CyFont : UiText });
-        box.Children.Add(new TextBlock { Text = _settings.AiTools ? "Ask anything, or tell me to do it on your PC." : "Ask anything.", FontSize = 11.5, Foreground = DimBrush, Margin = new Thickness(0, 3, 0, 8) });
-        var chips = new WrapPanel();
-        var ideas = _settings.AiTools
-            ? new[] { "My day so far", "What did I miss?", "My last call", "What's using my PC?", "Summarise my latest download", "Remind me to stretch in 30 min" }
-            : new[] { "Explain this simply", "Write a short reply email", "Plan my day", "Translate to French" };
-        foreach (var idea in ideas)
+        var acc = ChatAccent;
+        var box = new StackPanel { Margin = new Thickness(0, 14, 0, 0), Tag = "welcome", HorizontalAlignment = HorizontalAlignment.Stretch };
+
+        // the mark, with rings that ripple out from it
+        var stage = new Grid { Width = 120, Height = 96, HorizontalAlignment = HorizontalAlignment.Center };
+        var ripples = new List<System.Windows.Shapes.Ellipse>();
+        for (int r = 0; r < 2; r++)
         {
-            var chip = ChatChip(idea, null);
-            chip.Click += (_, _) => { if (_launchBox == null) return; _launchBox.Text = idea; _launchBox.CaretIndex = idea.Length; _launchBox.Focus(); };
-            chip.Margin = new Thickness(0, 0, 6, 6);
-            chips.Children.Add(chip);
+            var ring = new System.Windows.Shapes.Ellipse
+            {
+                Width = 64, Height = 64, StrokeThickness = 1.2, Opacity = 0, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                Stroke = Frozen(new LinearGradientBrush(A(acc, 0xC0), A(AiSecond, 0x80), 45)), RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1),
+            };
+            if (_cyber) ring.StrokeDashArray = new DoubleCollection { 2, 3 };
+            ripples.Add(ring);
+            stage.Children.Add(ring);
         }
-        box.Children.Add(chips);
+        var orb = new Controls.AiOrb(58, acc, AiSecond, _cyber) { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        stage.Children.Add(orb);
+        box.Children.Add(stage);
+        stage.Loaded += (_, _) =>
+        {
+            orb.Start();
+            if (Eco) return;
+            for (int r = 0; r < ripples.Count; r++)
+            {
+                var begin = TimeSpan.FromSeconds(r * 1.6);
+                var scale = new DoubleAnimation(0.9, 1.75, TimeSpan.FromSeconds(3.2)) { BeginTime = begin, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+                var fade = new DoubleAnimationUsingKeyFrames { BeginTime = begin, RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromSeconds(3.2) };
+                fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+                fade.KeyFrames.Add(new LinearDoubleKeyFrame(0.7, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0.4))));
+                fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(3.2))));
+                Timeline.SetDesiredFrameRate(scale, 30);
+                Timeline.SetDesiredFrameRate(fade, 30);
+                var st = (ScaleTransform)ripples[r].RenderTransform;
+                st.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
+                st.BeginAnimation(ScaleTransform.ScaleYProperty, scale);
+                ripples[r].BeginAnimation(OpacityProperty, fade);
+            }
+        };
+        stage.Unloaded += (_, _) =>
+        {
+            orb.Stop();
+            foreach (var r in ripples) { r.BeginAnimation(OpacityProperty, null); ((ScaleTransform)r.RenderTransform).BeginAnimation(ScaleTransform.ScaleXProperty, null); ((ScaleTransform)r.RenderTransform).BeginAnimation(ScaleTransform.ScaleYProperty, null); }
+        };
+
+        // the greeting (NotchWindow.LauncherChatGreeting)
+        box.Children.Add(Greeting());
+
+        // what it could do right now, as cards
+        var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2, Margin = new Thickness(0, 0, 0, 0) };
+        int k = 0;
+        foreach (var idea in WelcomeIdeas())
+        {
+            var (glyph, tone) = IdeaLook(idea);
+            var icon = new Border
+            {
+                Width = 24, Height = 24, CornerRadius = new CornerRadius(_cyber ? 0 : 7), VerticalAlignment = VerticalAlignment.Center,
+                Background = Frozen(A(tone, 0x26)), BorderBrush = Frozen(A(tone, 0x60)), BorderThickness = new Thickness(1),
+                Child = new TextBlock { Text = glyph, FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 11, Foreground = Frozen(tone), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+            };
+            var words = new TextBlock { Text = idea, FontSize = 11.5, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(9, 0, 4, 0), FontFamily = _cyber ? CyFont : UiText };
+            var row = new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition());
+            row.Children.Add(icon);
+            Grid.SetColumn(words, 1);
+            row.Children.Add(words);
+            Brush rest = Frozen(new LinearGradientBrush(Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF), Color.FromArgb(0x05, 0xFF, 0xFF, 0xFF), 90));
+            Brush lit = Frozen(new LinearGradientBrush(A(tone, 0x22), A(tone, 0x08), 0));
+            var card = new Border
+            {
+                Child = row, Padding = new Thickness(8, 7, 8, 7), Margin = new Thickness(k % 2 == 0 ? 0 : 4, 0, k % 2 == 0 ? 4 : 0, 8), MinHeight = 42, Cursor = Cursors.Hand,
+                CornerRadius = new CornerRadius(_cyber ? 0 : 10), Background = rest, BorderBrush = Frozen(Color.FromArgb(0x1E, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(1),
+                RenderTransform = new TranslateTransform(), Opacity = Eco ? 1 : 0,
+            };
+            card.MouseEnter += (_, _) => { card.Background = lit; card.BorderBrush = Frozen(A(tone, 0x90)); };
+            card.MouseLeave += (_, _) => { card.Background = rest; card.BorderBrush = Frozen(Color.FromArgb(0x1E, 0xFF, 0xFF, 0xFF)); };
+            card.MouseLeftButtonDown += (_, e) => e.Handled = true;
+            var text = idea;
+            card.MouseLeftButtonUp += (_, e) => { e.Handled = true; if (_launchBox == null) return; _launchBox.Text = text; _launchBox.CaretIndex = text.Length; _launchBox.Focus(); };
+            if (!Eco)
+            {
+                var begin = TimeSpan.FromMilliseconds(160 + 55 * k);
+                card.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(260)) { BeginTime = begin });
+                ((TranslateTransform)card.RenderTransform).BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(320)) { BeginTime = begin, EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+            }
+            grid.Children.Add(card);
+            k++;
+        }
+        box.Children.Add(grid);
+        box.Children.Add(new TextBlock
+        {
+            Text = "Type / for commands  ·  Ctrl+H for your chats", FontSize = 10, Foreground = Frozen(Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF)),
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 4), FontFamily = _cyber ? CyFont : UiText,
+        });
         _chatStack!.Children.Add(box);
         Arrive(box);
         ChatKeys();
+    }
+
+    /// <summary>An idea's icon and colour, by what it touches.</summary>
+    (string Glyph, Color Tone) IdeaLook(string idea)
+    {
+        string i = idea.ToLowerInvariant();
+        return i switch
+        {
+            _ when i.Contains("miss") => ("\uEA8F", StepTone("notch_data")),
+            _ when i.Contains("call") => ("\uE717", StepTone("notch_data")),
+            _ when i.Contains("last") && (i.Contains("mouse") || i.Contains("headset") || i.Contains("battery")) => ("\uE83F", StepTone("pc_status")),
+            _ when i.Contains("next") || i.Contains("remind") => ("\uE823", StepTone("notch_data")),
+            _ when i.Contains("song") || i.Contains("music") => ("\uE8D6", StepTone("notch_data")),
+            _ when i.Contains("download") || i.Contains("pdf") || i.Contains("file") => ("\uE8A5", StepTone("find_files")),
+            _ when i.Contains("pc") => ("\uE7F4", StepTone("pc_status")),
+            _ when i.Contains("day") => ("\uE787", StepTone("notch_data")),
+            _ when i.Contains("news") => ("\uE789", StepTone("news")),
+            _ when i.Contains("email") || i.Contains("write") => ("\uE70F", StepTone("write_file")),
+            _ when i.Contains("translate") => ("\uE8C1", StepTone("news")),
+            _ => ("\uE945", ChatAccent),
+        };
     }
 
     // ───────────────────────────── the key: set up by anyone, in the chat ─────────────────────────────
@@ -584,49 +728,150 @@ public partial class NotchWindow
             return;
         }
         var acc = ChatAccent;
+        var rows = new List<FrameworkElement>();
+        string? lastGroup = null;
         for (int i = 0; i < _histItems.Count; i++)
         {
             var item = _histItems[i];
             int index = i;
             bool sel = i == _histSel, armed = _histArmed == item.Id, current = _session?.Id == item.Id;
-            var row = new Grid { Height = 36, Margin = new Thickness(0, 0, 0, 2), Cursor = Cursors.Hand, Background = Brushes.Transparent };
+
+            // a heading when the day changes: Today, Yesterday, This week, Earlier
+            string group = HistGroup(item.Updated);
+            if (group != lastGroup)
+            {
+                lastGroup = group;
+                var head = new Grid { Margin = new Thickness(2, _chatHistList.Children.Count == 0 ? 2 : 10, 2, 5) };
+                head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                head.ColumnDefinitions.Add(new ColumnDefinition());
+                head.Children.Add(new TextBlock { Text = _cyber ? group.ToUpperInvariant() : group, FontSize = 9.5, FontWeight = FontWeights.SemiBold, Foreground = Frozen(_cyber ? CyYellow : A(acc, 0xD0)), FontFamily = _cyber ? CyFont : UiText, VerticalAlignment = VerticalAlignment.Center });
+                var rule = new Border { Height = 1, Margin = new Thickness(8, 1, 0, 0), VerticalAlignment = VerticalAlignment.Center, Background = Frozen(new LinearGradientBrush(A(acc, 0x50), A(acc, 0x00), 0)) };
+                Grid.SetColumn(rule, 1);
+                head.Children.Add(rule);
+                _chatHistList.Children.Add(head);
+            }
+
+            var (glyph, tone) = ChatTopicLook(item.Title);
+            if (armed) tone = Color.FromRgb(0xFF, 0x5A, 0x5F);
+            var row = new Grid { Height = 46, Margin = new Thickness(0, 0, 0, 3), Cursor = Cursors.Hand, Background = Brushes.Transparent };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
             row.ColumnDefinitions.Add(new ColumnDefinition());
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
             var plate = new Border
             {
-                CornerRadius = new CornerRadius(_cyber ? 0 : 7), Background = Frozen(armed ? Color.FromArgb(0x30, 0xFF, 0x45, 0x3A) : sel ? A(acc, 0x24) : Colors.Transparent),
-                BorderBrush = Frozen(sel ? A(acc, _cyber ? (byte)0x90 : (byte)0x40) : Colors.Transparent), BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(_cyber ? 0 : 10), BorderThickness = new Thickness(_cyber && sel ? 2 : 1, 1, 1, 1),
+                Background = armed ? Frozen(new LinearGradientBrush(Color.FromArgb(0x38, 0xFF, 0x45, 0x3A), Color.FromArgb(0x10, 0xFF, 0x45, 0x3A), 0))
+                    : sel ? Frozen(new LinearGradientBrush(A(tone, 0x2A), A(acc, 0x08), 0)) : Frozen(Color.FromArgb(0x08, 0xFF, 0xFF, 0xFF)),
+                BorderBrush = Frozen(armed ? Color.FromArgb(0x90, 0xFF, 0x45, 0x3A) : sel ? A(tone, _cyber ? (byte)0xC0 : (byte)0x70) : Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF)),
             };
-            Grid.SetColumnSpan(plate, 2);
+            Grid.SetColumnSpan(plate, 4);
             row.Children.Add(plate);
-            var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(9, 0, 4, 0) };
-            words.Children.Add(new TextBlock { Text = (current ? "● " : "") + (item.Title.Length > 0 ? item.Title : "Untitled"), FontSize = 12, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis, FontWeight = sel ? FontWeights.SemiBold : FontWeights.Normal });
-            words.Children.Add(new TextBlock
+
+            // its topic, as a small tile
+            var icon = new Border
             {
-                Text = armed ? "Press Delete again to remove it" : _histSnips.TryGetValue(item.Id, out var snip) ? "…" + snip + "…" : $"{item.Turns} message{(item.Turns == 1 ? "" : "s")} · {ChatAgo(item.Updated)}{(item.Model.Length > 0 ? " · " + ModelName(item.Model) : "")}",
-                FontSize = 10, Foreground = armed ? Frozen(Color.FromRgb(0xFF, 0x7A, 0x70)) : DimBrush, TextTrimming = TextTrimming.CharacterEllipsis,
-            });
+                Width = 28, Height = 28, CornerRadius = new CornerRadius(_cyber ? 0 : 8), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                Background = Frozen(new LinearGradientBrush(A(tone, sel ? (byte)0x44 : (byte)0x26), A(tone, 0x0C), 45)), BorderBrush = Frozen(A(tone, sel ? (byte)0x90 : (byte)0x50)), BorderThickness = new Thickness(1),
+                Child = new TextBlock { Text = glyph, FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 12, Foreground = Frozen(tone), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+            };
+            row.Children.Add(icon);
+
+            var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 6, 0) };
+            words.Children.Add(new TextBlock { Text = item.Title.Length > 0 ? item.Title : "Untitled", FontSize = 12, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis, FontWeight = sel ? FontWeights.SemiBold : FontWeights.Normal, FontFamily = _cyber ? CyFont : UiText });
+            var meta = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 0) };
+            if (armed) meta.Children.Add(new TextBlock { Text = "Press Delete again to remove it", FontSize = 10, Foreground = Frozen(Color.FromRgb(0xFF, 0x7A, 0x70)) });
+            else if (_histSnips.TryGetValue(item.Id, out var snip))
+                meta.Children.Add(new TextBlock { Text = "…" + snip + "…", FontSize = 10, Foreground = Frozen(Lighten(acc, 0.3)), TextTrimming = TextTrimming.CharacterEllipsis, FontStyle = FontStyles.Italic });
+            else
+            {
+                meta.Children.Add(new TextBlock { Text = "\uE8BD", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 9, Foreground = DimBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 1, 4, 0) });
+                meta.Children.Add(new TextBlock { Text = $"{item.Turns}", FontSize = 10, Foreground = DimBrush, VerticalAlignment = VerticalAlignment.Center });
+                meta.Children.Add(new TextBlock { Text = "  ·  " + HistWhen(item.Updated), FontSize = 10, Foreground = DimBrush, VerticalAlignment = VerticalAlignment.Center });
+            }
+            Grid.SetColumn(words, 1);
             row.Children.Add(words);
-            var bin = new TextBlock { Text = "", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 11, Foreground = DimBrush, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Opacity = sel ? 0.9 : 0, ToolTip = "Delete this chat" };
+
+            // the chat that's open now says so
+            if (current && !armed)
+            {
+                var open = new Border
+                {
+                    CornerRadius = new CornerRadius(_cyber ? 0 : 7), Padding = new Thickness(6, 1, 6, 2), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 2, 0),
+                    Background = Frozen(A(acc, 0x26)), BorderBrush = Frozen(A(acc, 0x80)), BorderThickness = new Thickness(1),
+                    Child = new TextBlock { Text = _cyber ? "OPEN" : "Open", FontSize = 9, FontWeight = FontWeights.SemiBold, Foreground = Frozen(acc), FontFamily = _cyber ? CyFont : UiText },
+                };
+                Grid.SetColumn(open, 2);
+                row.Children.Add(open);
+            }
+
+            var bin = new TextBlock { Text = "\uE74D", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 11, Foreground = armed ? Frozen(Color.FromRgb(0xFF, 0x7A, 0x70)) : DimBrush, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Opacity = sel || armed ? 0.9 : 0, ToolTip = "Delete this chat", Background = Brushes.Transparent, Width = 24, Height = 24, TextAlignment = TextAlignment.Center, Padding = new Thickness(0, 6, 0, 0) };
             bin.MouseEnter += (_, _) => bin.Foreground = Frozen(Color.FromRgb(0xFF, 0x7A, 0x70));
-            bin.MouseLeave += (_, _) => bin.Foreground = DimBrush;
+            bin.MouseLeave += (_, _) => { if (!armed) bin.Foreground = DimBrush; };
             bin.MouseLeftButtonUp += (_, e) => { e.Handled = true; DeleteChat(item.Id); };
-            Grid.SetColumn(bin, 1);
+            Grid.SetColumn(bin, 3);
             row.Children.Add(bin);
-            row.MouseEnter += (_, _) => { bin.Opacity = 0.9; if (!sel) plate.Background = Frozen(Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF)); };
-            row.MouseLeave += (_, _) => { if (!sel) { bin.Opacity = 0; plate.Background = Brushes.Transparent; } };
+            row.MouseEnter += (_, _) =>
+            {
+                bin.Opacity = 0.9;
+                if (!sel && !armed) { plate.Background = Frozen(new LinearGradientBrush(A(tone, 0x18), Color.FromArgb(0x06, 0xFF, 0xFF, 0xFF), 0)); plate.BorderBrush = Frozen(A(tone, 0x40)); }
+            };
+            row.MouseLeave += (_, _) =>
+            {
+                if (sel || armed) return;
+                bin.Opacity = 0;
+                plate.Background = Frozen(Color.FromArgb(0x08, 0xFF, 0xFF, 0xFF));
+                plate.BorderBrush = Frozen(Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF));
+            };
             row.MouseLeftButtonUp += (_, _) => { _histSel = index; OpenHistory(); };
             _chatHistList.Children.Add(row);
+            rows.Add(row);
         }
         // the picked line stays in view
-        if (_chatHistScroll != null && _histSel < _chatHistList.Children.Count)
+        if (_chatHistScroll != null && _histSel < rows.Count)
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
             {
-                if (_histSel >= _chatHistList.Children.Count) return;
-                double y = _histSel * 38, view = _chatHistScroll.ViewportHeight;
-                if (y < _chatHistScroll.VerticalOffset) ChatScrollTo(y - 4, 180);
-                else if (y + 38 > _chatHistScroll.VerticalOffset + view) ChatScrollTo(y + 42 - view, 180);
+                if (_histSel >= rows.Count || _chatHistScroll == null) return;
+                double y;
+                try { y = rows[_histSel].TransformToAncestor(_chatHistList).Transform(new Point(0, 0)).Y; } catch { return; }
+                double h = rows[_histSel].ActualHeight, view = _chatHistScroll.ViewportHeight;
+                if (y - 24 < _chatHistScroll.VerticalOffset) ChatScrollTo(y - 28, 180);
+                else if (y + h > _chatHistScroll.VerticalOffset + view) ChatScrollTo(y + h + 6 - view, 180);
             });
+    }
+
+    static string HistGroup(DateTime t)
+    {
+        var day = t.Date;
+        if (day == DateTime.Today) return "Today";
+        if (day == DateTime.Today.AddDays(-1)) return "Yesterday";
+        if (day > DateTime.Today.AddDays(-7)) return "This week";
+        if (day > DateTime.Today.AddDays(-31)) return "This month";
+        return "Earlier";
+    }
+
+    /// <summary>Today: the time it was last used; this week: the day; else the date.</summary>
+    static string HistWhen(DateTime t)
+    {
+        var d = DateTime.Now - t;
+        if (d.TotalMinutes < 1) return "just now";
+        if (d.TotalHours < 1) return $"{(int)d.TotalMinutes} min ago";
+        if (t.Date == DateTime.Today) return t.ToString("HH:mm");
+        if (t.Date > DateTime.Today.AddDays(-7)) return t.ToString("ddd HH:mm");
+        return t.ToString("d MMM");
+    }
+
+    /// <summary>A chat's icon and colour, from what its name is about.</summary>
+    (string Glyph, Color Tone) ChatTopicLook(string title)
+    {
+        string t = title.ToLowerInvariant();
+        if (System.Text.RegularExpressions.Regex.IsMatch(t, @"picture|image|photo|screenshot|wallpaper|draw")) return ("\uEB9F", StepTone("create_image"));
+        if (System.Text.RegularExpressions.Regex.IsMatch(t, @"code|script|bug|error|powershell|python|c#|function")) return ("\uE943", StepTone("run_powershell"));
+        if (System.Text.RegularExpressions.Regex.IsMatch(t, @"table|excel|sheet|word|pdf|doc|file|folder|download")) return ("\uE8A5", StepTone("find_files"));
+        if (System.Text.RegularExpressions.Regex.IsMatch(t, @"battery|pc|cpu|ram|memory|gpu|setup|laptop|computer|manufactur")) return ("\uE7F4", StepTone("pc_status"));
+        if (System.Text.RegularExpressions.Regex.IsMatch(t, @"call|discord|teams|message|whatsapp|alert|notif|remind|timer|music|song|spotify")) return ("\uE717", StepTone("notch_data"));
+        if (System.Text.RegularExpressions.Regex.IsMatch(t, @"news|when|who|what is|price|weather|release|latest|search|tab|brave|chrome|web")) return ("\uE774", StepTone("news"));
+        return ("\uE8BD", ChatAccent);
     }
 
     static string ChatAgo(DateTime t)
@@ -906,6 +1151,7 @@ public partial class NotchWindow
         }
         VoiceOut.Stop();
         if (_chatBusy) { _chatQueue.Enqueue(text); Toast(_chatQueue.Count == 1 ? "Sends when this answer is done" : $"{_chatQueue.Count} messages waiting"); return; }
+        ClearFollowUps();
         var session = _session ??= NewSession();
         if (session.Title.Length == 0) session.Title = TitleOf(text);
         session.Model = ChatModel;
@@ -959,6 +1205,11 @@ public partial class NotchWindow
                 tick.Tick += (_, _) =>
                 {
                     if (!dirty) return;
+                    // nobody's looking (you went to another app): nothing to draw; the whole answer is drawn once at the end
+                    if (!ChatOnScreen) return;
+                    // a long answer is redrawn less often, and less still on battery saver: the words still flow
+                    var every = TimeSpan.FromMilliseconds(Math.Min(260, (Eco ? 120 : 50) + live.Length / 60));
+                    if (tick.Interval != every) tick.Interval = every;
                     dirty = false;
                     string shown = CleanAnswer(live.ToString(), streaming: true);
                     if (shown.Length == 0) { bubble.Thinking(true); return; } // only its thinking so far
@@ -1018,6 +1269,7 @@ public partial class NotchWindow
                         _chatLastAnswer = finalAnswer = said;
                         ShowSources(bubble);
                         AnswerFooter(bubble, turn.Model ?? model, DateTime.Now - startedAt, stepCount);
+                        ShowFollowUps(bubble, FollowUps(turn.Text));
                         if (stepCount >= 2) FoldSteps(turnStart, stepCount, stepNames, DateTime.Now - startedAt);
                     }
                     break;
@@ -1055,6 +1307,19 @@ public partial class NotchWindow
                     string outcome = ToolOutcome(result);
                     step.Done(outcome is not ("failed" or "didn't work" or "not run"), outcome == "done" ? null : outcome);
                     session.Messages.Add(new JsonObject { ["role"] = "tool", ["tool_call_id"] = c.Id, ["content"] = result });
+                }
+                if (_pendingSight is { } sight)
+                {
+                    _pendingSight = null;
+                    session.Messages.Add(new JsonObject
+                    {
+                        ["role"] = "user", ["auto"] = true,
+                        ["content"] = new JsonArray
+                        {
+                            new JsonObject { ["type"] = "text", ["text"] = "(Automatic, not from the user) The app's window right now, as you asked to see it:" },
+                            new JsonObject { ["type"] = "image_url", ["image_url"] = new JsonObject { ["url"] = "data:image/jpeg;base64," + Convert.ToBase64String(sight) } },
+                        },
+                    });
                 }
                 if (cancel.IsCancellationRequested) { ChatNote("\uE71A", "Stopped"); break; }
             }
@@ -1145,7 +1410,11 @@ public partial class NotchWindow
         sb.AppendLine("You are the user's command center: you can see the notch's own records (notch_data), the PC (files, apps, windows, settings, browser history, PowerShell), and the web. RULES: 1) Never tell the user to go and check something themselves, never say you can't before trying: find it with your tools and answer with the actual details (names, times, durations, paths). 2) Questions about the user's calls, reminders, timer, focus, music, notifications, what they copied, the shelf, downloads or the PC's health: read notch_data first (with 'today' for a summary of their day). 3) Use notch_page only when the user asks to see a page. 4) If something truly isn't recorded, say exactly what is known and what isn't (e.g. a call's app and time are known, the person isn't).");
         sb.AppendLine("Reading between the lines: work out what the user means, not just the words. 'My setup', 'my gear', 'my stuff', 'my devices' = their peripherals (mouse, headset, keyboard, controller, earbuds), usually not the PC alone. A short follow-up ('not pc, I meant...', 'and the other one?', 'do it again', 'in French') changes the previous question: answer that again, corrected, without asking. When a question could mean several things, answer all of them in one table rather than picking one. Where to look, in this order: (1) LIVE NOW below, (2) notch_data, (3) the PC's tools, (4) the web. Never say the notch can't see something before checking LIVE NOW and notch_data. The user has no time to correct you twice: get it right the first time.");
         sb.AppendLine("LIVE NOW (fresh from the notch, no tool needed):\n" + LiveNow());
+        sb.AppendLine("Cards: when you give the user's device batteries, put the line [[card:batteries]] (it draws them as live meters) and keep your text to one short line beside it. When you tell how the PC is doing right now (processor, memory, disk), put [[card:pc]]. Never use a card for anything else.");
+        sb.AppendLine("Next steps: end every answer that leads somewhere with a last line '>> a | b | c': two or three short things the user would likely want next, written as their own words (under 6 words each), e.g. '>> Close Chrome | Show top apps | Free up memory'. They become buttons. Skip it for small talk, and never offer what you can't do.");
         sb.AppendLine("The sources and files you use are shown to the user as cards automatically: don't list them at the end. Mention a source inline only when it matters (who said it, or when they disagree).");
+        if (_settings.AiTools)
+            sb.AppendLine("Working apps like a personal assistant: you can use ANY app the user has, not just open it. To do something inside an app (call or message someone, play a song, change a setting, fill a form, find something in a website): 1) open it if it isn't (open), 2) use_app look to see its buttons and boxes, 3) act: click, type, keys; use the app's well-known shortcuts when they're faster (Discord, Slack, Teams: ctrl+k jumps to a person or channel; browsers: ctrl+l address bar, ctrl+t new tab; Spotify: ctrl+l search; most apps: ctrl+f find), 4) look again (or see, for a picture) after every step that changes the screen, and keep going until it's really done, 5) only then say it's done, in one line. Example, 'call Nostra on Discord': open discord → use_app keys 'ctrl+k' → type 'Nostra' → keys 'enter' (opens the DM) → look → click the button named like 'Start Voice Call' → look to confirm the call started. If a name matches several people, ask which one. Never claim something happened that you didn't check. Don't touch the user's mouse and keyboard for long: a few steps, then report.");
         if (_settings.AiTools)
         {
             sb.AppendLine("Acting: when the user asks for something on the PC, DO it with your tools; never just explain how. Pick the right tool: do_on_pc for the notch's own commands (volume, media, wifi, timers, reminders, focus, open/close apps, screenshots...); manage_window to focus, minimise, maximise or close a window; run_powershell for anything else Windows can do (settings, files, processes, system info, installs); find_files/read_file/list_folder for files; write_file to create documents (.docx, .xlsx, .pdf are real Word / Excel / PDF files: write the content as markdown, with a markdown table or CSV rows for .xlsx); create_image to make a picture from a description; undo_last when the user says to undo or take back what you did; browser_history for what was downloaded or visited in a browser (never guess from folders); notch_page to show one of the notch's pages; recent_notifications for messages the PC received; notify to show a short message on the notch (when a long job finishes, or the user asks to be told something). Chain steps until the task is really done, check results, and fix errors yourself before giving up. Then confirm in a few words what was done.");
@@ -1273,7 +1542,13 @@ public partial class NotchWindow
         var root = new Grid { Margin = new Thickness(0, 10, 18, 2), Background = Brushes.Transparent };
         root.Children.Add(rail);
         var bubble = new ChatBubble { Root = root, Body = body, Dots = dots, Extras = extras };
-        root.Children.Add(Actions(root, HorizontalAlignment.Right, ("\uE767", "Read aloud", () => { if (VoiceOut.Speaking) VoiceOut.Stop(); else Speak(bubble.Answer); }), ("\uE8C8", "Copy", () => CopyText(bubble.Answer, "Copied")), ("\uE72C", "Retry", Retry)));
+        string Plain() => System.Text.RegularExpressions.Regex.Replace(bubble.Answer, @"^\s*\[\[card:[a-z]+\]\]\s*$\n?", "", System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+        root.Children.Add(Actions(root, HorizontalAlignment.Right,
+            ("\uE738", "Shorter", () => SendChat("Say that shorter.")),
+            ("\uE710", "More detail", () => SendChat("Go into more detail on that.")),
+            ("\uE767", "Read aloud", () => { if (VoiceOut.Speaking) VoiceOut.Stop(); else Speak(Plain()); }),
+            ("\uE8C8", "Copy", () => CopyText(Plain(), "Copied")),
+            ("\uE72C", "Retry", Retry)));
         bubble.OnWord = w => { word = w; label.Text = w; };
         bubble.OnThinking = on =>
         {
@@ -1331,7 +1606,7 @@ public partial class NotchWindow
         "research" or "web_search" or "read_webpage" or "news" or "browser_history" => _cyber ? CyCyan : Color.FromRgb(0x5A, 0xB4, 0xFF),
         "find_files" or "read_file" or "list_folder" or "write_file" or "open" or "create_image" => _cyber ? CyYellow : Color.FromRgb(0xFF, 0xC4, 0x5A),
         "notch_data" or "notch_page" or "notify" or "recent_notifications" => _cyber ? CyMagenta : Color.FromRgb(0xC0, 0x8C, 0xFF),
-        "run_powershell" or "do_on_pc" or "manage_window" or "clipboard" or "pc_status" or "undo_last" => _cyber ? Color.FromRgb(0x00, 0xFF, 0xA3) : Color.FromRgb(0x5A, 0xE0, 0x9A),
+        "run_powershell" or "do_on_pc" or "manage_window" or "use_app" or "clipboard" or "pc_status" or "undo_last" => _cyber ? Color.FromRgb(0x00, 0xFF, 0xA3) : Color.FromRgb(0x5A, 0xE0, 0x9A),
         _ => A(ChatAccent, 0xC0),
     };
 
@@ -1603,6 +1878,14 @@ public partial class NotchWindow
             // a table: its rows are gathered, then drawn as one
             if (!inCode && IsTableRow(line)) { Flush(); tableRows.Add(line); continue; }
             if (tableRows.Count > 0) EmitTable();
+            // a card: drawn from the notch's live numbers once the answer is complete
+            if (!inCode && CardLine.Match(line) is { Success: true } card)
+            {
+                Flush();
+                if (!streaming && AnswerCard(card.Groups["k"].Value) is { } block) doc.Blocks.Add(block);
+                continue;
+            }
+            if (!inCode && streaming && line.TrimStart().StartsWith("[[")) continue; // a card line still arriving
             if (line.TrimStart().StartsWith("```"))
             {
                 if (inCode) { Code(code.ToString().TrimEnd('\n'), lang, open: false); code.Clear(); inCode = false; }

@@ -183,6 +183,8 @@ public sealed class Settings
     public bool AiMemory { get; set; } = true;
     /// <summary>Long alerts from apps put in a few words by the AI (never messages from people).</summary>
     public bool AiAlerts { get; set; } = true;
+    /// <summary>Chats older than this many days are deleted (0: keep the newest 60, whatever their age).</summary>
+    public int AiKeepDays { get; set; }
 
     public static string Folder =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DynamicNotch");

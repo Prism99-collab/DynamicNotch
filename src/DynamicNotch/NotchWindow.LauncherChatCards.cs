@@ -173,7 +173,7 @@ public partial class NotchWindow
             "research" or "web_search" or "read_webpage" => "web", "news" => "news", "browser_history" => "browser",
             "find_files" or "read_file" or "list_folder" => "files", "write_file" => "a file", "create_image" => "a picture",
             "notch_data" or "notch_page" or "notify" or "recent_notifications" => "the notch",
-            "run_powershell" => "PowerShell", "do_on_pc" or "manage_window" or "clipboard" or "pc_status" => "the PC", "remember" or "forget" => "memory", _ => n,
+            "run_powershell" => "PowerShell", "use_app" => "an app", "do_on_pc" or "manage_window" or "clipboard" or "pc_status" => "the PC", "remember" or "forget" => "memory", _ => n,
         }).Distinct());
         var chevron = new TextBlock { Text = "\uE76C", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 9, Foreground = Frozen(A(acc, 0xC0)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 1, 6, 0), RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform(0) };
         var label = new TextBlock { Text = $"{count} steps  ·  {kinds}", FontSize = 11, Foreground = Frozen(Color.FromArgb(0xC0, 0xFF, 0xFF, 0xFF)), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, FontFamily = _cyber ? CyFont : UiText };
@@ -209,6 +209,7 @@ public partial class NotchWindow
         if (Regex.Match(s, @"<(?:think|thinking|thought)>", RegexOptions.IgnoreCase) is { Success: true } open) s = s[..open.Index]; // still thinking: nothing to show yet
         s = Regex.Replace(s, @"<\|[^|>]{1,40}\|>", "");
         s = Regex.Replace(s, @"^\s*(?:Assistant|AI)\s*:\s*", "", RegexOptions.IgnoreCase);
+        s = WithoutFollowUps(s, streaming); // the ">> next | steps" line becomes buttons
         return streaming ? s.TrimStart() : s.Trim();
     }
 }

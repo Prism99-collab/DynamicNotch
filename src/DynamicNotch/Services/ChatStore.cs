@@ -14,7 +14,7 @@ public sealed class ChatSession
     public string Model { get; set; } = "";
     public JsonArray Messages { get; set; } = new();
 
-    public int UserTurns => Messages.Count(m => m?["role"]?.ToString() == "user");
+    public int UserTurns => Messages.Count(m => m?["role"]?.ToString() == "user" && m?["auto"] == null);
 }
 
 /// <summary>
@@ -26,7 +26,34 @@ public static class ChatStore
     public sealed record Info(string Id, string Title, DateTime Updated, int Turns, string Model);
 
     const int Keep = 60;
-    static string Folder => Path.Combine(Settings.Folder, "chats");
+    /// <summary>Chats older than this many days are deleted (0: only the newest 60 are kept).</summary>
+    public static int KeepDays { get; set; }
+    public static string Folder => Path.Combine(Settings.Folder, "chats");
+
+    /// <summary>How many chats are kept and how much room they take.</summary>
+    public static (int Count, long Bytes) Usage()
+    {
+        try
+        {
+            if (!Directory.Exists(Folder)) return (0, 0);
+            var files = new DirectoryInfo(Folder).GetFiles("*.json");
+            return (files.Length, files.Sum(f => f.Length));
+        }
+        catch { return (0, 0); }
+    }
+
+    /// <summary>
+    /// What a chat keeps on disk: the words, not the bulk. Long results of older steps (a web page it read, a folder
+    /// listing) are cut to their start: the answer that used them is kept whole.
+    /// </summary>
+    static JsonArray Slim(JsonArray messages)
+    {
+        var copy = messages.DeepClone().AsArray();
+        for (int i = 0; i < copy.Count - 6; i++)
+            if (copy[i] is JsonObject m && m["role"]?.ToString() == "tool" && m["content"]?.ToString() is { Length: > 1200 } long_)
+                m["content"] = long_[..1200] + "\n…(shortened when saved)";
+        return copy;
+    }
     static string FileOf(string id) => Path.Combine(Folder, id + ".json");
 
     public static void Save(ChatSession s)
@@ -37,7 +64,7 @@ public static class ChatStore
             var o = new JsonObject
             {
                 ["id"] = s.Id, ["title"] = s.Title, ["created"] = s.Created.ToString("o"), ["updated"] = s.Updated.ToString("o"),
-                ["model"] = s.Model, ["messages"] = s.Messages.DeepClone(),
+                ["model"] = s.Model, ["messages"] = Slim(s.Messages),
             };
             string tmp = FileOf(s.Id) + ".tmp";
             File.WriteAllText(tmp, o.ToJsonString());
@@ -135,8 +162,17 @@ public static class ChatStore
         try { if (Directory.Exists(Folder)) foreach (var f in Directory.EnumerateFiles(Folder)) File.Delete(f); } catch { }
     }
 
-    static void Trim()
+    /// <summary>The newest 60 stay (and none older than KeepDays): judged by the files' dates, nothing is read.</summary>
+    public static void Trim()
     {
-        foreach (var old in List().Skip(Keep)) Delete(old.Id);
+        try
+        {
+            if (!Directory.Exists(Folder)) return;
+            var files = new DirectoryInfo(Folder).GetFiles("*.json").OrderByDescending(f => f.LastWriteTimeUtc).ToList();
+            var cutoff = KeepDays > 0 ? DateTime.UtcNow.AddDays(-KeepDays) : DateTime.MinValue;
+            for (int i = 0; i < files.Count; i++)
+                if (i >= Keep || files[i].LastWriteTimeUtc < cutoff) { try { files[i].Delete(); } catch { } }
+        }
+        catch { }
     }
 }

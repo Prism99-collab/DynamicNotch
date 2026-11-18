@@ -62,6 +62,8 @@ public partial class App : Application
 
         try { Directory.CreateDirectory(Settings.Folder); } catch { }
         _settings = Settings.Load();
+        DynamicNotch.Services.ChatStore.KeepDays = _settings.AiKeepDays;
+        _ = System.Threading.Tasks.Task.Run(DynamicNotch.Services.ChatStore.Trim); // old chats go, off the start-up path
         Loc.Set(_settings.Language);
         // WPF caps every animation at 60 fps unless told otherwise: let them run at the screen's real refresh
         // rate (144 / 180 / 240 Hz...). Animations that pick their own rate (visualizer, glow) keep theirs.

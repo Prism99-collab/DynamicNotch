@@ -56,6 +56,7 @@ public partial class NotchWindow
       {"type":"function","function":{"name":"web_search","description":"A quick web search: titles, links and snippets only (prefer research to actually answer).","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}}},
       {"type":"function","function":{"name":"read_webpage","description":"Read the text of a web page.","parameters":{"type":"object","properties":{"url":{"type":"string"}},"required":["url"]}}},
       {"type":"function","function":{"name":"run_powershell","description":"Run a PowerShell script on this PC and get its output. For anything Windows can do that the other tools don't cover: settings, system info, processes, services, files in bulk, network, apps (winget), registry reads. Prefer one clear script. Risky scripts are shown to the user to approve first.","parameters":{"type":"object","properties":{"script":{"type":"string","description":"PowerShell code"},"why":{"type":"string","description":"In a few words, what it does (shown to the user)"}},"required":["script","why"]}}},
+      {"type":"function","function":{"name":"use_app","description":"Work any open app like a person, with its own buttons, boxes and lists (normal apps, browsers and web-based apps like Discord, Teams, WhatsApp, Spotify, Settings). action: 'look' lists what's on screen in the app, numbered (buttons, text boxes, list items, tabs, links) plus the text shown; 'click' presses one (target = its number from the last look, or its name); 'type' types text (target = the box's number or name, or leave it empty to type where the cursor is); 'keys' presses keys or shortcuts in order (text = 'ctrl+k' or 'ctrl+k, enter'); 'scroll' (text = up or down); 'see' gives you a picture of the window to check with your own eyes; 'focus' brings it to the front. Work in small steps and look or see after each action that changes something.","parameters":{"type":"object","properties":{"app":{"type":"string","description":"The app's name (discord, chrome, spotify, settings...); it must be open"},"action":{"type":"string","enum":["look","click","type","keys","scroll","see","focus"]},"target":{"type":"string","description":"For click/type: the number from the last look, or the name on it"},"text":{"type":"string","description":"For type: the text. For keys: the keys. For scroll: up or down"}},"required":["app","action"]}}},
       {"type":"function","function":{"name":"manage_window","description":"Focus, minimise, maximise, restore or close an app's windows.","parameters":{"type":"object","properties":{"app":{"type":"string","description":"The app's name, e.g. 'chrome', 'word', 'discord'"},"action":{"type":"string","enum":["focus","minimize","maximize","restore","close"]}},"required":["app","action"]}}},
       {"type":"function","function":{"name":"notify","description":"Show a short message on the notch (a pop-up at the top of the screen), e.g. when a long task is done or the user asked to be told something.","parameters":{"type":"object","properties":{"title":{"type":"string","description":"A few words"},"text":{"type":"string","description":"One short line"}},"required":["title"]}}},
       {"type":"function","function":{"name":"recent_notifications","description":"The notifications the PC received lately (app, title, text, time), newest first. For 'what did I miss?' or finding a message.","parameters":{"type":"object","properties":{}}}},
@@ -157,6 +158,7 @@ public partial class NotchWindow
             case "notch_data": return NotchData(Arg("what"), Arg("filter"));
             case "run_powershell": return await RunPowerShell(Arg("script"), Arg("why"), cancel);
             case "manage_window": return ManageWindow(Arg("app"), Arg("action"));
+            case "use_app": return await UseApp(Arg("app"), Arg("action"), Arg("target"), Arg("text"), cancel);
             case "notify":
             {
                 string title = Arg("title").Trim(), text = Arg("text").Trim();
@@ -404,10 +406,29 @@ public partial class NotchWindow
     struct MemStatus { public uint Length, Load; public ulong Total, Avail, TotalPage, AvailPage, TotalVirtual, AvailVirtual, AvailExtended; }
     [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern bool GlobalMemoryStatusEx(ref MemStatus m);
 
+    /// <summary>"Discord: click “Start Voice Call”", "Discord: type “hey”", "Discord: looking".</summary>
+    static string AppStep(string argsJson)
+    {
+        try
+        {
+            var n = System.Text.Json.Nodes.JsonNode.Parse(argsJson);
+            string app = n?["app"]?.ToString() ?? "", act = n?["action"]?.ToString() ?? "", target = n?["target"]?.ToString() ?? "", text = n?["text"]?.ToString() ?? "";
+            if (app.Length > 0) app = char.ToUpperInvariant(app[0]) + app[1..];
+            string what = act switch
+            {
+                "look" => "looking at it", "see" => "checking it with a picture", "focus" => "bringing it to the front",
+                "click" => $"pressing “{target}”", "type" => $"typing “{(text.Length > 40 ? text[..40] + "…" : text)}”",
+                "keys" => "pressing " + (text.Length > 0 ? text : target), "scroll" => "scrolling " + (text.Length > 0 ? text : "down"), _ => act,
+            };
+            return $"{app}: {what}";
+        }
+        catch { return "Using an app"; }
+    }
+
     static string ToolGlyph(string name) => name switch
     {
         "browser_history" => "\uE774", "notch_page" => "\uE7F4", "notch_data" => "\uE81C", "create_image" => "\uEB9F", "undo_last" => "\uE7A7",
-        "run_powershell" => "\uE756", "manage_window" => "\uE737", "notify" => "\uEA8F", "recent_notifications" => "\uEA8F", "remember" => "\uE8F1", "forget" => "\uE8F1",
+        "run_powershell" => "\uE756", "manage_window" => "\uE737", "use_app" => "\uE7C9", "notify" => "\uEA8F", "recent_notifications" => "\uEA8F", "remember" => "\uE8F1", "forget" => "\uE8F1",
         "do_on_pc" => "\uE945", "find_files" => "", "read_file" => "", "list_folder" => "", "write_file" => "",
         "open" => "\uE8A7", "clipboard" => "\uE77F", "web_search" => "\uE774", "read_webpage" => "\uE774", "research" => "\uE721", "news" => "\uE789", _ => "",
     };
@@ -444,6 +465,7 @@ public partial class NotchWindow
             "notch_page" => "Opening the notch: " + a,
             "run_powershell" => Why(argsJson),
             "manage_window" => "Window: " + a,
+            "use_app" => AppStep(argsJson),
             "notify" => "Notifying on the notch",
             "recent_notifications" => "Reading your notifications",
             "remember" => "Remembering: " + a,

@@ -71,7 +71,7 @@ Press <kbd>Tab</kbd> in the search, or pick **Ask AI**. The first time, it shows
 Google AI Studio (it takes a minute).
 
 Ask it anything. It searches the web when it needs to, finds and reads your files, makes Word, Excel and PDF files and
-pictures, and does things on your PC: `close discord and set volume to 30`, `what's using my CPU?`, `make a table of my
+pictures, and does things on your PC and inside your apps: `call Sam on Discord`, `close discord and set volume to 30`, `what's using my CPU?`, `make a table of my
 calls today`. It also knows what the notch knows, like your reminders, notifications and headset battery.
 
 Anything risky waits for your OK first, and you can turn off web use or PC actions from its ⋯ menu.

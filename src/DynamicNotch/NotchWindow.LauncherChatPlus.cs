@@ -208,6 +208,7 @@ public partial class NotchWindow
             if (tools == null && role == "tool") { list.Add(new JsonObject { ["role"] = "user", ["content"] = "(result of an earlier step) " + Cut(m["content"]?.ToString() ?? "", old ? 1500 : 6000) }); continue; }
             var copy = m.DeepClone().AsObject();
             copy.Remove("shown");
+            copy.Remove("auto");
             copy.Remove("file");
             copy.Remove("pictures");
             if (copy["content"] is JsonArray parts && !keepPictures.Contains(i))
