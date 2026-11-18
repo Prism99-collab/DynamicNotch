@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.8.0] — 2026-11-18
+
+The search can talk now. Press Tab (or pick Ask AI) and you get a chat that can look things up, find your files and do
+things on your PC for you. It runs on a free Google AI Studio key, which the notch helps you get the first time.
+
+### Added
+- An AI chat in the search, also as its own window. It answers from the web with sources, reads your files, makes
+  Word, Excel and PDF files, makes pictures, and acts on your PC (volume, apps, windows, settings, PowerShell).
+- It knows what the notch knows: your calls, reminders, notifications, what you copied, what's playing, your
+  headset and mouse battery, and how your PC is doing.
+- Anything risky (deleting, installing, admin, the registry) waits for your OK, and most actions can be undone.
+- Talk to it instead of typing, and have answers read aloud.
+- Tables, code with a copy button, clickable links and file paths, picture and video cards in answers.
+- Saved chats you can search, rename, export or delete. It can also remember a few things about you, if you want.
+- Long alerts from apps are put in a few words (messages from people are left as they are).
+
+### Changed
+- The same alert sent twice shows once, and Windows' wordy alerts are shorter. The screenshot alert shows once.
+- Copying the same text or picture again no longer adds it twice to the clipboard history.
+- A calmer, clearer System page.
+
 ## [2.7.1] — 2026-11-16
 
 New Neon backgrounds.

@@ -169,6 +169,7 @@ public partial class NotchWindow
         if (_selScan != null && s.Scan is { } scan) _selScan.Fill = Frozen(scan);
         if (_scrollThumb != null) _scrollThumb.Background = Frozen(Color.FromArgb(0x70, s.Accent.R, s.Accent.G, s.Accent.B));
         StylePane();
+        PaintMic();
         _keysShown = null;
     }
 }

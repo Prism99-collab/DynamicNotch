@@ -59,11 +59,12 @@ public partial class NotchWindow
             catch { }
         }));
         _index.Refresh();
+        Services.OpenRouter.Choose(_settings.AiProvider);
         LoadReminders();
         WireWindowsSearch();
         WireFileIndex();
         WarmLauncher();
-        Deactivated += (_, _) => { if (_launcherOpen) CloseLauncher(giveBack: false); };
+        Deactivated += (_, _) => { if (_launcherOpen && !_chatModal) CloseLauncher(giveBack: false); };
         AddSearchButton();
     }
 
@@ -105,6 +106,7 @@ public partial class NotchWindow
 
     void OpenLauncher(string? seed)
     {
+        if (_pop != null) { _pop.Activate(); return; } // the chat is in its own window: that's where you go
         if (_launcherOpen) { if (seed != null && _launchBox != null) { _launchBox.Text += seed; _launchBox.CaretIndex = _launchBox.Text.Length; } return; }
         var fg = GetForegroundWindow();
         _launchPrevFg = fg != _hwnd ? fg : IntPtr.Zero;
@@ -148,6 +150,10 @@ public partial class NotchWindow
         _launchBox.CaretIndex = _launchBox.Text.Length;
         _launchBox.Focus();
         Keyboard.Focus(_launchBox);
+        _chatMode = false; // it opens on the search; Tab goes back to the chat
+        _launchBox.AcceptsReturn = false;
+        if (_chatRoot != null) _chatRoot.Visibility = Visibility.Collapsed;
+        StyleEsc();
         Search();
         if (_cyber) CyberGlitch(strong: false, tint: CyCyan);
         // the results area keeps one size while the search is open: what changes inside it as you type is laid out
@@ -172,6 +178,11 @@ public partial class NotchWindow
     {
         if (!_launcherOpen) return;
         _launcherOpen = false;
+        if (_listening && _pop == null) FinishListening(cancel: true);
+        StopStartOrb();
+        ShowGrip(false);
+        DropChatExtra();
+        _chatOrb?.Stop();
         _launchWantH = 0;
         if (_mode == Mode.Expanded) ApplyShape(); // the open notch gets its own size back
         UpdateRain(); UpdateAmbient();
@@ -250,8 +261,10 @@ public partial class NotchWindow
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
         line.ColumnDefinitions.Add(new ColumnDefinition());
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _launchPrompt = new TextBlock { FontSize = 15, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
         line.Children.Add(_launchPrompt);
+        line.Children.Add(BuildLevelBars()); // while listening: your voice's level, in the prompt's place
         _launchBox = new TextBox
         {
             FontSize = 17, Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = Brushes.White,
@@ -270,12 +283,17 @@ public partial class NotchWindow
         Grid.SetColumn(_launchGhost, 1);
         line.Children.Add(_launchGhost);
         var esc = new TextBlock { Text = "esc", FontSize = 10, Foreground = DimBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
-        esc.MouseLeftButtonUp += (_, _) => CloseLauncher(giveBack: true);
-        Grid.SetColumn(esc, 2);
+        esc.Cursor = Cursors.Hand;
+        esc.MouseLeftButtonUp += (_, _) => OnLaunchEscClick(); // esc in the search; send / stop in the chat
+        _launchEsc = esc;
+        var mic = BuildMic();
+        Grid.SetColumn(mic, 2);
+        line.Children.Add(mic);
+        Grid.SetColumn(esc, 3);
         line.Children.Add(esc);
         var underline = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Bottom, Background = Frozen(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF)), Tag = "line" };
         _launchLine = underline;
-        Grid.SetColumnSpan(underline, 3);
+        Grid.SetColumnSpan(underline, 4);
         line.Children.Add(underline);
         root.Children.Add(line);
 
@@ -297,6 +315,7 @@ public partial class NotchWindow
         var pane = BuildPane(); // the picked line, shown big on the right
         Grid.SetColumn(pane, 1);
         body.Children.Add(pane);
+        body.Children.Add(BuildChat()); // the AI chat, in the results' place while it's on
         Grid.SetRow(body, 1);
         root.Children.Add(body);
 
@@ -304,6 +323,7 @@ public partial class NotchWindow
         var foot = BuildFoot(); // the keys you can press, riding the notch's bottom edge
         Grid.SetRow(foot, 2);
         root.Children.Add(foot);
+        root.Children.Add(BuildChatGrip()); // in the chat: pull the notch taller
 
         _launchScanLine = new Border
         {
@@ -350,6 +370,7 @@ public partial class NotchWindow
     void ApplyPlan(SearchPlan plan, bool merge)
     {
         if (_launchBox == null || _launchList == null || _launchStarters == null || _launchHint == null || _launchScroll == null) return;
+        if (_chatMode) return; // the chat has the panel
         _searchDone = _searchAsked;
         _lastPlan = plan;
         if (!merge) _renderAll = false;
@@ -370,12 +391,14 @@ public partial class NotchWindow
             FitLauncher();
             SetGhost(null);
             var tips = new List<string>();
+            if (_settings.AiChat) tips.Add(HasChat ? "Tab continues your AI chat" : "Tab opens the AI chat");
             if (_settings.SearchRecent && _index.Recent.Count > 0) tips.Add("↑ brings back what you searched");
             if (LauncherKeyName.Length > 0) tips.Add(LauncherKeyName + " opens this from anywhere");
             SetFoot(string.Join("  ·  ", tips));
             return;
         }
         ((UIElement?)_launchStarters.Parent ?? _launchStarters).Visibility = Visibility.Collapsed;
+        StopStartOrb();
         _launchScroll.Visibility = Visibility.Visible;
 
         // "desktop:" (or the chip in the empty search): only what's on the desktop
@@ -475,12 +498,19 @@ public partial class NotchWindow
         // a real question ("how do I…", "why is the sky blue?") with nothing on the PC to match: the assistant, already asked, first
         string query = q.Trim();
         bool question = query.EndsWith('?') || query.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length >= 4
-            || System.Text.RegularExpressions.Regex.IsMatch(query, @"^(?:how|what|why|who|when|where|which|can|could|should|is|are|do|does|explain|write|summari[sz]e|help|tell me|give me|make me)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            || System.Text.RegularExpressions.Regex.IsMatch(query, @"^(?:how|how's|hows|what|what's|whats|wat|why|who|who's|whos|when|where|where's|wheres|which|can|could|should|would|will|is|are|do|does|did|explain|write|draft|summari[sz]e|translate|plan|help|tell me|give me|make me|find me)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         var (aiName, aiUrl) = Assistant(_settings.SearchAssistant);
         Hit? ask = !understood && filter == null && query.Length >= 3 && aiUrl != null
             ? new Hit($"Ask {aiName} “{query}”", "Opens in your browser, already asked", "", null,
                 () => OpenTarget(aiUrl + Uri.EscapeDataString(query)), Section: "Web", Key: "web|ask")
             : null;
+        // the AI chat in the notch: first for a real question, else after what's on the PC
+        // always offered, whatever was typed; first when a filter found nothing ("...news today" isn't about today's files)
+        Hit? ai = query.Length >= 2 && _settings.AiChat
+            ? new Hit(OpenRouter.HasKey ? $"Ask AI “{query}”" : "Ask AI · set it up", OpenRouter.HasKey ? "Answers here, and can do things on your PC  ·  Shift+Enter" : "A free OpenRouter key, pasted once",
+                "\uE8BD", null, () => EnterChat(query), Section: "AI", Key: "ai|ask")
+            : null;
+        if (ai != null && (question && best < 650 || filter != null && pool.Count == 0)) { _hits.Insert(understoodCount, ai with { Section = null }); ai = null; }
         if (ask != null && question && best < 650) { _hits.Add(ask with { Section = null }); ask = null; }
 
         foreach (var s in sections)
@@ -490,6 +520,7 @@ public partial class NotchWindow
         if (filter != null && pool.Count == 0)
             _hits.Add(new Hit($"No {filter.Label.ToLowerInvariant()}{(terms.Length > 0 ? $" called “{terms}”" : "")}", _fileIndex.Ready ? "Try fewer words, or another date" : "Still reading your drives, a moment…", "", null, () => Nudge(), Key: "nothing"));
 
+        if (ai != null) _hits.Add(ai);
         // 4. always a way out: the web
         if (soft != null) _hits.Add(soft with { Section = "Web" });
         var (engine, engineUrl) = Engine(_settings.SearchEngine);
@@ -721,8 +752,11 @@ public partial class NotchWindow
     {
         if (_launchStarters == null) return;
         _launchStarters.Children.Clear();
+        // the AI first: its living mark, and what it would go on with
+        bool aiCard = AiStartCard() is { } ai && _launchStarters.Children.Add(ai) >= 0;
         var usual = _settings.SearchFrequent ? _index.Favourites(7, _settings.SearchHiddenApps).ToList() : new();
         bool first = true;
+        if (aiCard) first = false;
         double Gap() { double g = first ? 2 : 8; first = false; return g; }
         AddDesktopTiles(Gap);
         if (_desktopHidden && DesktopItems().Count > 0 && usual.Count > 6) usual = usual.Take(6).ToList(); // room for both rows
@@ -764,6 +798,7 @@ public partial class NotchWindow
                 tries.Children.Add(Chip(t, t, null));
             _launchStarters.Children.Add(tries);
         }
+        CascadeStarters();
     }
 
     /// <summary>
@@ -792,8 +827,18 @@ public partial class NotchWindow
         var host = new Grid { Margin = new Thickness(0, 0, 2, 0) };
         host.Children.Add(open);
         host.Children.Add(x);
-        host.MouseEnter += (_, _) => x.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(120)));
-        host.MouseLeave += (_, _) => x.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(160)));
+        var rise = new TranslateTransform();
+        icon.RenderTransform = rise;
+        host.MouseEnter += (_, _) =>
+        {
+            x.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(120)));
+            rise.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-2.5, TimeSpan.FromMilliseconds(160)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+        };
+        host.MouseLeave += (_, _) =>
+        {
+            x.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(160)));
+            rise.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(220)));
+        };
         x.MouseLeftButtonUp += (_, ev) => { ev.Handled = true; HideFrequent(e, host); };
         open.MouseRightButtonUp += (_, ev) => { ev.Handled = true; HideFrequent(e, host); };
         return host;
@@ -848,9 +893,22 @@ public partial class NotchWindow
     bool _pickedByKeys; // you moved to a line yourself: results arriving later keep it picked
     bool _recalling;
 
+    /// <summary>A chat to go back to: the one open now, or (kept) the last one.</summary>
+    bool HasChat => _session?.UserTurns > 0 || _settings.AiHistory && ChatStore.Count > 0;
+
     void OnLauncherKey(object sender, KeyEventArgs e)
     {
         if (_launchBox == null) return;
+        if (_chatMode) { OnChatKey(e); return; }
+        if (e.Key == Key.M && Keyboard.Modifiers == ModifierKeys.Control && _settings.AiChat && _settings.AiVoice) { e.Handled = true; StartListening(); return; }
+        // Shift+Enter: ask the AI whatever is typed; Tab in the empty search: back to the chat
+        if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Shift && _settings.AiChat && _actionsFor == null && _launchBox.Text.Trim().Length > 0)
+        {
+            e.Handled = true;
+            EnterChat(_launchBox.Text.Trim());
+            return;
+        }
+        if (e.Key == Key.Tab && _launchBox.Text.Length == 0 && _settings.AiChat) { e.Handled = true; EnterChat(null, resume: true); return; }
         if (e.Key is Key.Enter or Key.Tab or Key.Up or Key.Down or Key.Right or Key.PageUp or Key.PageDown) SearchNowIfBehind();
         int count = _hits.Count;
         bool atEnd = _launchBox.CaretIndex == _launchBox.Text.Length && _launchBox.SelectionLength == 0;

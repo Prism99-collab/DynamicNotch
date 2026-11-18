@@ -402,6 +402,8 @@ public partial class NotchWindow
         _cyFrame.Effect = _mode is Mode.Expanded or Mode.Osd && !Eco
             ? new System.Windows.Media.Effects.DropShadowEffect { Color = edge, BlurRadius = 8, ShadowDepth = 0, Opacity = 0.55 }
             : null;
+        // the glow is kept as a picture while it stays put: the rain moving under it doesn't make it redraw every frame
+        _cyFrame.CacheMode = _cyFrame.Effect != null ? new BitmapCache(Math.Max(1, _scale)) { SnapsToDevicePixels = true } : null;
         _cyTrace.Opacity = _mode == Mode.Game ? 0 : 1;
         // in a game the pill is just the number: no frame line around it, nothing bright at the edge of your view
         _cyFrame.Opacity = _mode == Mode.Game ? 0 : 1;

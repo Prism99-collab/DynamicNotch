@@ -131,6 +131,58 @@ public sealed class Settings
     public string SearchEngine { get; set; } = "google";
     /// <summary>The AI assistant offered for questions: "chatgpt", "claude", "perplexity", "copilot" or "off".</summary>
     public string SearchAssistant { get; set; } = "chatgpt";
+    /// <summary>The AI chat inside the search (OpenRouter; the key is kept apart, encrypted).</summary>
+    public bool AiChat { get; set; } = true;
+    /// <summary>The OpenRouter model id ("openrouter/free" picks a free one).</summary>
+    public string AiModel { get; set; } = "openrouter/free";
+    /// <summary>It may act on the PC (commands, files, clipboard, opening things).</summary>
+    public bool AiTools { get; set; } = true;
+    /// <summary>It may search the web and read pages.</summary>
+    public bool AiWeb { get; set; } = true;
+    /// <summary>Chats are kept on the PC to come back to.</summary>
+    public bool AiHistory { get; set; } = true;
+    /// <summary>Asking from the search goes on with the last chat when it was used in the last 30 minutes.</summary>
+    public bool AiContinue { get; set; } = true;
+    /// <summary>How it answers: "brief", "balanced" or "detailed".</summary>
+    public string AiStyle { get; set; } = "brief";
+    /// <summary>"precise", "balanced" or "creative" (the model's temperature).</summary>
+    public string AiCreativity { get; set; } = "balanced";
+    /// <summary>What it should always know or do (the user's own words).</summary>
+    public string AiInstructions { get; set; } = "";
+    /// <summary>How much taller the chat was pulled in the notch (px).</summary>
+    public double AiChatExtra { get; set; }
+    /// <summary>Where the popped-out chat window was ("x,y,w,h"), and whether it stays on top.</summary>
+    public string AiPopBounds { get; set; } = "";
+    public bool AiPopTopmost { get; set; } = true;
+    /// <summary>Risky commands (deleting, installing, changing settings...) wait for your OK.</summary>
+    public bool AiConfirm { get; set; } = true;
+    /// <summary>What waits for your OK: "risky" (deleting, installing, killing, downloads, registry, security), "changes" (anything that changes something) or "never".</summary>
+    public string AiAsk { get; set; } = "risky";
+    /// <summary>Talking to the AI (the mic, Ctrl+M) and hearing its answers.</summary>
+    public bool AiVoice { get; set; } = true;
+    /// <summary>"windows" (free, words appear as you speak) or "openrouter" (needs credit, any language).</summary>
+    public string AiVoiceEngine { get; set; } = "windows";
+    /// <summary>The language you speak ("auto": Windows' speech language), e.g. "fr-FR".</summary>
+    public string AiVoiceLanguage { get; set; } = "auto";
+    /// <summary>What you say is sent as soon as you stop talking.</summary>
+    public bool AiVoiceSend { get; set; } = true;
+    /// <summary>Answers read aloud: "voice" (when you talked), "always" or "never".</summary>
+    public string AiSpeak { get; set; } = "voice";
+    /// <summary>The Windows voice that reads (empty: the default one), and how fast.</summary>
+    public string AiVoiceId { get; set; } = "";
+    public double AiVoiceRate { get; set; } = 1.0;
+    /// <summary>The model that makes pictures (empty: a free one if any, else the cheapest).</summary>
+    public string AiImageModel { get; set; } = "";
+    /// <summary>The engine the AI searches with first: "google", "brave" or "duckduckgo".</summary>
+    public string AiSearchEngine { get; set; } = "google";
+    /// <summary>The AI's provider: "gemini" (Google, free, the default) or "openrouter".</summary>
+    public string AiProvider { get; set; } = "gemini";
+    /// <summary>The Gemini model ("openrouter/free" = Auto: the best that still has free requests today).</summary>
+    public string AiGeminiModel { get; set; } = "openrouter/free";
+    /// <summary>It keeps short facts about you (what you tell it to remember) and uses them.</summary>
+    public bool AiMemory { get; set; } = true;
+    /// <summary>Long alerts from apps put in a few words by the AI (never messages from people).</summary>
+    public bool AiAlerts { get; set; } = true;
 
     public static string Folder =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DynamicNotch");

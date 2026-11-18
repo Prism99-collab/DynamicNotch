@@ -775,7 +775,7 @@ public partial class NotchWindow : Window
 
         double ex = (ExpandedSize.Width / 2 + 10 + 16) * _scale;
         double cxe = _winLeft + _winW / 2.0;
-        bool inside = p.X >= cxe - ex && p.X <= cxe + ex && p.Y >= _winTop && p.Y <= _winTop + (ExpandedSize.Height + 16) * _scale;
+        bool inside = p.X >= cxe - ex && p.X <= cxe + ex && p.Y >= _winTop && p.Y <= _winTop + (ExpandedSize.Height + _chatExtra + 16) * _scale;
         UpdateTypeToSearch(inside); // with the pointer on the open notch, typing starts a search
         if (_launcherOpen) return;   // the search stays until Esc, Enter or a click elsewhere
         bool dragging = VolSlider.IsDragging || BriSlider.IsDragging || ExtBriSlider.IsDragging || AppVolSlider.IsDragging || ProgressSlider.IsDragging || _swiping || _dragOut;

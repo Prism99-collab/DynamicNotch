@@ -45,13 +45,17 @@ public sealed class PreferencesWindow : Window
         _open.Activate();
     }
 
-    enum Sec { General, Appearance, Behaviour, Alerts, Pages, Shortcuts, About, Search, Calls }
+    enum Sec { General, Appearance, Behaviour, Alerts, Pages, Shortcuts, About, Search, Calls, Ai }
+
+    /// <summary>The AI chat's section (for the chat's header to open it directly).</summary>
+    public const int AiSection = (int)Sec.Ai;
     static readonly (Sec Sec, string Glyph, string Name, string Sub)[] Sections =
     {
         (Sec.General, "", "General", "Language, start-up and power"),
         (Sec.Appearance, "", "Appearance", "Theme, colours and how the notch looks"),
         (Sec.Behaviour, "", "Behaviour", "How the notch reacts to you"),
         (Sec.Search, "\uE721", "Search", "What it finds, how it opens, what it remembers"),
+        (Sec.Ai, "\uE8BD", "AI chat", "The assistant in the search: key, model, how it answers, what it may do"),
         (Sec.Calls, "\uE717", "Calls", "The Calls page, and what happens when a call starts"),
         (Sec.Alerts, "", "Alerts", "What the notch tells you, and the smart helpers"),
         (Sec.Pages, "", "Pages", "Choose the pages of the control center"),
@@ -281,6 +285,7 @@ public sealed class PreferencesWindow : Window
             case Sec.Pages: Pages(); break;
             case Sec.Shortcuts: Shortcuts(); break;
             case Sec.Search: SearchSection(); break;
+            case Sec.Ai: AiSectionView(); break;
             case Sec.Calls: CallsSection(); break;
             case Sec.About: About(); break;
         }
@@ -344,6 +349,13 @@ public sealed class PreferencesWindow : Window
         new(Sec.Alerts, "", "Meeting mode", "Camera on: pause music, quiet", () => _s.MeetingMode, v => _notch.PrefSetMeeting(v), "Smart"),
         new(Sec.Alerts, "\uE7BA", "PC strain warnings", "CPU, GPU, memory and heat watched; warns when one stays high", () => _notch.PrefStrainOn("all"), v => _notch.PrefSetStrain("all", v), "Strain"),
 
+        new(Sec.Ai, "\uE8BD", "AI chat in the search", "“Ask AI” in the results, Shift+Enter on what you typed, Tab to go back to a chat", () => _s.AiChat, v => _s.AiChat = v, "ai"),
+        new(Sec.Ai, "\uE945", "Let it act on your PC", "The notch's commands, files, the clipboard, opening apps and pages", () => _s.AiTools, v => _s.AiTools = v, "ai"),
+        new(Sec.Ai, "\uE774", "Let it use the web", "Searches and reads pages for current answers", () => _s.AiWeb, v => _s.AiWeb = v, "ai"),
+        new(Sec.Ai, "\uE81C", "Keep your chats", "Saved on this PC so you can go back to them (Ctrl+H in the chat)", () => _s.AiHistory, v => _s.AiHistory = v, "ai"),
+        new(Sec.Ai, "\uE8EE", "Go on with the last chat", "Asking from the search continues a chat used in the last 30 minutes", () => _s.AiContinue, v => _s.AiContinue = v, "ai"),
+        new(Sec.Ai, "\uE8F1", "Let it remember things about you", "Short facts you tell it (your work, your preferences), kept on this PC and used in every chat", () => _s.AiMemory, v => _s.AiMemory = v, "ai"),
+        new(Sec.Ai, "\uE7E7", "Shorten long alerts", "Wordy alerts from apps are put in a few words (messages from people are never sent)", () => _s.AiAlerts, v => _s.AiAlerts = v, "ai"),
         new(Sec.Search, "\uE765", "Type to search", "With the notch open and the pointer on it, just start typing", () => _s.SearchTypeToOpen, v => { _s.SearchTypeToOpen = v; _notch.PrefSearchChanged(); }, "open"),
         new(Sec.Search, "\uE721", "Search button", "The magnifier in the control center's header", () => _s.SearchButton, v => { _s.SearchButton = v; _notch.PrefSearchChanged(); }, "open"),
         new(Sec.Search, "\uE8EF", "Commands and answers", "“volume 30”, “remind me…”, sums, time zones and dates", () => _s.SearchCommands, v => _s.SearchCommands = v, "find"),
@@ -1016,7 +1028,6 @@ public sealed class PreferencesWindow : Window
             () => _s.SearchEngine, v => _s.SearchEngine = v);
         Choice(Loc.T("AI assistant for questions"), new[] { ("chatgpt", "ChatGPT"), ("claude", "Claude"), ("perplexity", "Perplexity"), ("copilot", "Copilot"), ("off", Loc.T("Off")) },
             () => _s.SearchAssistant, v => _s.SearchAssistant = v);
-
         Label(Loc.T("Memory"));
         var memory = new WrapPanel();
         Button? recent = null;
@@ -1074,6 +1085,255 @@ public sealed class PreferencesWindow : Window
     }
 
     /// <summary>A row of pills, one of them picked (saved at once).</summary>
+    /// <summary>
+    /// The AI chat: on or off and what it may do, the key (pasted here or in the chat, checked with OpenRouter),
+    /// the model, how it answers, the user's own instructions, and the kept chats.
+    /// </summary>
+    void AiSectionView()
+    {
+        Card(Rows().Where(r => r.Sec == Sec.Ai && r.Group == "ai"));
+
+        // ── who answers
+        Services.OpenRouter.Choose(_s.AiProvider);
+        Choice(Loc.T("The AI runs on"), new[] { ("gemini", Loc.T("Google Gemini (free, thousands of requests a day)")), ("openrouter", Loc.T("OpenRouter (many models; 50 free a day)")) },
+            () => Services.OpenRouter.IsGemini ? "gemini" : "openrouter", v => { _s.AiProvider = v; Services.OpenRouter.Choose(v); RenderContent(); });
+
+        // ── the key
+        Label(Loc.T("Connection"));
+        var box = new StackPanel();
+        var state = new TextBlock { FontSize = 13, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 2) };
+        var help = new TextBlock { FontSize = 12, Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) };
+        void ShowState()
+        {
+            bool has = Services.OpenRouter.HasKey;
+            state.Text = has ? "✓  " + Loc.T("Connected to") + " " + Services.OpenRouter.ProviderName : Loc.T("Not connected yet");
+            state.Foreground = has ? Frozen(Color.FromRgb(0x30, 0xD1, 0x58)) : Text;
+            help.Text = has ? Loc.T("Your key is saved on this PC, encrypted for your Windows account. Paste another one below to replace it.")
+                : Services.OpenRouter.IsGemini
+                    ? Loc.T("1. Open Google AI Studio (Get a key) and sign in with Google.  2. Click “Create API key” and copy it.  3. Paste it below and press Check & save.")
+                    : Loc.T("1. Sign in at openrouter.ai/keys (free).  2. Create a key and copy it right away (it's shown once).  3. Paste it below and press Check & save.");
+        }
+        ShowState();
+        box.Children.Add(state);
+        box.Children.Add(help);
+        var field = new Grid();
+        field.ColumnDefinitions.Add(new ColumnDefinition());
+        field.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var pw = new PasswordBox { Background = Brushes.Transparent, Foreground = Text, CaretBrush = Text, BorderThickness = new Thickness(0), FontSize = 12.5, VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(10, 7, 10, 7) };
+        var pwHint = new TextBlock { Text = Services.OpenRouter.IsGemini ? "AQ.… or AIza…" : "sk-or-v1-…", Foreground = Frozen(Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)), IsHitTestVisible = false, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+        pw.PasswordChanged += (_, _) => pwHint.Visibility = pw.Password.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        var pwHost = new Grid();
+        pwHost.Children.Add(pw);
+        pwHost.Children.Add(pwHint);
+        field.Children.Add(new Border { CornerRadius = new CornerRadius(9), Background = Faint, BorderBrush = Edge, BorderThickness = new Thickness(1), Child = pwHost, Margin = new Thickness(0, 0, 8, 0) });
+        var result = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 8, 0, 0), Visibility = Visibility.Collapsed };
+        Button check = null!;
+        async void Check()
+        {
+            string raw = pw.Password.Trim();
+            var m = System.Text.RegularExpressions.Regex.Match(raw, @"AIza[0-9A-Za-z_\-]{30,}|AQ\.[0-9A-Za-z_\-]{30,}|sk-or-[A-Za-z0-9_\-]{20,}");
+            string key = m.Success ? m.Value : raw;
+            result.Visibility = Visibility.Visible;
+            if (key.Length < 32 || key.Contains(' '))
+            {
+                result.Foreground = Frozen(Color.FromRgb(0xFF, 0xB0, 0x20));
+                result.Text = raw.Contains("...") || raw.Contains('…') ? Loc.T("That's a shortened key from a list: copy the whole key.") : Loc.T("That isn't a key: a Google key starts with AQ. or AIza, an OpenRouter key with sk-or-v1-.");
+                return;
+            }
+            check.IsEnabled = false;
+            result.Foreground = Dim;
+            result.Text = Loc.T("Checking the key…");
+            bool? ok = await Services.OpenRouter.CheckKey(key);
+            check.IsEnabled = true;
+            if (ok == false) { result.Foreground = Frozen(Color.FromRgb(0xFF, 0xB0, 0x20)); result.Text = Loc.T("The provider says this key isn't valid. Create a new one and paste it here."); return; }
+            if (!Services.OpenRouter.SaveKey(key)) { result.Foreground = Frozen(Color.FromRgb(0xFF, 0xB0, 0x20)); result.Text = Loc.T("Couldn't save the key on this PC."); return; }
+            pw.Password = "";
+            result.Foreground = Frozen(Color.FromRgb(0x30, 0xD1, 0x58));
+            result.Text = ok == true ? Loc.T("Key checked and saved.") : Loc.T("Saved. It couldn't be checked right now: it's checked on your first message.");
+            if (Services.OpenRouter.KindOf(key) is { } kind) { _s.AiProvider = kind; Services.OpenRouter.Choose(_s.AiProvider); }
+            ShowState();
+            Saved();
+        }
+        check = PillButton("\uE73E", Loc.T("Check & save"), Check, primary: true);
+        pw.KeyDown += (_, e) => { if (e.Key == Key.Enter) Check(); };
+        Grid.SetColumn(check, 1);
+        field.Children.Add(check);
+        box.Children.Add(field);
+        box.Children.Add(result);
+        var links = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
+        var get = PillButton("\uE8A7", Loc.T("Get a key"), () => Open(Services.OpenRouter.IsGemini ? "https://aistudio.google.com/apikey" : "https://openrouter.ai/keys"), primary: false);
+        get.Margin = new Thickness(0, 0, 8, 0);
+        links.Children.Add(get);
+        var credits = PillButton("\uE8C7", Services.OpenRouter.IsGemini ? Loc.T("Your limits") : Loc.T("Credits"), () => Open(Services.OpenRouter.IsGemini ? "https://aistudio.google.com/usage" : "https://openrouter.ai/settings/credits"), primary: false);
+        credits.Margin = new Thickness(0, 0, 8, 0);
+        links.Children.Add(credits);
+        Button forget = null!;
+        forget = PillButton("\uE74D", Loc.T("Forget the key"), () => { Services.OpenRouter.ForgetKey(); ShowState(); forget.IsEnabled = false; Saved(); }, primary: false);
+        forget.IsEnabled = Services.OpenRouter.HasKey;
+        links.Children.Add(forget);
+        box.Children.Add(links);
+        _content.Children.Add(CardOf(box, new Thickness(18, 16, 18, 16)));
+
+        // ── the model
+        if (Services.OpenRouter.IsGemini)
+        {
+            Choice(Loc.T("Model"), new[] { ("openrouter/free", Loc.T("Auto (best with free requests left)")), ("gemini-flash-lite-latest", "Gemini Flash-Lite"), ("gemma-4-31b-it", "Gemma 4 31B"), ("gemma-4-26b-a4b-it", "Gemma 4 26B"), ("gemini-flash-latest", "Gemini Flash") },
+                () => _s.AiGeminiModel, v => _s.AiGeminiModel = v);
+            _content.Children.Add(new TextBlock { Text = Loc.T("Free with Google, per day: Gemma 4 about 1,500 each, Flash-Lite about 500, Flash about 20. Auto moves to the next model when one runs out; they all come back at midnight, California time."), Foreground = Dim, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(4, 4, 0, 6) });
+        }
+        else
+        Choice(Loc.T("Model"), new[]
+        {
+            ("openrouter/free", Loc.T("Free (auto)")), ("deepseek/deepseek-v4-flash", "DeepSeek Flash"), ("google/gemini-3-flash-preview", "Gemini Flash"),
+            ("anthropic/claude-haiku-5.5", "Claude Haiku"), ("anthropic/claude-sonnet-5.5", "Claude Sonnet"),
+        }, () => _s.AiModel, v => _s.AiModel = v);
+        var custom = new Grid { Margin = new Thickness(0, 0, 0, 4), Visibility = Services.OpenRouter.IsGemini ? Visibility.Collapsed : Visibility.Visible };
+        custom.ColumnDefinitions.Add(new ColumnDefinition());
+        custom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        custom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var idBox = new TextBox { Text = _s.AiModel, Background = Brushes.Transparent, Foreground = Text, CaretBrush = Text, BorderThickness = new Thickness(0), FontSize = 12.5, Padding = new Thickness(10, 7, 10, 7), ToolTip = Loc.T("Any model id from openrouter.ai/models") };
+        custom.Children.Add(new Border { CornerRadius = new CornerRadius(9), Background = Faint, BorderBrush = Edge, BorderThickness = new Thickness(1), Child = idBox, Margin = new Thickness(0, 0, 8, 0) });
+        var use = PillButton(null, Loc.T("Use this model"), () =>
+        {
+            string id = idBox.Text.Trim();
+            if (id.Length == 0) return;
+            _s.AiModel = id;
+            _notch.PrefChanged();
+            RenderContent();
+            Saved();
+        }, primary: false);
+        Grid.SetColumn(use, 1);
+        custom.Children.Add(use);
+        var browse = PillButton("\uE8A7", Loc.T("Browse"), () => Open("https://openrouter.ai/models"), primary: false);
+        browse.Margin = new Thickness(8, 0, 0, 0);
+        Grid.SetColumn(browse, 2);
+        custom.Children.Add(browse);
+        _content.Children.Add(custom);
+        if (!Services.OpenRouter.IsGemini)
+            _content.Children.Add(new TextBlock { Text = Loc.T("Free models cost nothing but can be slow or busy. Paid ones need credits on OpenRouter, and are better at doing things on the PC."), Foreground = Dim, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(4, 4, 0, 6) });
+
+        // ── where it searches
+        Choice(Loc.T("It searches the web with"), new[] { ("google", "Google"), ("brave", "Brave Search"), ("duckduckgo", "DuckDuckGo") },
+            () => _s.AiSearchEngine, v => { _s.AiSearchEngine = v; Services.WebTools.Engine = v; });
+        _content.Children.Add(new TextBlock { Text = Loc.T("If it doesn't answer, the others are tried, then the news and Wikipedia. Google runs in Windows' own Edge engine, out of sight."), Foreground = Dim, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(4, 0, 0, 8) });
+
+        // ── what waits for your OK
+        Choice(Loc.T("Ask before running commands"), new[] { ("risky", Loc.T("Only risky ones")), ("changes", Loc.T("Anything that changes something")), ("never", Loc.T("Never ask")) },
+            () => _s.AiConfirm ? _s.AiAsk : "never", v => { _s.AiAsk = v; _s.AiConfirm = true; });
+        _content.Children.Add(new TextBlock { Text = Loc.T("Risky: deleting, installing, closing programs, downloads, the registry, security, disks and power. Looking things up never asks."), Foreground = Dim, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(4, 0, 0, 8) });
+
+        // ── how it answers
+        Choice(Loc.T("Answers"), new[] { ("brief", Loc.T("Brief")), ("balanced", Loc.T("Balanced")), ("detailed", Loc.T("Detailed")) }, () => _s.AiStyle, v => _s.AiStyle = v);
+        Choice(Loc.T("Creativity"), new[] { ("precise", Loc.T("Precise")), ("balanced", Loc.T("Balanced")), ("creative", Loc.T("Creative")) }, () => _s.AiCreativity, v => _s.AiCreativity = v);
+
+        Label(Loc.T("Your instructions"));
+        var ins = new TextBox
+        {
+            Text = _s.AiInstructions, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 74, MaxHeight = 160, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Background = Brushes.Transparent, Foreground = Text, CaretBrush = Text, BorderThickness = new Thickness(0), FontSize = 12.5, Padding = new Thickness(10, 8, 10, 8),
+        };
+        var insHint = new TextBlock { Text = Loc.T("What it should always know or do. E.g. “I'm a student in Casablanca. Answer in French. Keep code in C#.”"), Foreground = Frozen(Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)), TextWrapping = TextWrapping.Wrap, IsHitTestVisible = false, Margin = new Thickness(12, 9, 12, 0) };
+        insHint.Visibility = ins.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ins.TextChanged += (_, _) => insHint.Visibility = ins.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ins.LostFocus += (_, _) =>
+        {
+            if (ins.Text == _s.AiInstructions) return;
+            _s.AiInstructions = ins.Text.Length > 1500 ? ins.Text[..1500] : ins.Text;
+            _notch.PrefChanged();
+            Saved();
+        };
+        var insHost = new Grid();
+        insHost.Children.Add(ins);
+        insHost.Children.Add(insHint);
+        _content.Children.Add(new Border { CornerRadius = new CornerRadius(9), Background = Faint, BorderBrush = Edge, BorderThickness = new Thickness(1), Child = insHost, Margin = new Thickness(0, 0, 0, 6) });
+
+        // ── voice
+        Label(Loc.T("Voice"));
+        Card(new[]
+        {
+            new Row(Sec.Ai, "\uE720", "Talk to it", "The mic beside the message box, or Ctrl+M: your words appear as you speak", () => _s.AiVoice, v => _s.AiVoice = v, "voice"),
+            new Row(Sec.Ai, "\uE724", "Send what I say right away", "Off: what you said waits in the box so you can check it", () => _s.AiVoiceSend, v => _s.AiVoiceSend = v, "voice"),
+        });
+        Choice(Loc.T("Listening with"), new[] { ("windows", Loc.T("Windows (free, words appear as you speak)")), ("ai", Services.OpenRouter.IsGemini ? Loc.T("Gemini (free with your key, any language)") : Loc.T("OpenRouter (needs $0.50 credit, any language)")) },
+            () => _s.AiVoiceEngine == "openrouter" ? "ai" : _s.AiVoiceEngine, v => _s.AiVoiceEngine = v);
+        var langs = new List<(string, string)> { ("auto", Loc.T("Windows' language")) };
+        try { foreach (var l in Windows.Media.SpeechRecognition.SpeechRecognizer.SupportedTopicLanguages) langs.Add((l.LanguageTag, l.DisplayName)); } catch { }
+        Choice(Loc.T("The language you speak"), langs.ToArray(), () => _s.AiVoiceLanguage, v => _s.AiVoiceLanguage = v);
+        Choice(Loc.T("Read answers aloud"), new[] { ("voice", Loc.T("When I talk")), ("always", Loc.T("Always")), ("never", Loc.T("Never")) }, () => _s.AiSpeak, v => _s.AiSpeak = v);
+        var voices = Services.VoiceOut.Voices();
+        if (voices.Count > 0)
+            Choice(Loc.T("Its voice"), new[] { ("", Loc.T("Default")) }.Concat(voices.Select(v => (v.Id, $"{v.Name.Replace("Microsoft ", "")} · {v.Language}"))).ToArray(), () => _s.AiVoiceId, v => _s.AiVoiceId = v);
+        Choice(Loc.T("Speed"), new[] { ("0.85", Loc.T("Slower")), ("1", Loc.T("Normal")), ("1.25", Loc.T("Faster")), ("1.5", Loc.T("Fast")) },
+            () => _s.AiVoiceRate.ToString(System.Globalization.CultureInfo.InvariantCulture), v => _s.AiVoiceRate = double.Parse(v, System.Globalization.CultureInfo.InvariantCulture));
+        _content.Children.Add(new TextBlock { Text = Loc.T("More voices (Arabic, French...): Windows Settings → Time & language → Speech → Add voices."), Foreground = Dim, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(4, 0, 0, 8) });
+
+        // ── pictures
+        Choice(Loc.T("Making pictures"), new[] { ("", Loc.T("Automatic (free if any, else cheapest)")), ("google/gemini-3.1-flash-lite-image", "Gemini Flash Lite Image"), ("google/gemini-2.5-flash-image", "Gemini 2.5 Flash Image"), ("openai/gpt-5-image-mini", "GPT Image mini") },
+            () => _s.AiImageModel, v => _s.AiImageModel = v);
+        _content.Children.Add(new TextBlock { Text = Loc.T("Pictures are made through OpenRouter (Google's free tier makes none, and OpenRouter has no free picture model now): add an OpenRouter key with a little credit, about a cent a picture."), Foreground = Dim, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(4, 0, 0, 8) });
+
+        // ── what it remembers
+        Label(Loc.T("What it remembers about you"));
+        var facts = Services.AiMemory.All();
+        var memo = new StackPanel();
+        void FillMemory()
+        {
+            memo.Children.Clear();
+            var now = Services.AiMemory.All();
+            if (now.Count == 0)
+            {
+                memo.Children.Add(new TextBlock { Text = Loc.T("Nothing yet. Tell it in the chat, e.g. “remember that I work night shifts”."), Foreground = Dim, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(18, 14, 18, 14) });
+                return;
+            }
+            for (int i = 0; i < now.Count; i++)
+            {
+                string fact = now[i];
+                if (i > 0) memo.Children.Add(new Border { Height = 1, Background = Edge, Margin = new Thickness(18, 0, 0, 0) });
+                var row = new Grid { MinHeight = 38 };
+                row.ColumnDefinitions.Add(new ColumnDefinition());
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.Children.Add(new TextBlock { Text = fact, FontSize = 12.5, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(18, 8, 10, 8) });
+                var del = new Button { Content = Glyph("\uE74D", 12, Dim), Width = 32, Height = 28, Margin = new Thickness(0, 0, 10, 0), Cursor = Cursors.Hand, Background = Brushes.Transparent, BorderThickness = new Thickness(0), ToolTip = Loc.T("Forget this"), Template = PillTemplate() };
+                del.Click += (_, _) => { Services.AiMemory.Remove(fact); FillMemory(); Saved(); };
+                Grid.SetColumn(del, 1);
+                row.Children.Add(del);
+                memo.Children.Add(row);
+            }
+        }
+        FillMemory();
+        _content.Children.Add(CardOf(memo));
+        if (facts.Count > 0)
+        {
+            Button clearMemo = null!;
+            clearMemo = PillButton("\uE74D", Loc.T("Forget everything"), () => { Services.AiMemory.Clear(); FillMemory(); clearMemo.IsEnabled = false; Saved(); }, primary: false);
+            clearMemo.HorizontalAlignment = HorizontalAlignment.Left;
+            clearMemo.Margin = new Thickness(0, 0, 0, 6);
+            _content.Children.Add(clearMemo);
+        }
+
+        // ── kept chats
+        Label(Loc.T("Your chats"));
+        int n = Services.ChatStore.Count;
+        Button wipe = null!;
+        bool armed = false;
+        wipe = PillButton("\uE74D", n == 0 ? Loc.T("No chats kept") : string.Format(Loc.T("Delete all chats ({0})"), n), () =>
+        {
+            if (!armed) { armed = true; ((TextBlock)((StackPanel)wipe.Content).Children[^1]).Text = Loc.T("Click again to delete them all"); return; }
+            Services.ChatStore.DeleteAll();
+            ((TextBlock)((StackPanel)wipe.Content).Children[^1]).Text = Loc.T("Deleted");
+            wipe.IsEnabled = false;
+            Saved();
+        }, primary: false);
+        wipe.IsEnabled = n > 0;
+        wipe.HorizontalAlignment = HorizontalAlignment.Left;
+        _content.Children.Add(wipe);
+    }
+
+    static void Open(string url)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
+    }
+
     void Choice(string title, (string Key, string Name)[] options, Func<string> get, Action<string> set)
     {
         Label(title);

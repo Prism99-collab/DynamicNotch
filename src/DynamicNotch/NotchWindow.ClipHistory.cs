@@ -23,6 +23,20 @@ public partial class NotchWindow
         public string? Image { get; set; }   // file name in the clips folder
         public DateTime At { get; set; }
         public bool Pinned { get; set; }
+        /// <summary>A picture's fingerprint (its pixels, without transparency): the same picture copied again is the same entry.</summary>
+        public string? Hash { get; set; }
+    }
+
+    /// <summary>Two copies of the same text: the same entry, even if one app ended lines differently or left spaces at a line's end.</summary>
+    static string ClipKey(string text) => string.Join("\n", text.Replace("\r\n", "\n").Replace('\r', '\n').Replace('\u00A0', ' ').Split('\n').Select(l => l.TrimEnd()));
+
+    static string PixelHash(BitmapSource bgra)
+    {
+        int stride = bgra.PixelWidth * 4;
+        var px = new byte[stride * bgra.PixelHeight];
+        bgra.CopyPixels(px, stride, 0);
+        for (int i = 3; i < px.Length; i += 4) px[i] = 0; // the clipboard often drops transparency: it doesn't count
+        return $"{bgra.PixelWidth}x{bgra.PixelHeight}:" + Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(px));
     }
 
     const int ClipTexts = 40, ClipImages = 12;
@@ -43,6 +57,36 @@ public partial class NotchWindow
                     _clips.Add(c);
         }
         catch { }
+        // texts saved twice before: kept once (the newest place)
+        var seen = new HashSet<string>();
+        _clips.RemoveAll(c => c.Text != null && !seen.Add(ClipKey(c.Text)));
+        FingerprintOldClips();
+    }
+
+    async void FingerprintOldClips()
+    {
+        var old = _clips.Where(c => c.Image != null && c.Hash == null).ToList();
+        if (old.Count == 0) return;
+        var hashes = await Task.Run(() => old.Select(c =>
+        {
+            try
+            {
+                var img = new BitmapImage();
+                img.BeginInit();
+                img.UriSource = new Uri(Path.Combine(ClipFolder, c.Image!));
+                img.CacheOption = BitmapCacheOption.OnLoad;
+                img.EndInit();
+                var bgra = new FormatConvertedBitmap(img, PixelFormats.Bgra32, null, 0);
+                bgra.Freeze();
+                return PixelHash(bgra);
+            }
+            catch { return null; }
+        }).ToList());
+        for (int i = 0; i < old.Count; i++) old[i].Hash = hashes[i];
+        var seen = new HashSet<string>();
+        int before = _clips.Count;
+        _clips.RemoveAll(c => c.Hash != null && !seen.Add(c.Hash) && !c.Pinned);
+        if (_clips.Count != before || hashes.Count > 0) ClipsChanged();
     }
 
     /// <summary>Saved shortly after the last change, off the UI thread, swapped in whole.</summary>
@@ -51,7 +95,7 @@ public partial class NotchWindow
         int v = ++_clipSaveVersion;
         await Task.Delay(800);
         if (v != _clipSaveVersion) return;
-        var snapshot = _clips.Select(c => new ClipEntry { Text = c.Text, Image = c.Image, At = c.At, Pinned = c.Pinned }).ToList();
+        var snapshot = _clips.Select(c => new ClipEntry { Text = c.Text, Image = c.Image, At = c.At, Pinned = c.Pinned, Hash = c.Hash }).ToList();
         await Task.Run(() =>
         {
             try
@@ -77,7 +121,8 @@ public partial class NotchWindow
         text = text.Trim();
         if (text.Length == 0) return;
         if (text.Length > 4000) text = text[..4000];
-        var same = _clips.FirstOrDefault(c => c.Text == text);
+        string key = ClipKey(text);
+        var same = _clips.FirstOrDefault(c => c.Text != null && (c.Text == text || ClipKey(c.Text) == key));
         bool pinned = same?.Pinned ?? false;
         if (same != null) _clips.Remove(same);
         _clips.Insert(0, new ClipEntry { Text = text, At = DateTime.Now, Pinned = pinned });
@@ -100,8 +145,16 @@ public partial class NotchWindow
             var frozen = new FormatConvertedBitmap(src, PixelFormats.Bgra32, null, 0);
             frozen.Freeze();
             string name = $"{DateTime.Now:yyyyMMdd-HHmmss-fff}.png";
-            bool ok = await Task.Run(() =>
+            string hash = await Task.Run(() => PixelHash(frozen));
+            // the same picture again (an app announcing it twice, or one of these copied back): it just moves to the top
+            if (_clips.FirstOrDefault(c => c.Hash == hash) is { } known) { BumpClip(known); return; }
+            if (_pendingClipHashes.Contains(hash)) return;
+            _pendingClipHashes.Add(hash);
+            bool ok;
+            try
             {
+                ok = await Task.Run(() =>
+                {
                 try
                 {
                     Directory.CreateDirectory(ClipFolder);
@@ -112,13 +165,26 @@ public partial class NotchWindow
                     return true;
                 }
                 catch { return false; }
-            });
+                });
+            }
+            finally { _pendingClipHashes.Remove(hash); }
             if (!ok) return;
-            _clips.Insert(0, new ClipEntry { Image = name, At = DateTime.Now });
+            if (_clips.FirstOrDefault(c => c.Hash == hash) is { } meanwhile) { BumpClip(meanwhile); return; } // saved twice at once
+            _clips.Insert(0, new ClipEntry { Image = name, At = DateTime.Now, Hash = hash });
             TrimClips();
             ClipsChanged();
         }
         catch { }
+    }
+
+    readonly HashSet<string> _pendingClipHashes = new();
+
+    /// <summary>Copied again: to the top with the new time (a pinned one keeps its place).</summary>
+    void BumpClip(ClipEntry c)
+    {
+        c.At = DateTime.Now;
+        if (!c.Pinned) { _clips.Remove(c); _clips.Insert(0, c); }
+        ClipsChanged();
     }
 
     /// <summary>The newest texts and pictures stay, pinned ones always.</summary>

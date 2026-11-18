@@ -21,8 +21,12 @@ public sealed class StrainService : IDisposable
     /// <summary>Each process's GPU load at the last <see cref="Sample"/> (process id → %).</summary>
     public IReadOnlyDictionary<uint, double> GpuByProcess => _gpu.GpuByProcess;
 
-    public Reading Sample()
+    /// <param name="perApp">also split the GPU load by app (<see cref="GpuByProcess"/>); only when the app list needs it</param>
+    public Reading Sample() => Sample(true);
+
+    public Reading Sample(bool perApp)
     {
+        _gpu.TrackProcesses = perApp;
         var s = _gpu.Sample(0);
         double? cpuTemp;
         lock (_gate) cpuTemp = Trusted(ThermalZone(), s.Cpu);

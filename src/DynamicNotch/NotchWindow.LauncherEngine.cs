@@ -31,6 +31,7 @@ public partial class NotchWindow
     /// <summary>A key was typed: the letter is on screen already; the results follow as soon as they're worked out.</summary>
     void QueueSearch()
     {
+        if (_chatMode) { OnChatTyped(); return; } // typing a message (or filtering your chats), not a search
         int v = ++_searchAsked;
         TypePulse();
         string q = _launchBox?.Text ?? "";

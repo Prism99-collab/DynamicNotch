@@ -113,12 +113,19 @@ public partial class NotchWindow
                 return;
             }
             var p = Root.PointFromScreen(new Point(x, y));
-            var target = Root.InputHitTest(p) as UIElement ?? Pill;
+            // what's under the pointer: a control, or a piece of text (a run in a message), which routes to what holds it
+            var hit = Root.InputHitTest(p);
+            Action<RoutedEventArgs> raise = hit switch
+            {
+                UIElement u => u.RaiseEvent,
+                ContentElement c => c.RaiseEvent,
+                _ => Pill.RaiseEvent,
+            };
             var preview = new MouseWheelEventArgs(Mouse.PrimaryDevice, Environment.TickCount, delta) { RoutedEvent = UIElement.PreviewMouseWheelEvent };
-            target.RaiseEvent(preview);
+            raise(preview);
             if (preview.Handled) return;
             var wheel = new MouseWheelEventArgs(Mouse.PrimaryDevice, Environment.TickCount, delta) { RoutedEvent = UIElement.MouseWheelEvent };
-            target.RaiseEvent(wheel);
+            raise(wheel);
         }
         catch (Exception ex) { Services.AppLog.Write("wheel: " + ex.Message); }
     }

@@ -164,12 +164,7 @@ public partial class NotchWindow
                     new DiscreteDoubleKeyFrame(220, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(7))),
                 },
             });
-        if (_vCaret != null && !Eco)
-            _vCaret.BeginAnimation(OpacityProperty, new DoubleAnimationUsingKeyFrames
-            {
-                RepeatBehavior = RepeatBehavior.Forever,
-                KeyFrames = { new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)), new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(530))), new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1060))) },
-            });
+        if (_vCaret != null) _vCaret.Opacity = 0.6; // it rests: nothing on the page moves unless it means something
         _ = SampleVitalsAsync();
         PlayVitalsArrival();
     }
@@ -190,6 +185,8 @@ public partial class NotchWindow
     Color Warm => _cyber ? CyYellow : Color.FromRgb(0xFF, 0x9F, 0x0A);
     Color Hot => _cyber ? CyRed : Color.FromRgb(0xFF, 0x45, 0x3A);
     Color Calm => _cyber ? Color.FromRgb(0x00, 0xFF, 0xA3) : Color.FromRgb(0x30, 0xD1, 0x58);
+    /// <summary>A level that's fine: soft white, no colour asking for attention.</summary>
+    static Color Quiet => Color.FromArgb(0x9C, 0xFF, 0xFF, 0xFF);
 
     /// <summary>Each tile's own colour (Neon: cyan, magenta, yellow, green).</summary>
     Color Hue(VMetric m) => _cyber
@@ -268,8 +265,7 @@ public partial class NotchWindow
         up.Cursor = Cursors.Arrow;
         up.ToolTip = "How long the PC has been on since it last started";
         up.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(up, 2);
-        head.Children.Add(up);
+        Grid.SetColumn(up, 2); // not shown: when calm, the line under the verdict says how long the PC has been on
 
         var tm = CallPlate(Own(new TextBlock { Text = "\uE9D9", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 12, Foreground = Frozen(look.Accent), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }), look, null, out var tmPlate, 26);
         tmPlate.Width = 26;
@@ -317,7 +313,7 @@ public partial class NotchWindow
             Grid.SetColumn(_vAppsRule, 1);
             appsHead.Children.Add(_vAppsRule);
         }
-        _vAppsTitle = Own(new TextBlock { FontSize = 9.5, Foreground = Frozen(look.Label), FontFamily = look.Font, Margin = new Thickness(2, 0, 0, 0) });
+        _vAppsTitle = Own(new TextBlock { FontSize = 10, Foreground = Frozen(look.Label), FontFamily = look.Font, Margin = new Thickness(2, 0, 0, 0) });
         appsHead.Children.Add(_vAppsTitle);
         apps.Children.Add(appsHead);
         _vListClip = new Grid { ClipToBounds = true, Background = Brushes.Transparent };
@@ -328,7 +324,7 @@ public partial class NotchWindow
         _vListClip.SizeChanged += (_, _) => { foreach (var r in _vRowMap.Values) r.Root.Width = RowWidth; };
         Grid.SetRow(_vListClip, 1);
         apps.Children.Add(_vListClip);
-        var appsPanel = VPanel(apps, look, new Thickness(6, 4, 6, 4), look.Neon ? NeonSweep(CyMagenta, CyCyan) : null, CyMagenta);
+        var appsPanel = VPanel(apps, look, new Thickness(6, 4, 6, 4), look.Neon ? Frozen(A(CyCyan, 0x55)) : null, CyCyan);
         bottom.Children.Add(appsPanel);
 
         var side = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
@@ -337,13 +333,8 @@ public partial class NotchWindow
         side.Children.Add(SideRow(look, out _vBatGlyph, out _vBatText, out _vBatSide));
         var diskRow = SideRow(look, out var diskGlyph, out _vDiskText, out _, bar: true);
         diskGlyph.Text = "\uEDA2";
-        if (look.Neon)
-        {
-            _vNetGlyph!.Foreground = Frozen(Hue(VMetric.Net));
-            diskGlyph.Foreground = Frozen(CyCyan);
-        }
         side.Children.Add(diskRow);
-        var right = VPanel(side, look, new Thickness(10, 5, 10, 5), look.Neon ? NeonSweep(CyCyan, CyMagenta) : null, CyCyan);
+        var right = VPanel(side, look, new Thickness(10, 5, 10, 5), look.Neon ? Frozen(A(CyCyan, 0x55)) : null, CyCyan);
         Grid.SetColumn(right, 2);
         bottom.Children.Add(right);
         Grid.SetRow(bottom, 4);
@@ -367,11 +358,22 @@ public partial class NotchWindow
         b.BorderThickness = new Thickness(0);
         b.Padding = new Thickness(pad.Left + 1, pad.Top + 1, pad.Right + 1, pad.Bottom + 1);
         NeonCorner(b, 9, 6);
-        var frame = new NeonFrame { Stroke = edge ?? Frozen(look.Edge), CutTR = 9, CutBL = 6, Hatch = true, Effect = NeonGlow(glow ?? CyCyan, 0.28) };
+        var frame = new NeonFrame { Stroke = edge ?? Frozen(look.Edge), CutTR = 9, CutBL = 6, Hatch = true, Effect = NeonGlow(glow ?? CyCyan, 0.14) };
         var holder = new Grid();
         holder.Children.Add(b);
-        holder.Children.Add(frame);
+        holder.Children.Add(Kept(frame));
         return holder;
+    }
+
+    /// <summary>
+    /// A glowing frame drawn once and kept as a picture: what moves behind it (the rain) or inside the tile no longer
+    /// makes its blur be worked out again every frame, which is what weak graphics chips struggle with. Kept at the
+    /// screen's own scale, so it stays sharp.
+    /// </summary>
+    FrameworkElement Kept(FrameworkElement glowing)
+    {
+        if (glowing.Effect == null) return glowing;
+        return new Grid { Children = { glowing }, IsHitTestVisible = false, CacheMode = new BitmapCache(Math.Max(1, _scale)) { SnapsToDevicePixels = true } };
     }
 
     /// <summary>A soft light around a neon edge: small and dim, so it lifts the colour without hurting the eyes.</summary>
@@ -410,7 +412,7 @@ public partial class NotchWindow
         text = Own(new TextBlock { FontSize = 10.5, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, FontFamily = look.Font });
         Grid.SetColumn(text, 2);
         row.Children.Add(text);
-        right = Own(new TextBlock { FontSize = 10, Foreground = Frozen(look.Label), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0), FontFamily = look.Font });
+        right = Own(new TextBlock { FontSize = 10.5, Foreground = Frozen(look.Label), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0), FontFamily = look.Font });
         System.Windows.Documents.Typography.SetNumeralAlignment(right, FontNumeralAlignment.Tabular);
         Grid.SetColumn(right, 3);
         row.Children.Add(right);
@@ -452,9 +454,9 @@ public partial class NotchWindow
         var top = new Grid();
         top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         top.ColumnDefinitions.Add(new ColumnDefinition());
-        var lab = Own(new TextBlock { Text = look.Neon ? label.ToUpperInvariant() : label, FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = Frozen(look.Neon ? hue : look.Label), FontFamily = look.Font, VerticalAlignment = VerticalAlignment.Center });
+        var lab = Own(new TextBlock { Text = look.Neon ? label.ToUpperInvariant() : label, FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(look.Label), FontFamily = look.Font, VerticalAlignment = VerticalAlignment.Center });
         top.Children.Add(lab);
-        var sub = Own(new TextBlock { FontSize = 9.5, Foreground = Frozen(Color.FromArgb(0xC8, 0xFF, 0xFF, 0xFF)), FontFamily = look.Font, TextTrimming = TextTrimming.CharacterEllipsis, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) });
+        var sub = Own(new TextBlock { FontSize = 10, Foreground = Frozen(Color.FromArgb(0xC8, 0xFF, 0xFF, 0xFF)), FontFamily = look.Font, TextTrimming = TextTrimming.CharacterEllipsis, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) });
         System.Windows.Documents.Typography.SetNumeralAlignment(sub, FontNumeralAlignment.Tabular);
         Grid.SetColumn(sub, 1);
         top.Children.Add(sub);
@@ -480,8 +482,8 @@ public partial class NotchWindow
         else numberLine.Children.Add(value);
         var peakText = Own(new TextBlock
         {
-            FontFamily = look.Font, FontSize = 9, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(4, 0, 0, 6), Opacity = 0,
-            Foreground = Frozen(look.Neon ? Color.FromArgb(0xD0, hue.R, hue.G, hue.B) : Color.FromArgb(0xA0, 0xFF, 0xFF, 0xFF)),
+            FontFamily = look.Font, FontSize = 10, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(4, 0, 0, 6), Opacity = 0,
+            Foreground = Frozen(Color.FromArgb(0xA0, 0xFF, 0xFF, 0xFF)),
             ToolTip = "The highest in the last minute",
         });
         System.Windows.Documents.Typography.SetNumeralAlignment(peakText, FontNumeralAlignment.Tabular);
@@ -493,7 +495,7 @@ public partial class NotchWindow
         // ── the level: a thin bar along the bottom (Neon: in cells). It moves by its mask only, no layout.
         var bar = new Grid { Height = look.Neon ? 5 : 3, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(10, 0, 10, 9), IsHitTestVisible = false };
         Grid.SetRow(bar, 1);
-        bar.Children.Add(Own(new Rectangle { Fill = Frozen(A(hue, 0x22)), RadiusX = look.Neon ? 0 : 1.5, RadiusY = look.Neon ? 0 : 1.5 }));
+        bar.Children.Add(Own(new Rectangle { Fill = Frozen(Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF)), RadiusX = look.Neon ? 0 : 1.5, RadiusY = look.Neon ? 0 : 1.5 }));
         var levelStops = new[] { new GradientStop(Colors.Black, 0), new GradientStop(Colors.Transparent, 0) };
         var mask = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
         mask.GradientStops.Add(new GradientStop(Colors.Black, 0));
@@ -527,17 +529,20 @@ public partial class NotchWindow
             // a crisp edge in the tile's colour, its cuts included, with a soft light; it lifts and gives with the tile
             plate.BorderThickness = new Thickness(0);
             NeonCorner(plate, 9, 6);
-            tile.Edge = new SolidColorBrush(A(hue, 0x8C));
-            tile.Glow = NeonGlow(hue, 0.2);
-            var frame = new NeonFrame { Stroke = tile.Edge, CutTR = 9, CutBL = 6, Hatch = true, Effect = tile.Glow, RenderTransform = plate.RenderTransform, RenderTransformOrigin = new Point(0.5, 0.5) };
+            tile.Edge = new SolidColorBrush(A(CyCyan, 0x40));
+            tile.Glow = NeonGlow(hue, 0);
+            var frame = new NeonFrame { Stroke = tile.Edge, CutTR = 9, CutBL = 6, Hatch = true, Effect = tile.Glow };
+            var kept = Kept(frame);
+            kept.RenderTransform = plate.RenderTransform;
+            kept.RenderTransformOrigin = new Point(0.5, 0.5);
             var holder = new Grid { Margin = b.Margin };
             b.Margin = new Thickness(0);
             holder.Children.Add(b);
-            holder.Children.Add(frame);
+            holder.Children.Add(kept);
             tile.Root = holder;
             var fx = tile.Glow;
-            if (fx != null) b.MouseEnter += (_, _) => fx.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, new DoubleAnimation(0.5, TimeSpan.FromMilliseconds(160)));
-            if (fx != null) b.MouseLeave += (_, _) => fx.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, new DoubleAnimation(_vMetric == kind ? 0.42 : 0.2, TimeSpan.FromMilliseconds(260)));
+            if (fx != null) b.MouseEnter += (_, _) => fx.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, new DoubleAnimation(_vMetric == kind ? 0.5 : 0.22, TimeSpan.FromMilliseconds(160)));
+            if (fx != null) b.MouseLeave += (_, _) => fx.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, new DoubleAnimation(_vMetric == kind ? 0.42 : 0, TimeSpan.FromMilliseconds(260)));
         }
         if (kind == VMetric.Net) { b.Cursor = Cursors.Arrow; b.ToolTip = "Download speed · upload and ping below"; }
         else
@@ -570,10 +575,13 @@ public partial class NotchWindow
             if (look.Neon) fill = on ? Tinted(look.Plate, t.Hue, 0.13) : look.Plate;
             ((SolidColorBrush)t.Plate.BorderBrush).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(edge, d) { EasingFunction = Out });
             ((SolidColorBrush)t.Plate.Background).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(fill, d) { EasingFunction = Out });
-            t.Edge?.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(A(t.Hue, on ? (byte)0xFF : (byte)0x8C), d) { EasingFunction = Out });
-            t.Glow?.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, new DoubleAnimation(on ? 0.42 : 0.2, d));
+            // only the picked tile wears its colour; the others stay quiet until they're busy
+            t.Edge?.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(on ? t.Hue : A(CyCyan, 0x40), d) { EasingFunction = Out });
+            t.Glow?.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, new DoubleAnimation(on ? 0.42 : 0, d));
             t.TopBar?.BeginAnimation(OpacityProperty, new DoubleAnimation(on ? 1 : 0, d));
+            ((SolidColorBrush)t.Label.Foreground).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(on ? (look.Neon ? t.Hue : Colors.White) : look.Label, d));
         }
+        if (animate) RenderVitalsTiles(false, false); // the level bars take the new colours
     }
 
     double RowWidth => Math.Max(0, (_vListClip?.ActualWidth ?? 0) - 5);
@@ -598,7 +606,7 @@ public partial class NotchWindow
         var name = Own(new TextBlock { FontSize = 10.5, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, FontFamily = look.Font });
         Grid.SetColumn(name, 1);
         line.Children.Add(name);
-        var val = Own(new TextBlock { FontSize = 10, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 2, 0), FontFamily = look.Font });
+        var val = Own(new TextBlock { FontSize = 10.5, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 2, 0), FontFamily = look.Font });
         System.Windows.Documents.Typography.SetNumeralAlignment(val, FontNumeralAlignment.Tabular);
         Grid.SetColumn(val, 2);
         line.Children.Add(val);
@@ -620,8 +628,8 @@ public partial class NotchWindow
             if (_vEndArmed != r.App) x.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(160)));
         };
         end.Click += (_, _) => { if (r.Current is { } cur) EndApp(cur); };
-        name.Text = a.Count > 1 ? $"{a.Display} ×{a.Count}" : a.Display;
-        name.ToolTip = a.Path ?? a.Name;
+        name.Text = a.Display;
+        name.ToolTip = a.Count > 1 ? $"{a.Path ?? a.Name} · {a.Count} processes" : a.Path ?? a.Name;
         SetRowIcon(r, a.Path);
         return r;
     }
@@ -654,9 +662,10 @@ public partial class NotchWindow
             int tick = _vTick++;
             _vStrain ??= new StrainService();
             var strain = _vStrain;
-            var readTask = Task.Run(() => { try { return (StrainService.Reading?)strain.Sample(); } catch { return null; } });
+            bool appsTick = tick % 2 == 0 || tick == 1;
+            var readTask = Task.Run(() => { try { return (StrainService.Reading?)strain.Sample(perApp: appsTick); } catch { return null; } });
             var snapTask = _monitor.SampleAsync();
-            Task<List<AppLoad.App>>? appsTask = tick % 2 == 0 || tick == 1 ? Task.Run(() => { try { return _appLoad.Sample(strain.GpuByProcess); } catch { return new List<AppLoad.App>(); } }) : null;
+            Task<List<AppLoad.App>>? appsTask = appsTick ? readTask.ContinueWith(_ => { try { return _appLoad.Sample(strain.GpuByProcess); } catch { return new List<AppLoad.App>(); } }, TaskScheduler.Default) : null;
             Task<ConnectionDetails>? connTask = tick % 3 == 0 ? _monitor.ConnectionAsync() : null;
             Task<BatteryDetails>? batTask = tick % 3 == 0 ? _monitor.BatteryAsync() : null;
 
@@ -694,13 +703,13 @@ public partial class NotchWindow
             {
                 case VMetric.Cpu when s != null:
                     Feed(t, s.Cpu, fresh);
-                    t.Sub.Text = r?.CpuTemp is { } ct ? $"{ct:0} °C" : "";
+                    Temp(t, r?.CpuTemp, 80);
                     break;
                 case VMetric.Gpu:
                     t.Root.Visibility = gpuKnown ? Visibility.Visible : Visibility.Collapsed;
                     if (r == null) break;
                     Feed(t, r.Gpu / 100.0, freshRead);
-                    t.Sub.Text = r.GpuTemp is { } gt ? $"{gt:0} °C" : Loc.T("Graphics");
+                    Temp(t, r.GpuTemp, 78);
                     break;
                 case VMetric.Ram when s != null:
                     Feed(t, s.Memory, fresh);
@@ -708,9 +717,9 @@ public partial class NotchWindow
                     break;
                 case VMetric.Net when s != null:
                     t.Target = s.DownBps;
-                    t.Sub.Text = "↑ " + Speed(s.UpBps);
-                    if (fresh) { t.Graph.Push(s.DownBps); ShowPeak(t, Speed(t.Graph.PeakRaw), t.Graph.PeakRaw > 2048); }
-                    SetLevel(t, t.Graph.PeakRaw > 0 ? s.DownBps / Math.Max(1, t.Graph.PeakRaw) : 0, t.Hue);
+                    t.Sub.Text = s.UpBps >= 100 * 1024 ? "↑ " + Speed(s.UpBps) : ""; // the upload only when something is sending
+                    if (fresh) { t.Graph.Push(s.DownBps); ShowPeak(t, Speed(t.Graph.PeakRaw), t.Graph.PeakRaw > Math.Max(100 * 1024, s.DownBps * 2)); }
+                    SetLevel(t, t.Graph.PeakRaw > 0 ? s.DownBps / Math.Max(1, t.Graph.PeakRaw) : 0, Quiet);
                     break;
             }
         }
@@ -721,10 +730,21 @@ public partial class NotchWindow
         void Feed(VTile t, double v, bool push)
         {
             t.Target = v * 100;
-            var c = LoadHue(t.Kind, v);
+            // colour means something: red at the limit, amber when busy, the tile's own only when it's the picked one
+            var c = v >= 0.9 ? Hot : v >= 0.7 ? Warm : t.Kind == _vMetric ? t.Hue : Quiet;
             t.Value.Foreground = v >= 0.9 ? Frozen(Lighten(c, 0.2)) : Brushes.White;
-            if (push) { t.Graph.Push(v); ShowPeak(t, $"{t.Graph.PeakRaw * 100:0}%", t.Graph.PeakRaw > 0.04); }
+            // the minute's peak only when it says something the number doesn't (a spike well above now)
+            if (push) t.Graph.Push(v);
+            ShowPeak(t, $"{t.Graph.PeakRaw * 100:0}%", t.Graph.PeakRaw - v >= 0.15);
             SetLevel(t, v, c);
+        }
+
+        void Temp(VTile t, double? temp, double warm)
+        {
+            // a temperature only when it's getting warm
+            bool show = temp is { } tc && tc >= warm;
+            t.Sub.Text = show ? $"{temp:0} °C" : "";
+            if (show) t.Sub.Foreground = Frozen(temp >= warm + 12 ? Hot : Warm);
         }
 
         void ShowPeak(VTile t, string label, bool show)
@@ -864,7 +884,7 @@ public partial class NotchWindow
             row.Root.BeginAnimation(Canvas.TopProperty, new DoubleAnimation(i * VRowH, TimeSpan.FromMilliseconds(420)) { EasingFunction = Out, BeginTime = stagger });
             if (row.Root.Opacity < 1 || fresh) row.Root.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(260)) { BeginTime = stagger });
             if (swap && row.Root.RenderTransform is TranslateTransform tt) tt.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(320)) { EasingFunction = Out, BeginTime = stagger });
-            if (!fresh && a.Count > 1) row.Name.Text = $"{a.Display} ×{a.Count}";
+            if (!fresh && a.Count > 1) row.Name.ToolTip = $"{a.Path ?? a.Name} · {a.Count} processes";
 
             double share = _vMetric == VMetric.Ram ? v / ramTop : v / 100;
             double load = _vMetric == VMetric.Ram && _vSnap is { } s ? v * 1048576.0 / Math.Max(1, s.MemTotal) * 2.5 : v / 100;
@@ -968,7 +988,7 @@ public partial class NotchWindow
             int bars = c.Online ? Math.Clamp(c.SignalBars ?? (c.IsWifi ? 0 : 5), 0, 5) : 0;
             int lit = c.IsWifi ? (int)Math.Ceiling(bars * 4 / 5.0) : c.Online ? 4 : 0;
             _vBars!.Visibility = c.IsWifi ? Visibility.Visible : Visibility.Collapsed;
-            var on = lit <= 1 ? Warm : look.Neon ? Hue(VMetric.Net) : Colors.White;
+            var on = lit <= 1 ? Warm : Colors.White;
             for (int i = 0; i < _vBars.Children.Count; i++)
                 ((SolidColorBrush)((Rectangle)_vBars.Children[i]).Fill).BeginAnimation(SolidColorBrush.ColorProperty,
                     new ColorAnimation(i < lit ? on : Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF), TimeSpan.FromMilliseconds(300)) { BeginTime = TimeSpan.FromMilliseconds(40 * i) });
@@ -977,7 +997,7 @@ public partial class NotchWindow
                 long typical = c.TypicalMs ?? ms;
                 bool shaky = c.JitterMs is >= 30;
                 _vNetPing!.Text = $"{ms} ms";
-                _vNetPing.Foreground = Frozen(typical < 60 && !shaky ? Calm : typical < 150 ? Warm : Hot);
+                _vNetPing.Foreground = Frozen(typical < 60 && !shaky ? look.Label : typical < 150 ? Warm : Hot);
                 _vNetPing.ToolTip = c.JitterMs is { } j ? $"{Loc.T("Typical")} {typical} ms · {Loc.T("jitter")} {j} ms" : null;
             }
             else
@@ -1001,7 +1021,7 @@ public partial class NotchWindow
         else
         {
             _vBatGlyph!.Text = _power.PluggedIn ? "\uE945" : "\uE83F";
-            _vBatGlyph.Foreground = Frozen(_power.Percent <= 20 && !_power.PluggedIn ? Hot : _power.PluggedIn ? Calm : look.Accent);
+            _vBatGlyph.Foreground = Frozen(_power.Percent <= 20 && !_power.PluggedIn ? Hot : look.Accent);
             string state =
                 b == null ? "" :
                 b.Full || (_power.PluggedIn && _power.Percent >= 99) ? Loc.T("full") :
@@ -1011,7 +1031,7 @@ public partial class NotchWindow
                 b.TimeLeft is { } tl ? string.Format(Loc.T("{0} left"), SystemMonitor.Duration(tl)) : "";
             _vBatText!.Text = state.Length > 0 ? $"{_power.Percent}% · {state}" : $"{_power.Percent}%";
             _vBatText.ToolTip = b?.WattsNow is { } w ? (b.Charging ? $"Charging at {w:0.#} W" : $"Using {w:0.#} W") : null;
-            if (b?.HealthPercent is { } h)
+            if (b?.HealthPercent is { } h && h < 80) // the battery's health only once it's worn
             {
                 _vBatSide!.Text = string.Format(Loc.T("{0}% health"), h.ToString("0"));
                 _vBatSide.Foreground = Frozen(h >= 80 ? look.Label : h >= 60 ? Warm : Hot);
@@ -1039,7 +1059,7 @@ public partial class NotchWindow
         if (_vSnap is { } snap)
         {
             var u = snap.Uptime;
-            _vUptime.Text = u.TotalDays >= 1 ? $"{(int)u.TotalDays}d {u.Hours}h" : $"{u.Hours}h {u.Minutes:00}m";
+            _vUptime.Text = UpFor(u);
         }
         var (head, sub, c) = Verdict();
         if (_vHeadline.Text != head)
@@ -1052,8 +1072,12 @@ public partial class NotchWindow
             string tag = c == Calm ? "OK" : c == Hot ? "CRIT" : c == Warm ? "WARN" : "SCAN";
             _vTagText.Text = tag;
             var d0 = TimeSpan.FromMilliseconds(260);
-            ((SolidColorBrush)_vTag.BorderBrush).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(c, d0));
-            ((SolidColorBrush)_vTag.Background).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(c, d0));
+            // calm: a quiet outline; only a warning fills in with its colour
+            bool quiet = c == Calm || tag == "SCAN";
+            var tone = quiet ? CyCyan : c;
+            _vTagText.Foreground = Frozen(quiet ? A(CyCyan, 0xD0) : CyNight);
+            ((SolidColorBrush)_vTag.BorderBrush).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(quiet ? A(tone, 0x70) : tone, d0));
+            ((SolidColorBrush)_vTag.Background).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(quiet ? A(tone, 0x14) : tone, d0));
             if (c == Hot && !Eco)
                 _vTag.BeginAnimation(OpacityProperty, new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, KeyFrames = { new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)), new DiscreteDoubleKeyFrame(0.3, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(500))), new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(800))) } });
             else { _vTag.BeginAnimation(OpacityProperty, null); _vTag.Opacity = 1; }
@@ -1097,6 +1121,8 @@ public partial class NotchWindow
     }
 
     string? _vSubRaw;
+
+    static string UpFor(TimeSpan u) => u.TotalDays >= 1 ? $"{(int)u.TotalDays}d {u.Hours}h" : $"{u.Hours}h {u.Minutes:00}m";
 
     /// <summary>Marks the first place each of these appears (for <see cref="Emphasize"/>), whatever the language's word order.</summary>
     static string Mark(string text, params string[] what)
@@ -1153,11 +1179,8 @@ public partial class NotchWindow
         string calm = _cyber ? "SYSTEMS NOMINAL" : Loc.T("Running smoothly");
         // calm: an app only worth naming when it's really doing something; otherwise the PC's headroom at a glance
         if (byCpu is { Cpu: >= 10 }) return (calm, Busiest(byCpu), Calm);
-        var bits = new List<string>();
-        if (r?.CpuTemp is { } t0) bits.Add(string.Format(Loc.T("CPU {0}"), $"*{t0:0} °C*"));
-        bits.Add(string.Format(Loc.T("{0} memory free"), $"*{(s.MemTotal - s.MemUsed) / 1073741824.0:0.#} GB*"));
-        if (c is { Online: true, PingMs: { } pm }) bits.Add(string.Format(Loc.T("{0} ping"), $"*{pm} ms*"));
-        return (calm, string.Join(" · ", bits), Calm);
+        // the tiles already show the numbers: the line only says how long the PC has been on
+        return (calm, string.Format(Loc.T("On for {0}"), $"*{UpFor(s.Uptime)}*"), Calm);
 
         static string Busiest(AppLoad.App a) => string.Format(Loc.T("{0} is the busiest · {1} CPU"), $"*{a.Display}*", $"*{a.Cpu:0}%*");
     }

@@ -136,21 +136,24 @@ public partial class NotchWindow
             if (!_settings.SystemAlerts) return;
             // decoding a full-size screenshot takes 50–150 ms: never on the UI thread
             var thumb = await Task.Run(() => IconHelper.Thumbnail(path, 96));
-            ShowOsd("screenshot", null, null, "Screenshot saved", "Click to open · also in your clipboard", null,
+            ShowOsd("screenshot", null, null, Loc.T("Screenshot"), Loc.T("Saved and copied"), null,
                 art: thumb, seconds: 3, onClick: () => OpenPath(path));
         };
 
         _notifications.Received += t =>
         {
+            KeepToast(t); // for the AI ("what did I miss?"): the last few, in memory only
             if (!_settings.NotificationAlerts) return;
             if (TryRingFromToast(t)) return; // "Incoming call": shown as ringing, not as a message
             if (_focus.IsOn) { _focus.Hold(t.App); return; } // kept for the end-of-focus summary
             if (_inMeeting || _hidden || _mode == Mode.Expanded) return;
+            var (drop, show) = TidyToast(t); // repeats dropped, wordy ones in a few words (NotchWindow.AlertTidy)
+            if (drop) return;
             // a burst of messages rings once, not ten times in a row
             if ((DateTime.UtcNow - _lastToast.At).TotalSeconds > 2) _notificationSound.Play();
             _lastToast = (t.App, DateTime.UtcNow);
             PalReact(Controls.Companion.Act.Point, 2.8); // the companion points up at it
-            ShowToast(t); // told the short way, in the app's colour (NotchWindow.AlertStory)
+            if (show != null) show(); else ShowToast(t); // told the short way, in the app's colour (NotchWindow.AlertStory)
         };
     }
 
@@ -685,7 +688,7 @@ public partial class NotchWindow
             await Task.Delay(900);
             if (version != _clipVersion || _mode == Mode.Expanded) return;
         }
-        if (_osd?.Kind == "screenshot" || (DateTime.UtcNow - _lastScreenshotAt).TotalSeconds < 3) return; // the screenshot alert already says it
+        if (_osd?.Kind == "screenshot" || (DateTime.UtcNow - _lastScreenshotAt).TotalSeconds < 3 || (DateTime.UtcNow - _screenshotToastAt).TotalSeconds < 4) return; // the screenshot alert already says it
         // only the start matters for an 80-character preview (a 10 MB log shouldn't be split on the UI thread)
         string preview = text != null
             ? string.Join(" ", (text.Length > 400 ? text[..400] : text).Split(new[] { '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries))

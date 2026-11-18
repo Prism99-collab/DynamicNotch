@@ -1163,7 +1163,7 @@ public partial class NotchWindow
         CloseCallSheet(instant: true);
         if (_settings.CallHistory && length.TotalSeconds >= 10)
         {
-            _history.Insert(0, new CallLog(call.Name, call.Path, call.Key, call.Started, (int)length.TotalSeconds));
+            _history.Insert(0, new CallLog(call.Name, call.Path, call.Key, call.Started, (int)length.TotalSeconds, _callWith));
             if (_history.Count > 30) _history.RemoveRange(30, _history.Count - 30);
             SaveCallHistory();
         }
@@ -1181,7 +1181,7 @@ public partial class NotchWindow
 
     // ───────────────────────────── history ─────────────────────────────
 
-    sealed record CallLog(string Name, string? Path, string Key, DateTime Start, int Seconds);
+    sealed record CallLog(string Name, string? Path, string Key, DateTime Start, int Seconds, string? With = null);
     List<CallLog> _history = new();
     static string HistoryFile => System.IO.Path.Combine(Settings.Folder, "calls.json");
 

@@ -135,6 +135,7 @@ public partial class NotchWindow
         RefreshBase();
         if (switched) { BuildCallButtons(); UpdateCallsPage(); return; }
         OnCallBegan();
+        RememberCallPeople(); // who it's with, from the call window's title
         AppLog.Write($"call started: {name}");
         ShowOsd("call", icon == null ? "" : null, null, _cyber && answered ? Loc.T("LINK ESTABLISHED") : "On a call", name, null, art: icon, glyphBrush: Green,
             seconds: 2.6, motion: Motion.Pulse, onClick: () => ExpandTo(0));

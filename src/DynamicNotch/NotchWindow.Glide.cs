@@ -37,6 +37,7 @@ public partial class NotchWindow
     void Glide(ScrollViewer sv, MouseWheelEventArgs e)
     {
         if (e.Handled || sv.ScrollableHeight <= 0) return;
+        if (ReferenceEquals(sv, _chatScroll) || ReferenceEquals(sv, _chatHistScroll)) return; // the chat scrolls itself
         if (e.OriginalSource is DependencyObject src && (FindParent<PillSlider>(src) != null || FindParent<ColorWheel>(src) != null)) return;
         // the innermost list scrolls (a list inside a list keeps its own wheel)
         if (e.OriginalSource is DependencyObject o && FindParent<ScrollViewer>(o) is { } inner && !ReferenceEquals(inner, sv) && inner.ScrollableHeight > 0) return;

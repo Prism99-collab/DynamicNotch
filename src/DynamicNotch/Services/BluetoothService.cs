@@ -51,6 +51,9 @@ public sealed class BluetoothService
     }
 
     /// <summary>The device to name on the Bluetooth tile: audio first, then controllers / phones, mice and keyboards last.</summary>
+    /// <summary>Every Bluetooth device connected now (with its battery when it reports one).</summary>
+    public IReadOnlyList<BtDevice> ConnectedDevices { get { try { return _devices.Values.Where(d => d.Connected && d.Name.Length > 0).ToList(); } catch { return Array.Empty<BtDevice>(); } } }
+
     public BtDevice? Primary => _devices.Values.Where(d => d.Connected && d.Name.Length > 0)
         .OrderBy(d => d.IsQuietInput ? 2 : d.Category.StartsWith("Audio", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
         .FirstOrDefault();

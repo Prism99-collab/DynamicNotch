@@ -1,6 +1,6 @@
 # Privacy policy
 
-*Dynamic Notch · updated 13 November 2026 (version 2.3)*
+*Dynamic Notch · updated 18 November 2026 (version 2.8)*
 
 Dynamic Notch has no account, no ads, no analytics and no telemetry. Nothing about you or your PC is sent to the
 developer or to anyone else.
@@ -21,6 +21,7 @@ All of this stays on your PC.
 | Battery, Wi-Fi, Bluetooth, brightness and audio devices | For the controls and alerts |
 | Start menu apps, recent files, and the names of files and folders on your drives | For the search |
 | The windows you have open | So the search can take you to them |
+| Your files, browser history and other PC details | Only when you ask the AI chat something that needs them |
 
 ## What it keeps
 
@@ -33,6 +34,7 @@ Only on your PC, in `%APPDATA%\DynamicNotch`:
 - how often you open things from the search and what you searched lately, so they show up first;
 - a list of file and folder names on your drives, with their dates (never what's inside them), so the search can find
   files anywhere. Windows, program and app-data folders are left out. You can turn this off in Preferences → Search;
+- your AI chats, the few facts you ask it to remember, and your AI key (encrypted with your Windows account);
 - the overload log;
 - technical logs (`app.log`, `error.log`).
 
@@ -45,6 +47,12 @@ You can delete any of it, and uninstalling removes it.
 - **Dropped links:** a picture or file link dropped on the shelf is downloaded.
 - **Search:** web searches, maps, translations and questions for AI assistants open in your browser, and only when
   you press Enter. What you typed goes to that site and is covered by its own privacy policy.
+- **AI chat (only if you use it):** your messages, and what it looks up for them (a file it read, a web page, the
+  notch's own records), go to the AI service whose key you entered (Google AI Studio by default, or OpenRouter),
+  under that service's privacy policy. Web searches it runs go to Google, Brave, DuckDuckGo or Wikipedia. Pictures it
+  makes are drawn by Pollinations from the description. Your key is only ever sent to its own service.
+- **Shorter alerts (with an AI key, can be turned off):** the text of a long alert from an app (never a message from a
+  person) is sent to the same AI service to be put in a few words.
 - **Browser extension (optional):** talks to the app only on your own PC (`127.0.0.1`, port 47853), and only about
   tabs that play media.
 

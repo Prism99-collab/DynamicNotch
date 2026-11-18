@@ -441,6 +441,7 @@ public partial class NotchWindow
         {
             "Open windows" => "Switch",
             "Web" => "Search",
+            "AI" => "Ask",
             "Clipboard & shelf" => "Copy",
             _ when hit.Key == "answer" || hit.Swatch != null => "Copy",
             _ when hit.Big => "Do it",
@@ -462,7 +463,7 @@ public partial class NotchWindow
     void FitLauncher()
     {
         if (!_launcherOpen || _launchScroll == null) return;
-        double want = ExpandedSize.Height;
+        double want = ExpandedSize.Height + _chatExtra;
         if (_launchScroll.Visibility == Visibility.Visible)
         {
             double body = Math.Max(_listHeight, _paneOn ? PaneNeed : 0);
@@ -478,7 +479,7 @@ public partial class NotchWindow
     void FollowLauncherEdge()
     {
         if (_launchFootRow == null) return;
-        double y = _launcherOpen ? Math.Min(0, _sh.Value - ExpandedSize.Height) : 0;
+        double y = _launcherOpen ? Math.Min(0, _sh.Value - ExpandedSize.Height - _chatExtra) : 0;
         if (Math.Abs(_footShift.Y - y) > 0.05) _footShift.Y = y;
     }
 

@@ -60,10 +60,21 @@ volume 30 and dark mode           turn off bluetooth  shut down in an hour
 ```
 
 Each instruction shows what it will do, and nothing happens until you press Enter. Everything runs on your PC,
-except web searches and questions you choose to send to an AI assistant.
+except web searches and what you ask the AI chat.
 
 If you keep your desktop icons hidden, the search shows your desktop instead, so nothing gets lost.
 You can change the shortcut and what the search looks through in **Preferences → Search**.
+
+### AI chat
+
+Press <kbd>Tab</kbd> in the search, or pick **Ask AI**. The first time, it shows you how to get a free key from
+Google AI Studio (it takes a minute).
+
+Ask it anything. It searches the web when it needs to, finds and reads your files, makes Word, Excel and PDF files and
+pictures, and does things on your PC: `close discord and set volume to 30`, `what's using my CPU?`, `make a table of my
+calls today`. It also knows what the notch knows, like your reminders, notifications and headset battery.
+
+Anything risky waits for your OK first, and you can turn off web use or PC actions from its ⋯ menu.
 
 ### Also
 
