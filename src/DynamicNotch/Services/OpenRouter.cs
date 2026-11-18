@@ -30,7 +30,15 @@ public static partial class OpenRouter
     }
 
     /// <summary>What one turn of the AI came back with.</summary>
-    public sealed record Turn(string Text, List<ToolCall> Calls, string? Error, string? Model);
+    public sealed record Turn(string Text, List<ToolCall> Calls, string? Error, string? Model)
+    {
+        /// <summary>The tokens Google counted for this turn (what was sent plus what came back), when it said.</summary>
+        public int Tokens { get; init; }
+        /// <summary>The provider's own error, word for word (Google says which allowance ran out in it).</summary>
+        public string? ErrorBody { get; init; }
+        /// <summary>The provider's rate headers (Groq: requests left today, tokens left this minute, when they refill).</summary>
+        public Dictionary<string, string>? Headers { get; init; }
+    }
 
     /// <summary>
     /// Sends the conversation and streams the answer: <paramref name="onText"/> gets each new piece of the reply,
@@ -39,7 +47,7 @@ public static partial class OpenRouter
     public static async Task<Turn> Stream(string key, string model, JsonArray messages, JsonArray? tools,
         Action<string> onText, Action? onThinking, CancellationToken cancel, double? temperature = null, string? effort = null)
     {
-        if (IsGemini) return await StreamGemini(key, model, messages, tools, onText, onThinking, cancel, temperature, effort);
+        if (IsGemini) return await StreamSmart(model, messages, tools, onText, onThinking, cancel, temperature, effort); // Google + Groq
         bool plain = model == "openrouter/free-plain"; // the fallback: OpenRouter's own free pick, no list
         if (plain) model = DefaultModel;
         var body = new JsonObject
@@ -61,12 +69,64 @@ public static partial class OpenRouter
     }
 
     /// <summary>One request, its answer streamed: shared by both providers (they speak the same chat format).</summary>
-    static async Task<Turn> Send(string endpoint, string key, JsonObject body, Action<string> onText, Action? onThinking, CancellationToken cancel, bool gemini)
+    /// <summary>What OpenRouter says about the key: its plan, credits left (null: no limit set), daily free requests.</summary>
+    public sealed record KeyAccount(bool FreeTier, double? CreditsLeft, double Used, int FreePerDay);
+    static (KeyAccount Info, DateTime At)? _account;
+
+    public static async Task<KeyAccount?> OpenRouterAccount()
     {
-        string who = gemini ? "Google" : "OpenRouter";
+        if (_account is { } a && DateTime.UtcNow - a.At < TimeSpan.FromMinutes(5)) return a.Info;
+        if (LoadOpenRouterKey() is not { } key) return null;
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, "https://openrouter.ai/api/v1/key");
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            using var res = await Http.SendAsync(req, cts.Token);
+            if (!res.IsSuccessStatusCode) return null;
+            var d = JsonNode.Parse(await res.Content.ReadAsStringAsync(cts.Token))?["data"];
+            bool free = d?["is_free_tier"]?.GetValue<bool>() ?? true;
+            double? left = d?["limit_remaining"] is JsonValue lv && lv.TryGetValue(out double l) ? l : null;
+            double used = d?["usage"] is JsonValue uv && uv.TryGetValue(out double u) ? u : 0;
+            var info = new KeyAccount(free, left, used, free ? 50 : 1000); // OpenRouter: 50 free-model requests a day, 1000 once credit was bought
+            _account = (info, DateTime.UtcNow);
+            return info;
+        }
+        catch { return null; }
+    }
+
+    static DateTime _warmedAt;
+
+    /// <summary>
+    /// Opens the connection to the AI ahead of the first message (the secure handshake takes a moment): called when
+    /// the chat opens. Once a minute at most; nothing is asked, nothing counts.
+    /// </summary>
+    public static void Warm()
+    {
+        if ((DateTime.UtcNow - _warmedAt).TotalSeconds < 60 || !HasKey) return;
+        _warmedAt = DateTime.UtcNow;
+        string host = IsGemini ? "https://generativelanguage.googleapis.com/" : "https://openrouter.ai/";
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(6));
+                using var req = new HttpRequestMessage(HttpMethod.Head, host);
+                using var res = await Http.SendAsync(req, cts.Token);
+            }
+            catch { }
+            if (IsGemini) try { await GeminiModels(); } catch { }
+        });
+    }
+
+    static async Task<Turn> Send(string endpoint, string key, JsonObject body, Action<string> onText, Action? onThinking, CancellationToken cancel, bool gemini, bool groq = false)
+    {
+        string who = groq ? "Groq" : gemini ? "Google" : "OpenRouter";
+        Dictionary<string, string>? rate = null;
         var text = new StringBuilder();
         var calls = new SortedDictionary<int, ToolCall>();
         string? usedModel = null;
+        int tokens = 0;
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Post, endpoint)
@@ -77,10 +137,12 @@ public static partial class OpenRouter
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
             timeout.CancelAfter(TimeSpan.FromSeconds(40)); // until the answer starts
             using var res = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            rate = res.Headers.Where(h => h.Key.StartsWith("x-ratelimit", StringComparison.OrdinalIgnoreCase)).ToDictionary(h => h.Key.ToLowerInvariant(), h => h.Value.FirstOrDefault() ?? "");
             if (!res.IsSuccessStatusCode)
             {
                 string err = await res.Content.ReadAsStringAsync(cancel);
-                if (gemini) return new Turn("", new(), ExplainGemini((int)res.StatusCode, err), null);
+                if (groq) return new Turn("", new(), ExplainGroq((int)res.StatusCode, err), null) { ErrorBody = err, Headers = rate };
+                if (gemini) return new Turn("", new(), ExplainGemini((int)res.StatusCode, err), null) { ErrorBody = err };
                 if ((int)res.StatusCode == 400 && body.ContainsKey("models") && !cancel.IsCancellationRequested) return new Turn("", new(), "retry-plain", null);
                 return new Turn("", new(), Explain((int)res.StatusCode, err), null);
             }
@@ -109,9 +171,10 @@ public static partial class OpenRouter
                 if (node["error"] is JsonObject e)
                 {
                     int code = e["code"] is JsonValue ev && ev.TryGetValue(out int c0) ? c0 : 0;
-                    return new Turn(text.ToString(), new(), gemini ? ExplainGemini(code, e.ToJsonString()) : Friendly(code, e["message"]?.ToString() ?? "Something went wrong"), usedModel);
+                    return new Turn(text.ToString(), new(), groq ? ExplainGroq(code, new JsonObject { ["error"] = e.DeepClone() }.ToJsonString()) : gemini ? ExplainGemini(code, e.ToJsonString()) : Friendly(code, e["message"]?.ToString() ?? "Something went wrong"), usedModel) { ErrorBody = e.ToJsonString(), Headers = rate };
                 }
                 usedModel ??= node["model"]?.ToString();
+                if (node["usage"]?["total_tokens"] is JsonValue tv && tv.TryGetValue(out int total)) tokens = total; // it grows as it writes: the last one counts
                 if (node["choices"] is not JsonArray choices || choices.Count == 0) continue;
                 var delta = choices[0]?["delta"];
                 if (delta == null) continue;
@@ -136,11 +199,11 @@ public static partial class OpenRouter
                         if (tc["extra_content"] is JsonNode extra) call.Extra = extra.DeepClone();
                     }
             }
-            if (cancel.IsCancellationRequested) return new Turn(text.ToString(), new(), null, usedModel);
+            if (cancel.IsCancellationRequested) return new Turn(text.ToString(), new(), null, usedModel) { Tokens = tokens };
             foreach (var c in calls.Values) if (c.Id.Length == 0) c.Id = "call_" + Guid.NewGuid().ToString("N")[..12];
-            return new Turn(text.ToString(), calls.Values.Where(c => c.Name.Length > 0).ToList(), null, usedModel);
+            return new Turn(text.ToString(), calls.Values.Where(c => c.Name.Length > 0).ToList(), null, usedModel) { Tokens = tokens, Headers = rate };
         }
-        catch (Exception) when (cancel.IsCancellationRequested) { return new Turn(text.ToString(), new(), null, usedModel); }
+        catch (Exception) when (cancel.IsCancellationRequested) { return new Turn(text.ToString(), new(), null, usedModel) { Tokens = tokens }; }
         catch (OperationCanceledException) { return new Turn(text.ToString(), new(), $"No answer from {who} in time. Check your connection and try again.", usedModel); }
         catch (HttpRequestException) { return new Turn(text.ToString(), new(), $"Can't reach {who}. Check your internet connection.", usedModel); }
         catch (Exception ex) { AppLog.Write("ai: " + ex.Message); return new Turn(text.ToString(), new(), "Something went wrong: " + ex.Message, usedModel); }
@@ -199,6 +262,25 @@ public static partial class OpenRouter
     /// <summary>Speech to text: the recording, written down word for word in the language it was spoken.</summary>
     public static async Task<(string Text, string? Error)> Transcribe(string key, string model, byte[] wav, CancellationToken cancel)
     {
+        // Google: the model asked first, then the next ones that can hear, until one writes it down
+        if (IsGemini && !model.StartsWith("#") && GroqKeyIfUsable() is { } groqKey)
+        {
+            var heard = await TranscribeGroq(groqKey, wav, cancel);
+            if (heard.Error == null || !HasGeminiKey || cancel.IsCancellationRequested) return heard;
+        }
+        if (IsGemini && !model.StartsWith("#") && HasGeminiKey)
+        {
+            var chain = await GeminiChain(model, audio: true);
+            (string Text, string? Error) last = ("", "No Google model can hear speech right now.");
+            foreach (var id in chain.Take(5))
+            {
+                last = await Transcribe(key, "#" + id, wav, cancel);
+                if (last.Error == null || cancel.IsCancellationRequested) return last;
+                if (last.Error.Contains("key", StringComparison.OrdinalIgnoreCase) && last.Error.Contains("accept", StringComparison.OrdinalIgnoreCase)) return last;
+            }
+            return last;
+        }
+        model = model.TrimStart('#');
         var body = new JsonObject
         {
             ["model"] = model,
@@ -217,9 +299,12 @@ public static partial class OpenRouter
         var (json, error) = await Post(IsGemini ? GeminiEndpoint : Endpoint, key, body, TimeSpan.FromSeconds(40), cancel);
         if (error != null)
         {
+            if (IsGemini && error.StartsWith("quota-day")) AiUsage.MarkFull(model, key);
+            if (IsGemini && error.StartsWith("unsupported")) { if (error.StartsWith("unsupported retired") || error.StartsWith("unsupported denied")) AiUsage.Retire(model, key); return ("", "That model can't hear speech."); }
             if (IsGemini && error.StartsWith("quota")) { Spend(model, error.StartsWith("quota-day")); return ("", "That model's free requests are used up for now: try again (another one will listen)."); }
             return ("", error);
         }
+        if (IsGemini) AiUsage.Count(model, key);
         string text = json?["choices"]?[0]?["message"]?["content"]?.ToString() ?? "";
         return (text.Trim().Trim('"', '“', '”'), null);
     }
@@ -326,6 +411,7 @@ public static partial class OpenRouter
     public static async Task<bool?> CheckKey(string key)
     {
         if (KindOf(key) == "gemini") return await CheckGeminiKey(key);
+        if (KindOf(key) == "groq") return await CheckGroqKey(key);
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, "https://openrouter.ai/api/v1/key");
@@ -379,7 +465,7 @@ public static partial class OpenRouter
 
     // ───────────────────────────── the key, encrypted for this Windows user ─────────────────────────────
 
-    static string KeyFile => IsGemini ? GeminiKeyFile : OpenRouterKeyFile;
+    static string KeyFile => IsGemini ? (HasGeminiKey || !HasGroqKey ? GeminiKeyFile : GroqKeyFile) : OpenRouterKeyFile;
 
     /// <summary>Is there a key for the provider in use?</summary>
     public static bool HasKey => File.Exists(KeyFile);
@@ -408,9 +494,14 @@ public static partial class OpenRouter
             Directory.CreateDirectory(Settings.Folder);
             var sealedBytes = Protect(Encoding.UTF8.GetBytes(key));
             if (sealedBytes == null) return false;
-            File.WriteAllBytes(kind == "gemini" ? GeminiKeyFile : OpenRouterKeyFile, sealedBytes);
-            Provider = kind;
-            if (kind == "gemini") _gemini = null;
+            File.WriteAllBytes(kind == "gemini" ? GeminiKeyFile : kind == "groq" ? GroqKeyFile : OpenRouterKeyFile, sealedBytes);
+            // Google and Groq work as one (the smart router); OpenRouter on its own
+            Provider = kind == "openrouter" ? "openrouter" : "gemini";
+            _groq = null;
+            // a new key: nothing carried over from the old one (its used-up models, its list, its account)
+            _gemini = null;
+            _account = null;
+            lock (_gate) _exhausted.Clear();
             return true;
         }
         catch { return false; }

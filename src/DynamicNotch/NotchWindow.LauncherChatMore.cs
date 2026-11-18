@@ -182,10 +182,17 @@ public partial class NotchWindow
         if (_chatModelChip == null) return;
         if (OpenRouter.IsGemini)
         {
-            var models = await OpenRouter.GeminiModels();
-            var g = new List<(string, string, string?, bool, Action)> { ("\uE945", "Auto", "The best that still has free requests today", ChatModel == OpenRouter.DefaultModel, () => SetModel(OpenRouter.DefaultModel)) };
+            var models = OpenRouter.HasGeminiKey ? (await OpenRouter.GeminiModels()).Where(m => !OpenRouter.IsRetired(m.Id)).ToList() : new();
+            var g = new List<(string, string, string?, bool, Action)> { ("\uE945", "Auto", OpenRouter.HasGroqKey && OpenRouter.HasGeminiKey ? "Picks Google or Groq by the question, each covers for the other" : "The best that still has free requests today", ChatModel == OpenRouter.DefaultModel, () => SetModel(OpenRouter.DefaultModel)) };
             foreach (var m in models)
                 g.Add(("\uE950", m.Name, m.Id.Contains("flash-lite") ? "Fast · hears and sees · ~500 free a day" : m.Id.StartsWith("gemma") ? "Most free requests · ~1,500 a day" : m.Id.Contains("flash") ? "Smartest · only ~20 free a day" : m.Id, ChatModel == m.Id, () => SetModel(m.Id)));
+            if (OpenRouter.HasGroqKey)
+            {
+                g.Add(("", "-", null, false, () => { }));
+                foreach (var q in await OpenRouter.GroqModels())
+                    g.Add(("\uE945", "Groq · " + q.Name, "Very fast · tools · ~1,000 a day", ChatModel == "groq:" + q.Id, () => SetModel("groq:" + q.Id)));
+            }
+            else g.Add(("\uE710", "Add Groq (free, faster)…", "A second engine that covers for Google", false, () => ChatGroqCard()));
             g.Add(("", "-", null, false, () => { }));
             g.Add(("\uE713", "All AI settings…", null, false, () => { CloseLauncher(giveBack: false); PreferencesWindow.ShowFor(this, PreferencesWindow.AiSection); }));
             Menu(_chatModelChip, g);

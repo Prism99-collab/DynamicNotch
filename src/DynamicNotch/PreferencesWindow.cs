@@ -1095,7 +1095,7 @@ public sealed class PreferencesWindow : Window
 
         // ── who answers
         Services.OpenRouter.Choose(_s.AiProvider);
-        Choice(Loc.T("The AI runs on"), new[] { ("gemini", Loc.T("Google Gemini (free, thousands of requests a day)")), ("openrouter", Loc.T("OpenRouter (many models; 50 free a day)")) },
+        Choice(Loc.T("The AI runs on"), new[] { ("gemini", Loc.T("Google Gemini + Groq (free, thousands of requests a day)")), ("openrouter", Loc.T("OpenRouter (many models; 50 free a day)")) },
             () => Services.OpenRouter.IsGemini ? "gemini" : "openrouter", v => { _s.AiProvider = v; Services.OpenRouter.Choose(v); RenderContent(); });
 
         // ── the key
@@ -1131,7 +1131,7 @@ public sealed class PreferencesWindow : Window
         async void Check()
         {
             string raw = pw.Password.Trim();
-            var m = System.Text.RegularExpressions.Regex.Match(raw, @"AIza[0-9A-Za-z_\-]{30,}|AQ\.[0-9A-Za-z_\-]{30,}|sk-or-[A-Za-z0-9_\-]{20,}");
+            var m = System.Text.RegularExpressions.Regex.Match(raw, @"AIza[0-9A-Za-z_\-]{30,}|AQ\.[0-9A-Za-z_\-]{30,}|gsk_[A-Za-z0-9]{20,}|sk-or-[A-Za-z0-9_\-]{20,}");
             string key = m.Success ? m.Value : raw;
             result.Visibility = Visibility.Visible;
             if (key.Length < 32 || key.Contains(' '))
@@ -1173,6 +1173,76 @@ public sealed class PreferencesWindow : Window
         links.Children.Add(forget);
         box.Children.Add(links);
         _content.Children.Add(CardOf(box, new Thickness(18, 16, 18, 16)));
+
+        // ── Groq: the second engine (free, very fast); it shares the work with Google and covers for it
+        if (Services.OpenRouter.IsGemini)
+        {
+            Label(Loc.T("Second engine: Groq (optional, free)"));
+            var gbox = new StackPanel();
+            var gstate = new TextBlock { FontSize = 13, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 2) };
+            var ghelp = new TextBlock { FontSize = 12, Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) };
+            void GroqState()
+            {
+                bool has = Services.OpenRouter.HasGroqKey, refused = Services.OpenRouter.GroqRefused;
+                gstate.Text = refused ? Loc.T("Groq didn't accept its key") : has ? "✓  " + Loc.T("Groq connected: it shares the work with Google") : Loc.T("Not added");
+                gstate.Foreground = refused ? Frozen(Color.FromRgb(0xFF, 0xB0, 0x20)) : has ? Frozen(Color.FromRgb(0x30, 0xD1, 0x58)) : Text;
+                ghelp.Text = has && !refused
+                    ? Loc.T("Quick questions and commands go to Groq (it answers in under a second), big or visual ones to Google, and each takes over when the other is busy, used up or down.")
+                    : Loc.T("1. Open console.groq.com/keys and sign in (free).  2. Click “Create API Key” and copy it.  3. Paste it below and press Check & save. It makes the AI faster and gives it a second daily allowance.");
+            }
+            GroqState();
+            gbox.Children.Add(gstate);
+            gbox.Children.Add(ghelp);
+            var gfield = new Grid();
+            gfield.ColumnDefinitions.Add(new ColumnDefinition());
+            gfield.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var gpw = new PasswordBox { Background = Brushes.Transparent, Foreground = Text, CaretBrush = Text, BorderThickness = new Thickness(0), FontSize = 12.5, VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(10, 7, 10, 7) };
+            var gHint = new TextBlock { Text = "gsk_…", Foreground = Frozen(Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)), IsHitTestVisible = false, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+            gpw.PasswordChanged += (_, _) => gHint.Visibility = gpw.Password.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+            var gHost = new Grid();
+            gHost.Children.Add(gpw);
+            gHost.Children.Add(gHint);
+            gfield.Children.Add(new Border { CornerRadius = new CornerRadius(9), Background = Faint, BorderBrush = Edge, BorderThickness = new Thickness(1), Child = gHost, Margin = new Thickness(0, 0, 8, 0) });
+            var gresult = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 8, 0, 0), Visibility = Visibility.Collapsed };
+            Button gcheck = null!;
+            async void GroqCheck()
+            {
+                var gm = System.Text.RegularExpressions.Regex.Match(gpw.Password.Trim(), @"gsk_[A-Za-z0-9]{20,}");
+                gresult.Visibility = Visibility.Visible;
+                if (!gm.Success) { gresult.Foreground = Frozen(Color.FromRgb(0xFF, 0xB0, 0x20)); gresult.Text = Loc.T("That isn't a Groq key: it starts with gsk_."); return; }
+                gcheck.IsEnabled = false;
+                gresult.Foreground = Dim;
+                gresult.Text = Loc.T("Checking with Groq…");
+                bool? ok = await Services.OpenRouter.CheckKey(gm.Value);
+                gcheck.IsEnabled = true;
+                if (ok == false) { gresult.Foreground = Frozen(Color.FromRgb(0xFF, 0xB0, 0x20)); gresult.Text = Loc.T("Groq says this key isn't valid. Create a new one and paste it here."); return; }
+                if (!Services.OpenRouter.SaveKey(gm.Value)) { gresult.Foreground = Frozen(Color.FromRgb(0xFF, 0xB0, 0x20)); gresult.Text = Loc.T("Couldn't save the key on this PC."); return; }
+                gpw.Password = "";
+                _s.AiProvider = "gemini";
+                _s.AiGroqAsked = true;
+                Services.OpenRouter.Choose(_s.AiProvider);
+                gresult.Foreground = Frozen(Color.FromRgb(0x30, 0xD1, 0x58));
+                gresult.Text = ok == true ? Loc.T("Groq added: the two now share the work.") : Loc.T("Saved. It couldn't be checked right now: it's checked on first use.");
+                GroqState();
+                Saved();
+            }
+            gcheck = PillButton("\uE73E", Loc.T("Check & save"), GroqCheck, primary: true);
+            gpw.KeyDown += (_, e) => { if (e.Key == Key.Enter) GroqCheck(); };
+            Grid.SetColumn(gcheck, 1);
+            gfield.Children.Add(gcheck);
+            gbox.Children.Add(gfield);
+            gbox.Children.Add(gresult);
+            var glinks = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
+            var gget = PillButton("\uE8A7", Loc.T("Get a Groq key"), () => Open("https://console.groq.com/keys"), primary: false);
+            gget.Margin = new Thickness(0, 0, 8, 0);
+            glinks.Children.Add(gget);
+            Button gforget = null!;
+            gforget = PillButton("\uE74D", Loc.T("Remove Groq"), () => { try { System.IO.File.Delete(System.IO.Path.Combine(Settings.Folder, "groq.key")); } catch { } GroqState(); gforget.IsEnabled = false; Saved(); }, primary: false);
+            gforget.IsEnabled = Services.OpenRouter.HasGroqKey;
+            glinks.Children.Add(gforget);
+            gbox.Children.Add(glinks);
+            _content.Children.Add(CardOf(gbox, new Thickness(18, 16, 18, 16)));
+        }
 
         // ── the model
         if (Services.OpenRouter.IsGemini)
@@ -1309,6 +1379,24 @@ public sealed class PreferencesWindow : Window
             clearMemo.HorizontalAlignment = HorizontalAlignment.Left;
             clearMemo.Margin = new Thickness(0, 0, 0, 6);
             _content.Children.Add(clearMemo);
+        }
+
+        // ── what it learned while working (how things get done here, this person's habits)
+        int learned = Services.AiLearn.Count;
+        Label(Loc.T("What it learned on this PC"));
+        _content.Children.Add(new TextBlock
+        {
+            Text = learned == 0 ? Loc.T("Nothing yet: it learns how things get done here as it works (which steps worked, your corrections, your habits).")
+                : string.Format(Loc.T("{0} ways of doing things and lessons, used to get it right faster next time. Kept on this PC."), learned),
+            FontSize = 11.5, Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 0, 0, 6),
+        });
+        if (learned > 0)
+        {
+            Button forgetLearned = null!;
+            forgetLearned = PillButton("\uE74D", Loc.T("Forget what it learned"), () => { Services.AiLearn.Clear(); forgetLearned.IsEnabled = false; Saved(); }, primary: false);
+            forgetLearned.HorizontalAlignment = HorizontalAlignment.Left;
+            forgetLearned.Margin = new Thickness(0, 0, 0, 6);
+            _content.Children.Add(forgetLearned);
         }
 
         // ── kept chats

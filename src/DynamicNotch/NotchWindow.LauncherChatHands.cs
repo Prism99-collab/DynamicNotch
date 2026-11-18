@@ -35,13 +35,13 @@ public partial class NotchWindow
         {
             case "look":
             case "read":
-                return await Task.Run(() => LookAt(hwnd, title), cancel);
+                return await Limited(() => LookAt(hwnd, title), "Error: the app isn't responding (its window couldn't be read). Try 'see', or wait a moment.");
 
             case "see":
             {
                 if (!await Front(hwnd)) return $"Error: couldn't bring {title} to the front to see it.";
                 await Task.Delay(150, cancel);
-                var jpeg = await Task.Run(() => Snap(hwnd), cancel);
+                var jpeg = await Limited(() => Snap(hwnd), (byte[]?)null);
                 if (jpeg == null) return "Error: couldn't take a picture of the window.";
                 _pendingSight = jpeg;
                 return $"A picture of {title} comes right after this, as an image: look at it to check.";
@@ -52,12 +52,12 @@ public partial class NotchWindow
             case "open":
             case "select":
             {
-                var (el, kind, name) = await Task.Run(() => FindElement(hwnd, target), cancel);
+                var (el, kind, name) = await Limited(() => FindElement(hwnd, target), ((AutomationElement?)null, "", ""));
                 if (el == null) return $"Error: nothing called “{target}” in {title}. Look again: it may have another name, or be further down (scroll).";
                 if (RiskyButton.IsMatch(name) && _settings.AiAsk != "never" && await ConfirmInChat($"Press “{name}” in {AppOf(title)}", title, cancel) == 0)
                     return "The user declined: it wasn't pressed.";
                 if (!await Front(hwnd)) return $"Error: couldn't bring {title} to the front.";
-                string how = await Task.Run(() => Press(el, kind));
+                string how = await Limited(() => Press(el, kind), "Error: the app didn't respond to the press.");
                 await Task.Delay(450, cancel); // the app reacts
                 return how.StartsWith("Error") ? how : $"{how} {kind} “{name}”. Look or see to check what happened.";
             }
@@ -69,9 +69,9 @@ public partial class NotchWindow
                 if (!await Front(hwnd)) return $"Error: couldn't bring {title} to the front, so nothing was typed.";
                 if (target.Trim().Length > 0)
                 {
-                    var (el, kind, _) = await Task.Run(() => FindElement(hwnd, target), cancel);
+                    var (el, kind, _) = await Limited(() => FindElement(hwnd, target), ((AutomationElement?)null, "", ""));
                     if (el == null) return $"Error: no box called “{target}”. Look again.";
-                    await Task.Run(() => { try { el.SetFocus(); } catch { Press(el, kind); } });
+                    await Limited(() => { try { el.SetFocus(); } catch { Press(el, kind); } return true; }, false);
                     await Task.Delay(120, cancel);
                 }
                 if (!StillFront(hwnd)) return "Error: the app lost the front, so nothing was typed.";
@@ -112,6 +112,13 @@ public partial class NotchWindow
                 return await Front(hwnd) ? $"{title} is in front." : $"Error: couldn't bring {title} to the front.";
         }
         return "Error: action must be look, see, click, type, keys, scroll or focus.";
+    }
+
+    /// <summary>A UI Automation call with a time limit: an app that isn't responding doesn't hold the AI.</summary>
+    static async Task<T> Limited<T>(Func<T> work, T ifHung, int seconds = 8)
+    {
+        var task = Task.Run(work);
+        return await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(seconds))) == task ? await task : ifHung;
     }
 
     static string AppOf(string title) => title.Contains(" - ") ? title[(title.LastIndexOf(" - ") + 3)..] : title;

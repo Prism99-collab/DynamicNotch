@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using DynamicNotch.Services;
+using static DynamicNotch.Interop.Native;
 
 namespace DynamicNotch;
 
@@ -229,14 +230,61 @@ public partial class NotchWindow
     // ───────────────────────────── the notch tells you ─────────────────────────────
 
     /// <summary>The answer came while the chat wasn't on screen: the notch says so; a click brings the chat back.</summary>
+    string? _lastProblem;                 // why the last answer couldn't finish (set by ChatProblem)
+    DateTime _askedAt = DateTime.Now;     // when the last question was sent
+    System.Windows.Threading.DispatcherTimer? _noticeLater;
+
+    /// <summary>
+    /// The AI finished while you were somewhere else (another app, the notch closed, the chat window behind): the notch
+    /// says so, with a sound: done, with the answer's first line, or couldn't finish, and why. A click brings the
+    /// chat back. If the notch can't speak right now (a game, a presentation, a meeting), it says it as soon as it can.
+    /// </summary>
     void AnswerReady(string answer, bool acted)
     {
-        bool seen = _launcherOpen && _chatMode || _pop is { IsActive: true } || _pop is { WindowState: not WindowState.Minimized, IsVisible: true } && _pop.IsActive;
-        if (seen || answer.Length == 0 && !acted) return;
-        string first = Regex.Replace(answer.Split('\n').FirstOrDefault(l => l.Trim().Length > 0) ?? "Done", @"[*`#>_\[\]]", "").Trim();
-        if (first.Length > 70) first = first[..69] + "…";
-        ShowOsd("ai", "", null, _cyber ? "AI // DONE" : "AI · answer ready", first, null, glyphBrush: Frozen(ChatAccent), seconds: 5, force: true, prio: Prio.Normal,
-            onClick: ReopenChat);
+        if (ChatInFront()) { _lastProblem = null; return; }
+        bool failed = answer.Length == 0 && _lastProblem != null;
+        if (answer.Length == 0 && !acted && !failed) return;
+        string line = failed ? _lastProblem! : Regex.Replace(answer.Split('\n').FirstOrDefault(l => l.Trim().Length > 0) ?? "Done", @"[*`#>_\[\]]", "").Trim();
+        if (line.Length > 70) line = line[..69] + "…";
+        _lastProblem = null;
+        var took = DateTime.Now - _askedAt;
+        string right = took.TotalSeconds < 60 ? $"{took.TotalSeconds:0}s" : $"{(int)took.TotalMinutes}m";
+        string title = failed ? (_cyber ? "AI // COULDN'T FINISH" : "AI · couldn't finish") : acted ? (_cyber ? "AI // TASK DONE" : "AI · task done") : (_cyber ? "AI // ANSWER READY" : "AI · answer ready");
+        void Tell()
+        {
+            ShowOsd("ai", failed ? "\uE7BA" : "\uE73E", null, title, line, right, glyphBrush: Frozen(failed ? Warn : Ok), seconds: 8, force: true, prio: Prio.High, onClick: ReopenChat);
+            try { _notificationSound.Play(); } catch { }
+            if (!failed) PalReact(Controls.Companion.Act.Pump, 2.4);
+        }
+        // in a game, presenting, or in a meeting: said as soon as that's over (for up to 20 minutes)
+        _noticeLater?.Stop();
+        if (InGame || _presenter || SilencedByMeeting("ai", force: false))
+        {
+            var until = DateTime.Now.AddMinutes(20);
+            _noticeLater = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            _noticeLater.Tick += (_, _) =>
+            {
+                if (DateTime.Now > until || ChatInFront()) { _noticeLater?.Stop(); return; }
+                if (InGame || _presenter || SilencedByMeeting("ai", force: false)) return;
+                _noticeLater?.Stop();
+                Tell();
+            };
+            _noticeLater.Start();
+            return;
+        }
+        Tell();
+    }
+
+    /// <summary>Is the chat actually in front of you (not just open behind another app)?</summary>
+    bool ChatInFront()
+    {
+        try
+        {
+            var fg = GetForegroundWindow();
+            if (_pop is { IsVisible: true, WindowState: not WindowState.Minimized } && new System.Windows.Interop.WindowInteropHelper(_pop).Handle == fg) return true;
+            return _launcherOpen && _chatMode && fg == _hwnd;
+        }
+        catch { return false; }
     }
 
     void ReopenChat()

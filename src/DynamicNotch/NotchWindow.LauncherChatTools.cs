@@ -23,7 +23,7 @@ public partial class NotchWindow
     static JsonArray? _chatTools;
 
     static readonly string[] WebToolNames = { "web_search", "read_webpage", "research", "news" };
-    static readonly string[] MemoryTools = { "remember", "forget" };
+    static readonly string[] MemoryTools = { "remember", "forget", "learn" };
 
     /// <summary>The tools Preferences allow: acting on the PC, the web, both, or none (then it only talks).</summary>
     JsonArray? ChatToolsFor()
@@ -56,12 +56,15 @@ public partial class NotchWindow
       {"type":"function","function":{"name":"web_search","description":"A quick web search: titles, links and snippets only (prefer research to actually answer).","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}}},
       {"type":"function","function":{"name":"read_webpage","description":"Read the text of a web page.","parameters":{"type":"object","properties":{"url":{"type":"string"}},"required":["url"]}}},
       {"type":"function","function":{"name":"run_powershell","description":"Run a PowerShell script on this PC and get its output. For anything Windows can do that the other tools don't cover: settings, system info, processes, services, files in bulk, network, apps (winget), registry reads. Prefer one clear script. Risky scripts are shown to the user to approve first.","parameters":{"type":"object","properties":{"script":{"type":"string","description":"PowerShell code"},"why":{"type":"string","description":"In a few words, what it does (shown to the user)"}},"required":["script","why"]}}},
+      {"type":"function","function":{"name":"youtube","description":"Find real YouTube videos or live streams (titles, channels, real links) and open the best one. live: true for live streams. open: false to only list them. Use it for any video, clip, stream or 'watch' request. Never write a YouTube link yourself: only links this returns are real.","parameters":{"type":"object","properties":{"query":{"type":"string"},"live":{"type":"boolean"},"open":{"type":"boolean"}},"required":["query"]}}},
+      {"type":"function","function":{"name":"play_music","description":"Play a song, artist, album, playlist, podcast or video in one step, and it's checked that it started. where: 'spotify' (opens Spotify on the search and plays the top result), 'youtube' (opens and plays the first video), or empty to pick (Spotify when it's installed). Always use this to play something: never open the app and click through it with use_app.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"What to play, as you'd search it: 'lofi beats', 'Daft Punk Get Lucky', 'chill jazz playlist'"},"where":{"type":"string","enum":["","spotify","youtube"]}},"required":["query"]}}},
       {"type":"function","function":{"name":"use_app","description":"Work any open app like a person, with its own buttons, boxes and lists (normal apps, browsers and web-based apps like Discord, Teams, WhatsApp, Spotify, Settings). action: 'look' lists what's on screen in the app, numbered (buttons, text boxes, list items, tabs, links) plus the text shown; 'click' presses one (target = its number from the last look, or its name); 'type' types text (target = the box's number or name, or leave it empty to type where the cursor is); 'keys' presses keys or shortcuts in order (text = 'ctrl+k' or 'ctrl+k, enter'); 'scroll' (text = up or down); 'see' gives you a picture of the window to check with your own eyes; 'focus' brings it to the front. Work in small steps and look or see after each action that changes something.","parameters":{"type":"object","properties":{"app":{"type":"string","description":"The app's name (discord, chrome, spotify, settings...); it must be open"},"action":{"type":"string","enum":["look","click","type","keys","scroll","see","focus"]},"target":{"type":"string","description":"For click/type: the number from the last look, or the name on it"},"text":{"type":"string","description":"For type: the text. For keys: the keys. For scroll: up or down"}},"required":["app","action"]}}},
       {"type":"function","function":{"name":"manage_window","description":"Focus, minimise, maximise, restore or close an app's windows.","parameters":{"type":"object","properties":{"app":{"type":"string","description":"The app's name, e.g. 'chrome', 'word', 'discord'"},"action":{"type":"string","enum":["focus","minimize","maximize","restore","close"]}},"required":["app","action"]}}},
       {"type":"function","function":{"name":"notify","description":"Show a short message on the notch (a pop-up at the top of the screen), e.g. when a long task is done or the user asked to be told something.","parameters":{"type":"object","properties":{"title":{"type":"string","description":"A few words"},"text":{"type":"string","description":"One short line"}},"required":["title"]}}},
       {"type":"function","function":{"name":"recent_notifications","description":"The notifications the PC received lately (app, title, text, time), newest first. For 'what did I miss?' or finding a message.","parameters":{"type":"object","properties":{}}}},
       {"type":"function","function":{"name":"browser_history","description":"What the user downloaded or visited in their browsers (Brave, Chrome, Edge, Vivaldi, Opera; every profile). Use it for 'what did I download', 'that site I visited yesterday', 'find the page about X'.","parameters":{"type":"object","properties":{"kind":{"type":"string","enum":["downloads","visits"]},"browser":{"type":"string","description":"brave, chrome, edge, vivaldi, opera, or any"},"search":{"type":"string","description":"Words to look for in titles, addresses or file names (optional)"},"days":{"type":"integer","description":"How far back, in days (default 7)"}},"required":["kind"]}}},
       {"type":"function","function":{"name":"notch_page","description":"Open the notch on one of its pages: home (music), system (CPU, memory, apps), tools, clipboard (clipboard and files), colors, settings, calls.","parameters":{"type":"object","properties":{"page":{"type":"string"}},"required":["page"]}}},
+      {"type":"function","function":{"name":"learn","description":"Save a short lesson about how to get things done on THIS PC or how this user wants them done, after a correction or after finding what works (e.g. 'Spotify here is in French: play buttons are named Lire', 'When the user says the group, they mean the Discord group nox, Vareth, Natar'). One rule, one sentence. Not for facts about the user's life (use remember).","parameters":{"type":"object","properties":{"lesson":{"type":"string"}},"required":["lesson"]}}},
       {"type":"function","function":{"name":"remember","description":"Save a lasting fact about the user (a preference, their work, a place, how they like things done). Not passwords or secrets.","parameters":{"type":"object","properties":{"fact":{"type":"string","description":"One short sentence, e.g. 'Prefers answers in French'"}},"required":["fact"]}}},
       {"type":"function","function":{"name":"forget","description":"Forget saved facts about the user that contain these words.","parameters":{"type":"object","properties":{"about":{"type":"string"}},"required":["about"]}}},
       {"type":"function","function":{"name":"pc_status","description":"What's going on on the PC right now: the time, battery, volume, the song playing, the open windows, memory and free disk space, reminders.","parameters":{"type":"object","properties":{}}}}
@@ -106,6 +109,7 @@ public partial class NotchWindow
                 string t = Arg("target").Trim();
                 if (t.Length == 0) return "Error: nothing to open.";
                 bool url = Regex.IsMatch(t, @"^(https?|mailto):", RegexOptions.IgnoreCase);
+                if (url && !Real(t, Seen(_session))) return "Error: that link wasn't found by a search or given by the user (it may not exist). For videos and streams use the youtube tool; for anything else, research first.";
                 string path = url ? t : ExpandPath(t);
                 if (!url && !File.Exists(path) && !Directory.Exists(path)) return "Error: not found: " + path;
                 try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); return "Opened " + path; }
@@ -159,6 +163,8 @@ public partial class NotchWindow
             case "run_powershell": return await RunPowerShell(Arg("script"), Arg("why"), cancel);
             case "manage_window": return ManageWindow(Arg("app"), Arg("action"));
             case "use_app": return await UseApp(Arg("app"), Arg("action"), Arg("target"), Arg("text"), cancel);
+            case "play_music": return await PlayMusic(Arg("query"), Arg("where"), cancel);
+            case "youtube": return await YouTubeTool(Arg("query"), Arg("live").Equals("true", StringComparison.OrdinalIgnoreCase), !Arg("open").Equals("false", StringComparison.OrdinalIgnoreCase), cancel);
             case "notify":
             {
                 string title = Arg("title").Trim(), text = Arg("text").Trim();
@@ -174,6 +180,11 @@ public partial class NotchWindow
                 return await Task.Run(() => BrowserHistory.Query(browser, kind, search, days));
             }
             case "notch_page": return OpenNotchPage(Arg("page"));
+            case "learn":
+            {
+                string kept = AiLearn.Lesson(Arg("lesson"));
+                return kept;
+            }
             case "remember":
             {
                 string kept = AiMemory.Remember(Arg("fact"));
@@ -428,7 +439,7 @@ public partial class NotchWindow
     static string ToolGlyph(string name) => name switch
     {
         "browser_history" => "\uE774", "notch_page" => "\uE7F4", "notch_data" => "\uE81C", "create_image" => "\uEB9F", "undo_last" => "\uE7A7",
-        "run_powershell" => "\uE756", "manage_window" => "\uE737", "use_app" => "\uE7C9", "notify" => "\uEA8F", "recent_notifications" => "\uEA8F", "remember" => "\uE8F1", "forget" => "\uE8F1",
+        "run_powershell" => "\uE756", "manage_window" => "\uE737", "use_app" => "\uE7C9", "play_music" => "\uE8D6", "youtube" => "\uE714", "notify" => "\uEA8F", "recent_notifications" => "\uEA8F", "remember" => "\uE8F1", "learn" => "\uE82F", "forget" => "\uE8F1",
         "do_on_pc" => "\uE945", "find_files" => "", "read_file" => "", "list_folder" => "", "write_file" => "",
         "open" => "\uE8A7", "clipboard" => "\uE77F", "web_search" => "\uE774", "read_webpage" => "\uE774", "research" => "\uE721", "news" => "\uE789", _ => "",
     };
@@ -466,9 +477,12 @@ public partial class NotchWindow
             "run_powershell" => Why(argsJson),
             "manage_window" => "Window: " + a,
             "use_app" => AppStep(argsJson),
+            "youtube" => System.Text.Json.Nodes.JsonNode.Parse(argsJson) is { } yn ? $"YouTube{(yn["live"]?.ToString() == "true" ? " live" : "")}: “{yn["query"]}”" : "YouTube",
+            "play_music" => System.Text.Json.Nodes.JsonNode.Parse(argsJson) is { } pn ? $"Playing “{pn["query"]}”{(pn["where"]?.ToString() is { Length: > 0 } w ? " on " + char.ToUpperInvariant(w[0]) + w[1..] : "")}" : "Playing",
             "notify" => "Notifying on the notch",
             "recent_notifications" => "Reading your notifications",
             "remember" => "Remembering: " + a,
+            "learn" => "Learned: " + a,
             "forget" => "Forgetting: " + a,
             _ => name,
         };

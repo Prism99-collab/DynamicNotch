@@ -146,13 +146,14 @@ public partial class NotchWindow
     }
 
     /// <summary>Under an answer: which model wrote it, how long it took, how many steps it took (small, dim).</summary>
-    void AnswerFooter(ChatBubble bubble, string? model, TimeSpan took, int steps)
+    void AnswerFooter(ChatBubble bubble, string? model, TimeSpan took, int steps, int tokens = 0)
     {
-        string name = model == null || model == OpenRouter.DefaultModel ? "" : OpenRouter.IsGemini && !model.Contains('/') ? OpenRouter.GeminiName(model) : model.Contains('/') ? model[(model.IndexOf('/') + 1)..] : model;
+        string name = model == null || model == OpenRouter.DefaultModel ? "" : model.StartsWith("groq:") ? OpenRouter.GroqName(model) : OpenRouter.IsGemini && !model.Contains('/') ? OpenRouter.GeminiName(model) : model.Contains('/') ? model[(model.IndexOf('/') + 1)..] : model;
         var parts = new List<string>();
         if (name.Length > 0) parts.Add(name);
         parts.Add(took.TotalSeconds < 10 ? $"{took.TotalSeconds:0.0} s" : $"{took.TotalSeconds:0} s");
         if (steps > 0) parts.Add(steps == 1 ? "1 step" : $"{steps} steps");
+        if (tokens > 0) parts.Add(tokens >= 1000 ? $"{tokens / 1000.0:0.#}K tokens" : $"{tokens} tokens");
         var line = new TextBlock
         {
             Text = string.Join("  ·  ", parts), FontSize = 9.5, Margin = new Thickness(0, 4, 0, 0), FontFamily = _cyber ? CyFont : UiText,
@@ -173,7 +174,7 @@ public partial class NotchWindow
             "research" or "web_search" or "read_webpage" => "web", "news" => "news", "browser_history" => "browser",
             "find_files" or "read_file" or "list_folder" => "files", "write_file" => "a file", "create_image" => "a picture",
             "notch_data" or "notch_page" or "notify" or "recent_notifications" => "the notch",
-            "run_powershell" => "PowerShell", "use_app" => "an app", "do_on_pc" or "manage_window" or "clipboard" or "pc_status" => "the PC", "remember" or "forget" => "memory", _ => n,
+            "run_powershell" => "PowerShell", "use_app" => "an app", "play_music" => "music", "do_on_pc" or "manage_window" or "clipboard" or "pc_status" => "the PC", "remember" or "forget" => "memory", _ => n,
         }).Distinct());
         var chevron = new TextBlock { Text = "\uE76C", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 9, Foreground = Frozen(A(acc, 0xC0)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 1, 6, 0), RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform(0) };
         var label = new TextBlock { Text = $"{count} steps  ·  {kinds}", FontSize = 11, Foreground = Frozen(Color.FromArgb(0xC0, 0xFF, 0xFF, 0xFF)), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, FontFamily = _cyber ? CyFont : UiText };

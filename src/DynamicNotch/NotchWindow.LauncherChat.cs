@@ -248,6 +248,8 @@ public partial class NotchWindow
             StartSession(null);
         if (resume && _session == null && _settings.AiHistory && ChatStore.List().FirstOrDefault() is { } last && ChatStore.Load(last.Id) is { } s) StartSession(s);
         _chatMode = true;
+        OpenRouter.Warm(); // the first answer doesn't wait for the handshake
+        OpenRouter.CompactSystem ??= CompactSystemPrompt; // Groq's short instructions
         OpenRouter.Choose(_settings.AiProvider);
         _ = OpenRouter.IsGemini ? OpenRouter.GeminiModels() : (Task)OpenRouter.Models();
         WireWebSearch();
@@ -375,7 +377,8 @@ public partial class NotchWindow
 
     static string ModelName(string id) => id switch
     {
-        OpenRouter.DefaultModel => OpenRouter.IsGemini ? "Gemini · Auto" : "Free",
+        OpenRouter.DefaultModel => OpenRouter.IsGemini ? (OpenRouter.HasGeminiKey && OpenRouter.HasGroqKey ? "Auto · Google + Groq" : OpenRouter.HasGroqKey && !OpenRouter.HasGeminiKey ? "Groq · Auto" : "Gemini · Auto") : "Free",
+        _ when id.StartsWith("groq:") => OpenRouter.GroqName(id),
         _ when OpenRouter.IsGemini && !id.Contains('/') => OpenRouter.GeminiName(id),
         _ => id.Contains('/') ? id[(id.IndexOf('/') + 1)..].Replace(":free", " (free)") : id,
     };
@@ -468,6 +471,8 @@ public partial class NotchWindow
 
         // the greeting (NotchWindow.LauncherChatGreeting)
         box.Children.Add(Greeting());
+        // what's left of the free AI today (NotchWindow.LauncherChatQuota)
+        if (QuotaCard() is { } quota) box.Children.Add(quota);
 
         // what it could do right now, as cards
         var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2, Margin = new Thickness(0, 0, 0, 0) };
@@ -547,6 +552,8 @@ public partial class NotchWindow
     /// <summary>A Google (AIza…) or OpenRouter (sk-or-…) key in what was pasted (quotes, spaces, "Bearer", text around it are fine).</summary>
     string? KeyIn(string text)
     {
+        var q = Regex.Match(text, @"gsk_[A-Za-z0-9]{20,}");
+        if (q.Success) return q.Value;
         var g = Regex.Match(text, @"AIza[0-9A-Za-z_\-]{30,}|AQ\.[0-9A-Za-z_\-]{30,}");
         if (g.Success) return g.Value;
         var m = Regex.Match(text, @"sk-or-[A-Za-z0-9_\-]{20,}");
@@ -1036,6 +1043,7 @@ public partial class NotchWindow
 
     async void SendChat(string text)
     {
+        if (KeyIn(text) is { } groqKey && groqKey.StartsWith("gsk_") && text.Trim().Length < 120 && _keyBox == null) { if (_launchBox != null) _launchBox.Text = ""; GroqKeyPasted(groqKey); return; } // the second engine, added on the spot
         if (KeyIn(text) is { } pasted && text.Trim().Length < 120) { _chatAwaitingKey = true; if (_keyBox == null) ChatSetupCard(); if (_keyBox != null) _keyBox.Password = pasted; return; }
         if (text.StartsWith('/') && ChatCommand(text)) return;
         if (!OpenRouter.HasKey || OpenRouter.LoadKey() is not { } key)
@@ -1073,8 +1081,11 @@ public partial class NotchWindow
         foreach (var w in _chatStack?.Children.OfType<FrameworkElement>().Where(x => x.Tag as string == "welcome").ToList() ?? new()) _chatStack!.Children.Remove(w); // the welcome makes way
         ChatUser(text, attached: attachedName, pictures: pictures, at: DateTime.Now);
         UpdateChatHeader();
+        if (pictures.Count == 0 && attachedName == null && await TryInstant(text, session)) return; // NotchWindow.LauncherChatInstant
 
         _chatBusy = true;
+        _askedAt = DateTime.Now;
+        _lastProblem = null;
         ChatKeys();
         _chatCancel?.Dispose();
         _chatCancel = new CancellationTokenSource();
@@ -1086,9 +1097,11 @@ public partial class NotchWindow
         bool acted = false;
         _turnSources.Clear();
         var startedAt = DateTime.Now;
-        int stepCount = 0;
+        int stepCount = 0, tokenCount = 0;
+        var turnSteps = new List<(string Tool, string Args, bool Ok)>(); // what it did, for what it learns (AiLearn)
         int turnStart = _chatStack?.Children.Count ?? 0;
         var stepNames = new List<string>();
+        DispatcherTimer? liveTick = null;
         try
         {
             for (int round = 0; round <= ChatToolRounds; round++)
@@ -1109,10 +1122,11 @@ public partial class NotchWindow
                     string shown = CleanAnswer(live.ToString(), streaming: true);
                     if (shown.Length == 0) { bubble.Thinking(true); return; } // only its thinking so far
                     bubble.Thinking(false);
-                    RenderMarkdown(bubble.Body, shown + " ▍", streaming: true);
+                    RenderMarkdown(bubble.Body, shown, streaming: true);
                     FollowChat();
                 };
                 tick.Start();
+                liveTick = tick;
                 var tools = round < ChatToolRounds ? ChatToolsFor() : null;
                 OpenRouter.Turn turn;
                 int attempt = 0;
@@ -1138,7 +1152,8 @@ public partial class NotchWindow
                 tick.Stop();
                 bubble.Thinking(false);
                 if (OpenRouter.IsGemini && turn.Error == null && turn.Model is { Length: > 0 } usedModel) model = usedModel; // the rest of this answer stays on it
-                string said = CleanAnswer(turn.Text);
+                tokenCount += turn.Tokens;
+                string said = KeepRealLinks(CleanAnswer(turn.Text), session); // a link no tool found and you didn't give can't reach you
                 if (said.Length > 0) { RenderMarkdown(bubble.Body, said); bubble.Answer = said; }
                 else _chatStack?.Children.Remove(bubble.Root);
 
@@ -1152,7 +1167,8 @@ public partial class NotchWindow
                 {
                     // the question stays unanswered: taken back, so it can simply be asked again
                     if (round == 0 && session.Messages.Count > 0 && session.Messages[^1]?["role"]?.ToString() == "user") session.Messages.RemoveAt(session.Messages.Count - 1);
-                    if (turn.Error.Contains("/key")) { OpenRouter.ForgetKey(); _chatPending = text; ChatSetupCard($"{OpenRouter.ProviderName} didn't accept the saved key: paste a new one."); }
+                    if (turn.Error.Contains("/key") && await OpenRouter.CheckKey(key) == false) { OpenRouter.ForgetKey(); _chatPending = text; ChatSetupCard($"{OpenRouter.ProviderName} didn't accept the saved key: paste a new one."); }
+                    else if (turn.Error.Contains("/key")) ChatProblem($"{OpenRouter.ProviderName} turned this request down, but the key itself is fine (it was checked). Try again in a moment.", round == 0 ? ("Try again", () => SendChat(text)) : null);
                     else ChatProblem(turn.Error, turn.Error.StartsWith("Today's 50") ? ("Add credit", () => OpenLink("https://openrouter.ai/settings/credits")) : turn.Error.StartsWith("Today's free Google") ? null : round == 0 ? ("Try again", () => SendChat(text)) : null);
                     break;
                 }
@@ -1163,8 +1179,11 @@ public partial class NotchWindow
                     {
                         _chatLastAnswer = finalAnswer = said;
                         ShowSources(bubble);
-                        AnswerFooter(bubble, turn.Model ?? model, DateTime.Now - startedAt, stepCount);
+                        AnswerFooter(bubble, turn.Model ?? model, DateTime.Now - startedAt, stepCount, tokenCount);
+                        bubble.Finished?.Invoke();
                         ShowFollowUps(bubble, FollowUps(turn.Text));
+                        // it got done: how, kept for next time
+                        if (_settings.AiMemory && turnSteps.Count > 0 && turnSteps[^1].Ok) AiLearn.Record(text, turnSteps, (DateTime.Now - startedAt).TotalSeconds);
                         if (stepCount >= 2) FoldSteps(turnStart, stepCount, stepNames, DateTime.Now - startedAt);
                     }
                     break;
@@ -1190,7 +1209,14 @@ public partial class NotchWindow
                     {
                         _pendingUndo = null;
                         _pendingCards.Clear();
-                        try { result = await RunTool(c.Name, c.Args.ToString(), cancel); }
+                        try
+                        {
+                            var running = RunTool(c.Name, c.Args.ToString(), cancel);
+                            // a step that hangs (an app not responding, a stuck command) is let go, and the AI told so
+                            var finished = await Task.WhenAny(running, Task.Delay(TimeSpan.FromSeconds(c.Name is "run_powershell" or "create_image" or "write_file" ? 150 : 75), cancel));
+                            result = finished == running ? await running : "Error: the step took too long and was stopped (the app or command didn't respond). Try another way.";
+                        }
+                        catch (OperationCanceledException) when (cancel.IsCancellationRequested) { result = "Cancelled by the user."; }
                         catch (Exception ex) { result = "Error: " + ex.Message; }
                         if (_pendingUndo is { } u && !result.StartsWith("Error")) AttachUndo(step, u);
                         _pendingUndo = null;
@@ -1200,7 +1226,9 @@ public partial class NotchWindow
                     acted = true;
                     if (result.Length > 12000) result = result[..12000] + "\n…(cut)";
                     string outcome = ToolOutcome(result);
-                    step.Done(outcome is not ("failed" or "didn't work" or "not run"), outcome == "done" ? null : outcome);
+                    bool stepOk = outcome is not ("failed" or "didn't work" or "not run");
+                    step.Done(stepOk, outcome == "done" ? null : outcome);
+                    turnSteps.Add((c.Name, c.Args.ToString(), stepOk));
                     session.Messages.Add(new JsonObject { ["role"] = "tool", ["tool_call_id"] = c.Id, ["content"] = result });
                 }
                 if (_pendingSight is { } sight)
@@ -1219,8 +1247,15 @@ public partial class NotchWindow
                 if (cancel.IsCancellationRequested) { ChatNote("\uE71A", "Stopped"); break; }
             }
         }
+        catch (Exception ex)
+        {
+            // nothing may leave the chat half-drawn: the problem is said, the question can be asked again
+            AppLog.Write("chat: " + ex);
+            try { ChatProblem("Something went wrong on this PC while answering (" + ex.GetBaseException().Message + ").", ("Try again", () => SendChat(text))); } catch { }
+        }
         finally
         {
+            liveTick?.Stop();
             _chatBusy = false;
             session.Updated = DateTime.Now;
             if (_settings.AiHistory && session.UserTurns > 0)
@@ -1265,6 +1300,9 @@ public partial class NotchWindow
             case "/history":
                 ShowChatView(ChatView.History);
                 return true;
+            case "/groq":
+                ChatGroqCard();
+                return true;
             case "/key":
                 OpenRouter.ForgetKey();
                 ChatSetupCard();
@@ -1304,12 +1342,16 @@ public partial class NotchWindow
         sb.AppendLine("How to work: 1) Understand what is really asked. 2) If it's about facts that change (news, prices, scores, weather, releases, people's roles, 'latest', 'today', anything after your training) or that you aren't sure of, look it up first with research or news: never answer such things from memory. 3) Call independent tools together in the same turn, and keep steps few: each step costs the user's limited daily requests. 4) Check what the tools returned; if a search finds nothing useful, try once with better words or another tool, then say plainly what you tried. 5) Answer the question in the first line, with specifics (names, numbers, dates, paths), then only what helps.");
         sb.AppendLine("You are the user's command center: you can see the notch's own records (notch_data), the PC (files, apps, windows, settings, browser history, PowerShell), and the web. RULES: 1) Never tell the user to go and check something themselves, never say you can't before trying: find it with your tools and answer with the actual details (names, times, durations, paths). 2) Questions about the user's calls, reminders, timer, focus, music, notifications, what they copied, the shelf, downloads or the PC's health: read notch_data first (with 'today' for a summary of their day). 3) Use notch_page only when the user asks to see a page. 4) If something truly isn't recorded, say exactly what is known and what isn't (e.g. a call's app and time are known, the person isn't).");
         sb.AppendLine("Reading between the lines: work out what the user means, not just the words. 'My setup', 'my gear', 'my stuff', 'my devices' = their peripherals (mouse, headset, keyboard, controller, earbuds), usually not the PC alone. A short follow-up ('not pc, I meant...', 'and the other one?', 'do it again', 'in French') changes the previous question: answer that again, corrected, without asking. When a question could mean several things, answer all of them in one table rather than picking one. Where to look, in this order: (1) LIVE NOW below, (2) notch_data, (3) the PC's tools, (4) the web. Never say the notch can't see something before checking LIVE NOW and notch_data. The user has no time to correct you twice: get it right the first time.");
+        sb.AppendLine("Understanding commands: users type fast, casual, misspelled, in any language or mixed (English, French, Darija, Spanish...). Read the intent, not the words: 'baisse le son' / 'nkss sout' = volume down, 'skip' / 'next' = next song, 'ferme discord' = close Discord, 'mets le pc en sombre' = dark mode on, 'wifi off', 'lance spotify' = open Spotify. When a request has several parts ('open spotify, play lofi and set volume 40'), do every part, in order, in one go. If a word could be an app, a file or a website, prefer what's on this PC. Ask back only when two very different actions both fit, in one short question with the choices.");
+        sb.AppendLine("Truth: never make up links, video IDs, file paths, names, numbers or facts. Use only what a tool returned or the user gave. Videos, clips, live streams: the youtube tool (real results), then give or open the one it found. If a tool found nothing, say so plainly.");
+        sb.AppendLine("Stay on topic: answer only what was asked. Mention LIVE NOW details (volume, music, batteries, calls) only when the question is about them.");
+        sb.AppendLine("Answering after doing something: one short line that says what changed, with the result ('Volume 40%, Spotify playing lofi.'), never 'I have successfully...', never steps you already showed. If something failed, say what and the one thing that would fix it. Don't repeat what the step lines already show.");
         sb.AppendLine("LIVE NOW (fresh from the notch, no tool needed):\n" + LiveNow());
         sb.AppendLine("Cards: when you give the user's device batteries, put the line [[card:batteries]] (it draws them as live meters) and keep your text to one short line beside it. When you tell how the PC is doing right now (processor, memory, disk), put [[card:pc]]. Never use a card for anything else.");
         sb.AppendLine("Next steps: end every answer that leads somewhere with a last line '>> a | b | c': two or three short things the user would likely want next, written as their own words (under 6 words each), e.g. '>> Close Chrome | Show top apps | Free up memory'. They become buttons. Skip it for small talk, and never offer what you can't do.");
         sb.AppendLine("The sources and files you use are shown to the user as cards automatically: don't list them at the end. Mention a source inline only when it matters (who said it, or when they disagree).");
         if (_settings.AiTools)
-            sb.AppendLine("Working apps like a personal assistant: you can use ANY app the user has, not just open it. To do something inside an app (call or message someone, play a song, change a setting, fill a form, find something in a website): 1) open it if it isn't (open), 2) use_app look to see its buttons and boxes, 3) act: click, type, keys; use the app's well-known shortcuts when they're faster (Discord, Slack, Teams: ctrl+k jumps to a person or channel; browsers: ctrl+l address bar, ctrl+t new tab; Spotify: ctrl+l search; most apps: ctrl+f find), 4) look again (or see, for a picture) after every step that changes the screen, and keep going until it's really done, 5) only then say it's done, in one line. Example, 'call Nostra on Discord': open discord → use_app keys 'ctrl+k' → type 'Nostra' → keys 'enter' (opens the DM) → look → click the button named like 'Start Voice Call' → look to confirm the call started. If a name matches several people, ask which one. Never claim something happened that you didn't check. Don't touch the user's mouse and keyboard for long: a few steps, then report.");
+            sb.AppendLine("Working apps like a personal assistant: you can use ANY app the user has, not just open it. To do something inside an app (call or message someone, play a song, change a setting, fill a form, find something in a website): 1) open it if it isn't (open), 2) use_app look to see its buttons and boxes, 3) act: click, type, keys; use the app's well-known shortcuts when they're faster (Discord, Slack, Teams: ctrl+k jumps to a person or channel; browsers: ctrl+l address bar, ctrl+t new tab; Spotify: ctrl+l search; most apps: ctrl+f find), 4) look again (or see, for a picture) after every step that changes the screen, and keep going until it's really done, 5) only then say it's done, in one line. To play music or a video, always use play_music (one step, checked), never use_app. Example, 'call Nostra on Discord': open discord → use_app keys 'ctrl+k' → type 'Nostra' → keys 'enter' (opens the DM) → look → click the button named like 'Start Voice Call' → look to confirm the call started. If a name matches several people, ask which one. Never claim something happened that you didn't check. Don't touch the user's mouse and keyboard for long: a few steps, then report.");
         if (_settings.AiTools)
         {
             sb.AppendLine("Acting: when the user asks for something on the PC, DO it with your tools; never just explain how. Pick the right tool: do_on_pc for the notch's own commands (volume, media, wifi, timers, reminders, focus, open/close apps, screenshots...); manage_window to focus, minimise, maximise or close a window; run_powershell for anything else Windows can do (settings, files, processes, system info, installs); find_files/read_file/list_folder for files; write_file to create documents (.docx, .xlsx, .pdf are real Word / Excel / PDF files: write the content as markdown, with a markdown table or CSV rows for .xlsx); create_image to make a picture from a description; undo_last when the user says to undo or take back what you did; browser_history for what was downloaded or visited in a browser (never guess from folders); notch_page to show one of the notch's pages; recent_notifications for messages the PC received; notify to show a short message on the notch (when a long job finishes, or the user asks to be told something). Chain steps until the task is really done, check results, and fix errors yourself before giving up. Then confirm in a few words what was done.");
@@ -1323,6 +1365,17 @@ public partial class NotchWindow
             sb.AppendLine("Memory: when the user tells you a lasting fact or preference about themselves, their work or how they want things done (not passwords or secrets), save it with remember. Use what you remember without being asked; update or forget facts that change.");
             var facts = AiMemory.All();
             if (facts.Count > 0) sb.AppendLine("What you remember about the user:\n- " + string.Join("\n- ", facts));
+        }
+        if (_settings.AiMemory)
+        {
+            // what it learned on this PC: its own lessons, this person's habits, and how similar requests got done before
+            sb.AppendLine("Learning: when the user corrects you ('no', 'not that', 'I meant…', 'pas ça', 'machi hadi'), or a way failed and another worked, fix it, then save the lesson with learn (one short rule about this PC or this user, e.g. 'Discord calls: open the DM with ctrl+k, then press Start Voice Call'). Use what you learned without being asked.");
+            var lessons = AiLearn.Lessons();
+            if (lessons.Count > 0) sb.AppendLine("Lessons you learned on this PC (follow them):\n- " + string.Join("\n- ", lessons.TakeLast(20)));
+            var habits = AiLearn.Habits();
+            if (habits.Count > 0) sb.AppendLine("This user's habits: " + string.Join("; ", habits) + ".");
+            var like = AiLearn.Like(_chatLastUser);
+            if (like.Count > 0) sb.AppendLine("Similar requests got done before like this (go straight to what worked, skip the failed steps, fewer looks):\n- " + string.Join("\n- ", like.Select(r => $"“{r.Ask}” → {r.Steps} ({r.Seconds:0} s{(r.Uses > 1 ? $", {r.Uses} times" : "")})")));
         }
         if (_settings.AiInstructions.Trim().Length > 0) sb.AppendLine("The user's own instructions (follow them): " + _settings.AiInstructions.Trim());
         return sb.ToString().TrimEnd();
@@ -1357,6 +1410,8 @@ public partial class NotchWindow
         public string Answer = "";
         public Action<bool>? OnThinking;
         public Action<string>? OnWord;
+        /// <summary>The answer is complete: a light runs down its edge.</summary>
+        public Action? Finished;
         public void Thinking(bool on) => OnThinking?.Invoke(on);
         public void Thinking(bool on, string word) { OnWord?.Invoke(word); OnThinking?.Invoke(on); }
     }
@@ -1491,7 +1546,23 @@ public partial class NotchWindow
         };
         var root = new Grid { Margin = new Thickness(0, 10, 18, 2), Background = Brushes.Transparent };
         root.Children.Add(rail);
+        // when it's done: a light runs down the edge, once
+        var shine = new Border
+        {
+            Width = 2, HorizontalAlignment = HorizontalAlignment.Left, Opacity = 0, IsHitTestVisible = false,
+            Background = Frozen(new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1), GradientStops = { new GradientStop(Colors.Transparent, 0), new GradientStop(Lighten(acc, 0.5), 0.5), new GradientStop(Colors.Transparent, 1) } }),
+        };
+        if (!_cyber) shine.Effect = new System.Windows.Media.Effects.DropShadowEffect { Color = acc, BlurRadius = 10, ShadowDepth = 0, Opacity = 0.9 };
+        root.Children.Add(shine);
         var bubble = new ChatBubble { Root = root, Body = body, Dots = dots, Extras = extras };
+        bubble.Finished = () =>
+        {
+            if (Eco) return;
+            var glow = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(900) };
+            glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(220)), new CubicEase { EasingMode = EasingMode.EaseOut }));
+            glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(900)), new CubicEase { EasingMode = EasingMode.EaseIn }));
+            shine.BeginAnimation(OpacityProperty, glow);
+        };
         string Plain() => System.Text.RegularExpressions.Regex.Replace(bubble.Answer, @"^\s*\[\[card:[a-z]+\]\]\s*$\n?", "", System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
         root.Children.Add(Actions(root, HorizontalAlignment.Right,
             ("\uE738", "Shorter", () => SendChat("Say that shorter.")),
@@ -1556,7 +1627,7 @@ public partial class NotchWindow
         "research" or "web_search" or "read_webpage" or "news" or "browser_history" => _cyber ? CyCyan : Color.FromRgb(0x5A, 0xB4, 0xFF),
         "find_files" or "read_file" or "list_folder" or "write_file" or "open" or "create_image" => _cyber ? CyYellow : Color.FromRgb(0xFF, 0xC4, 0x5A),
         "notch_data" or "notch_page" or "notify" or "recent_notifications" => _cyber ? CyMagenta : Color.FromRgb(0xC0, 0x8C, 0xFF),
-        "run_powershell" or "do_on_pc" or "manage_window" or "use_app" or "clipboard" or "pc_status" or "undo_last" => _cyber ? Color.FromRgb(0x00, 0xFF, 0xA3) : Color.FromRgb(0x5A, 0xE0, 0x9A),
+        "run_powershell" or "do_on_pc" or "manage_window" or "use_app" or "play_music" or "youtube" or "learn" or "clipboard" or "pc_status" or "undo_last" => _cyber ? Color.FromRgb(0x00, 0xFF, 0xA3) : Color.FromRgb(0x5A, 0xE0, 0x9A),
         _ => A(ChatAccent, 0xC0),
     };
 
@@ -1856,6 +1927,13 @@ public partial class NotchWindow
                 var full = Regex.Match(md, @"https?://(?:www\.|m\.)?" + Regex.Escape(url) + @"[^\s)\]]*");
                 if (MediaBlock(full.Success ? full.Value : "https://" + url, "Video", video: true) is { } v) doc.Blocks.Add(v);
             }
+        // still writing: a caret in the theme's colour after the last word
+        if (streaming)
+        {
+            var caret = new Run("\u2009▍") { Foreground = Frozen(_cyber ? CyYellow : Lighten(ChatAccent, 0.2)) };
+            if (doc.Blocks.LastBlock is Paragraph lastPara) lastPara.Inlines.Add(caret);
+            else doc.Blocks.Add(new Paragraph(caret) { Margin = new Thickness(0) });
+        }
         if (doc.Blocks.LastBlock is { } last) last.Margin = new Thickness(last.Margin.Left, last.Margin.Top, last.Margin.Right, 0);
     }
 

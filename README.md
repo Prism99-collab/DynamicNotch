@@ -67,8 +67,17 @@ You can change the shortcut and what the search looks through in **Preferences �
 
 ### AI chat
 
-Press <kbd>Tab</kbd> in the search, or pick **Ask AI**. The first time, it shows you how to get a free key from
-Google AI Studio (it takes a minute).
+Press <kbd>Tab</kbd> in the search, or pick **Ask AI**.
+
+**Setting it up (two minutes, free):**
+
+1. The first time you open the chat, it walks you through a free key from Google AI Studio: sign in, click
+   **Create API key**, copy it, paste it in the chat.
+2. Optional, but worth it: right after, it offers a second free key from **Groq** (console.groq.com/keys →
+   **Create API Key** → paste). Groq answers in under a second and takes over whenever Google is busy or used up.
+   You can also add it later with `/groq` or in **Settings → AI chat**.
+
+Both keys stay on your PC, encrypted for your Windows account. The chat's home page shows what's left for today.
 
 Ask it anything. It searches the web when it needs to, finds and reads your files, makes Word, Excel and PDF files and
 pictures, and does things on your PC and inside your apps: `call Sam on Discord`, `close discord and set volume to 30`, `what's using my CPU?`, `make a table of my

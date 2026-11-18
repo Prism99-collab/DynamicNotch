@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.11.0] — 2026-11-18
+
+The AI chat got a second engine, and got a lot quicker.
+
+### Added
+- Groq as a second, free AI engine (optional): quick questions and commands go to Groq and come back in under a
+  second, bigger or visual ones go to Google, and each takes over when the other is busy, used up or down, even in the
+  middle of a task. Add it when the chat offers, with /groq, or in Settings → AI chat.
+- Simple commands ("volume 30", "dark mode on", "open spotify and discord") are done at once, without waiting for the AI.
+- "Play lofi", "mets du jazz sur spotify": Spotify starts the song in one step, or YouTube plays the first video.
+- "Find me a live stream of…", "a video about…": real YouTube results, opened at once.
+- The AI learns as it works: what got things done on your PC, your corrections, your habits.
+- A usage card on the chat's home page: what's left today for your keys, Google and Groq, and when it all comes back.
+- The notch tells you when the AI finishes, or couldn't, while you're in another app.
+
+### Changed
+- The AI never gives or opens a link it made up, and sticks to what you asked.
+- Much sturdier with Google: retired or busy models are skipped, a minute's limit is never taken for the whole day,
+  and a key is never forgotten unless Google says it's wrong.
+- Voice is faster with Groq.
+
 ## [2.10.0] — 2026-11-18
 
 A better-looking AI chat.

@@ -191,6 +191,8 @@ public partial class NotchWindow
             RenderSession();
             _launchBox?.Focus();
             if (_chatPending is { } q) { _chatPending = null; SendChat(q); }
+            // Google's in: the second engine is offered, once
+            else if (OpenRouter.KindOf(key) == "gemini" && !OpenRouter.HasGroqKey && !_settings.AiGroqAsked) { _settings.AiGroqAsked = true; _settings.Save(); ChatGroqCard(); }
         }
         save.Click += (_, _) => Submit();
         _keyBox.PreviewKeyDown += (_, e) =>
@@ -212,7 +214,7 @@ public partial class NotchWindow
         if (problem != null) { status.Text = problem; status.Foreground = Frozen(Warn); status.Visibility = Visibility.Visible; }
         var privacy = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
         privacy.Children.Add(new TextBlock { Text = "", FontFamily = icons, FontSize = 9, Foreground = DimBrush, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 2, 6, 0) });
-        privacy.Children.Add(new TextBlock { Text = "Kept on this PC, encrypted for your Windows account, and only ever sent to the AI's own provider. An OpenRouter key works too.", FontSize = 9.5, Foreground = DimBrush, TextWrapping = TextWrapping.Wrap, MaxWidth = 330 });
+        privacy.Children.Add(new TextBlock { Text = "Kept on this PC, encrypted for your Windows account, and only ever sent to the AI's own provider. A Groq key (gsk_…) or an OpenRouter key works too; you can add Groq as a second engine after.", FontSize = 9.5, Foreground = DimBrush, TextWrapping = TextWrapping.Wrap, MaxWidth = 330 });
         card.Children.Add(privacy);
 
         var border = new Border

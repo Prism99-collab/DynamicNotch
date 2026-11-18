@@ -282,6 +282,7 @@ public partial class NotchWindow
     /// <summary>Why it couldn't answer, what to expect, and a way out.</summary>
     void ChatProblem(string error, (string Label, Action Act)? action)
     {
+        _lastProblem = error; // the notch says it if you're elsewhere (AnswerReady)
         if (_chatStack == null) return;
         var icons = (FontFamily)FindResource("IconFont");
         string glyph, title;
