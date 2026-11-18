@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.11.1] — 2026-11-18
+
+A better memory, and cleaner pictures.
+
+### Changed
+- Say "remember…" (or save this, don't forget, retiens, n'oublie pas…) and it's kept at once: how you want the AI to
+  act from now on, something to give back later, a fact about you, or a reminder at a time. "Remember this" keeps
+  what was just said. Passwords and card numbers are never kept.
+- Pictures the AI makes have no watermark, and a second one in a row waits a moment instead of failing.
+
 ## [2.11.0] — 2026-11-18
 
 The AI chat got a second engine, and got a lot quicker.

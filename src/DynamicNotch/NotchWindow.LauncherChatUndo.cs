@@ -154,12 +154,15 @@ public partial class NotchWindow
     /// <summary>A picture from a description, free and without a key; its shape follows the words (wallpaper, phone...).</summary>
     static async Task<(byte[]? Bytes, string? Error)> FreePicture(string prompt, CancellationToken cancel)
     {
-        var (w, h) = System.Text.RegularExpressions.Regex.IsMatch(prompt, @"wallpaper|landscape|wide|banner|cinematic|desktop|16:9|fond d.[ée]cran|paysage", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? (1536, 864)
-            : System.Text.RegularExpressions.Regex.IsMatch(prompt, @"portrait|phone|vertical|story|poster|9:16|affiche", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? (864, 1536) : (1024, 1024);
+        var (w, h) = System.Text.RegularExpressions.Regex.IsMatch(prompt, @"wallpaper|landscape|wide|banner|cinematic|desktop|16:9|fond d.[ée]cran|paysage", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? (1280, 720)
+            : System.Text.RegularExpressions.Regex.IsMatch(prompt, @"portrait|phone|vertical|story|poster|9:16|affiche", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? (720, 1280) : (1024, 1024);
         string words = prompt.Trim();
         if (words.Length > 800) words = words[..800];
-        string url = $"https://image.pollinations.ai/prompt/{Uri.EscapeDataString(words)}?width={w}&height={h}&nologo=true&seed={Random.Shared.Next(1, 1_000_000)}";
-        for (int attempt = 0; attempt < 2; attempt++)
+        // asked a little taller: the free service's mark sits in the bottom strip, which is trimmed off (WithoutMark)
+        int seed = Random.Shared.Next(1, 1_000_000);
+        string Url(double scale) => $"https://image.pollinations.ai/prompt/{Uri.EscapeDataString(words)}?width={(int)(w * scale)}&height={(int)Math.Round(h * scale / (1 - MarkStrip))}&nologo=true&seed={seed}";
+        string url = Url(1);
+        for (int attempt = 0; attempt < 3; attempt++)
         {
             try
             {
@@ -168,7 +171,21 @@ public partial class NotchWindow
                 if (res.IsSuccessStatusCode && type.StartsWith("image/"))
                 {
                     var bytes = await res.Content.ReadAsByteArrayAsync(cancel);
-                    if (bytes.Length > 2000) return (bytes, null);
+                    if (bytes.Length > 2000) return (await Task.Run(() => WithoutMark(bytes)), null);
+                }
+                if ((int)res.StatusCode == 402 && attempt < 2)
+                {
+                    string why = await res.Content.ReadAsStringAsync(cancel);
+                    // the free service allows one picture every 45 s per connection, and says how long to wait: waited, then again
+                    if (why.Contains("FREE_LIMIT") || why.Contains("Retry after", StringComparison.OrdinalIgnoreCase))
+                    {
+                        double wait = res.Headers.RetryAfter?.Delta?.TotalSeconds ?? 46;
+                        if (wait > 75) return (null, "the free picture service is busy for a minute");
+                        await Task.Delay(TimeSpan.FromSeconds(wait + 1), cancel);
+                        continue;
+                    }
+                    url = Url(attempt == 0 ? 0.75 : 0.55); // a size it charges for: the same picture, a bit smaller
+                    continue;
                 }
                 if ((int)res.StatusCode is not (429 or >= 500)) return (null, $"it said {(int)res.StatusCode}");
             }
@@ -177,6 +194,28 @@ public partial class NotchWindow
             await Task.Delay(2500, cancel);
         }
         return (null, "busy");
+    }
+
+    /// <summary>The share of the picture's height, at the bottom, where the free service puts its mark.</summary>
+    const double MarkStrip = 0.1;
+
+    /// <summary>The picture without its bottom strip (where the free service's mark is), as a high-quality JPEG.</summary>
+    static byte[] WithoutMark(byte[] bytes)
+    {
+        try
+        {
+            using var ms = new MemoryStream(bytes);
+            var frame = BitmapDecoder.Create(ms, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad).Frames[0];
+            int keep = (int)Math.Round(frame.PixelHeight * (1 - MarkStrip));
+            if (keep < 64 || keep >= frame.PixelHeight) return bytes;
+            var cut = new CroppedBitmap(frame, new Int32Rect(0, 0, frame.PixelWidth, keep));
+            var enc = new JpegBitmapEncoder { QualityLevel = 94 };
+            enc.Frames.Add(BitmapFrame.Create(cut));
+            using var outStream = new MemoryStream();
+            enc.Save(outStream);
+            return outStream.ToArray();
+        }
+        catch { return bytes; }
     }
 
     string SavePictures(List<byte[]> images, string madeWith)

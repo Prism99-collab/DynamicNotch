@@ -1362,9 +1362,13 @@ public partial class NotchWindow
         if (_settings.AiTools) sb.AppendLine("On the PC, to find something: find_files (names, also 'pdf last week'), browser_history (downloads and visited pages), list_folder (a folder's newest items); combine them when unsure, and give full paths.");
         if (_settings.AiMemory)
         {
-            sb.AppendLine("Memory: when the user tells you a lasting fact or preference about themselves, their work or how they want things done (not passwords or secrets), save it with remember. Use what you remember without being asked; update or forget facts that change.");
-            var facts = AiMemory.All();
+            sb.AppendLine("Memory: whenever the user says remember, save this, keep in mind, don't forget, note this, retiens, n'oublie pas, souviens-toi (any language), save it at once with remember, the right kind: 'rule' for how to act from now on, 'note' for something to give back later, 'fact' about them. 'Remember this' with nothing after it means what was just said or answered. Confirm in one line. Also save lasting facts and preferences they mention on their own. Never passwords or card numbers. Use what you remember without being asked; update or forget what changes.");
+            var rules = AiMemory.Rules();
+            if (rules.Count > 0) sb.AppendLine("STANDING RULES from the user (always follow them; they come before the style above):\n- " + string.Join("\n- ", rules));
+            var facts = AiMemory.Facts();
             if (facts.Count > 0) sb.AppendLine("What you remember about the user:\n- " + string.Join("\n- ", facts));
+            var notes = AiMemory.Notes();
+            if (notes.Count > 0) sb.AppendLine("Notes the user asked you to keep (give them back word for word when asked, e.g. 'what did I tell you to remember?'):\n- " + string.Join("\n- ", notes.TakeLast(25)));
         }
         if (_settings.AiMemory)
         {

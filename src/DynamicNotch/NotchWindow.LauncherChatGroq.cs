@@ -31,8 +31,13 @@ public partial class NotchWindow
         sb.AppendLine("LIVE NOW:\n" + LiveNow());
         if (_settings.AiMemory)
         {
-            var facts = AiMemory.All();
+            var rules = AiMemory.Rules();
+            if (rules.Count > 0) sb.AppendLine("STANDING RULES from the user (always follow):\n- " + string.Join("\n- ", rules));
+            var facts = AiMemory.Facts();
             if (facts.Count > 0) sb.AppendLine("About the user: " + string.Join("; ", facts.TakeLast(10)));
+            var notes = AiMemory.Notes();
+            if (notes.Count > 0) sb.AppendLine("Notes kept for the user (give back when asked):\n- " + string.Join("\n- ", notes.TakeLast(10).Select(n => n.Length > 300 ? n[..300] + "…" : n)));
+            sb.AppendLine("When the user says remember / save this / don't forget / retiens: save it with remember (rule, note or fact) and confirm in one line.");
             var lessons = AiLearn.Lessons();
             if (lessons.Count > 0) sb.AppendLine("Lessons learned on this PC (follow them):\n- " + string.Join("\n- ", lessons.TakeLast(8)));
             var habits = AiLearn.Habits();

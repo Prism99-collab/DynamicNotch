@@ -41,6 +41,9 @@ public partial class NotchWindow
     /// <summary>Done at once when it's a plain, safe command; false hands it to the AI.</summary>
     async Task<bool> TryInstant(string text, ChatSession session)
     {
+        // "remember …", "save this", "n'oublie pas …": kept at once (NotchWindow.LauncherChatRemember)
+        if (_settings.AiMemory && RememberRequest(text, session) is { } keep)
+            return await RunInstant(session, keep.Tool, keep.Args, keep.Act);
         // "find me a live stream of X", "a video about X", "watch X": YouTube's real results, the best one opened
         if (_settings.AiTools && text.Length <= 120 && !text.Contains('?') && WatchRequest(text) is { } watch)
             return await RunInstant(session, "youtube", new JsonObject { ["query"] = watch.Query, ["live"] = watch.Live }.ToJsonString(), () => YouTubeTool(watch.Query, watch.Live, open: true, CancellationToken.None));
