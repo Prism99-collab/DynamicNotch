@@ -248,11 +248,7 @@ public partial class NotchWindow
             StartSession(null);
         if (resume && _session == null && _settings.AiHistory && ChatStore.List().FirstOrDefault() is { } last && ChatStore.Load(last.Id) is { } s) StartSession(s);
         _chatMode = true;
-        OpenRouter.Warm(); // the first answer doesn't wait for the handshake
-        OpenRouter.CompactSystem ??= CompactSystemPrompt; // Groq's short instructions
-        WebTools.Rank ??= url => TrustOf(url, _chatLastUser); // research reads the trusted pages first
-        OpenRouter.Choose(_settings.AiProvider);
-        _ = OpenRouter.IsGemini ? OpenRouter.GeminiModels() : (Task)OpenRouter.Models();
+        PrepareAi();
         WireWebSearch();
         StopStartOrb();
         _launchScroll.Visibility = Visibility.Collapsed;
@@ -1174,6 +1170,7 @@ public partial class NotchWindow
                 while (true)
                 {
                     var request = BuildRequest(session, tools);
+                    OpenRouter.ChatRequest.Value = true; // Groq gets the chat's short instructions (only the chat's)
                     turn = await OpenRouter.Stream(key, model, request, tools,
                         piece => Dispatcher.InvokeAsync(() => { live.Append(piece); dirty = true; }),
                         () => Dispatcher.InvokeAsync(() => bubble.Thinking(true)),

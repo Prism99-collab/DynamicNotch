@@ -17,10 +17,10 @@ namespace DynamicNotch;
 /// <summary>Swipeable pages: Home, System, Tools, Clipboard &amp; Files, Smart and Settings.</summary>
 public partial class NotchWindow
 {
-    static readonly string[] PageNames = { "", "System", "Tools", "Clipboard & Files", "Colors", "Settings", "Calls" };
+    static readonly string[] PageNames = { "", "System", "Tools", "Clipboard & Files", "Colors", "Settings", "Calls", "Work" };
     /// <summary>The order pages come in, left to right (each keeps its own number: Calls is 6, shown second).</summary>
-    static readonly int[] PageOrder = { 0, 6, 1, 2, 3, 4, 5 };
-    readonly UIElement[] _pageEls = new UIElement[7];
+    static readonly int[] PageOrder = { 0, 7, 6, 1, 2, 3, 4, 5 }; // Work second, then Calls
+    readonly UIElement[] _pageEls = new UIElement[8];
 
     /// <summary>A page's own panel in the strip.</summary>
     UIElement PageElement(int page) => _pageEls[page];
@@ -70,6 +70,8 @@ public partial class NotchWindow
         PagesStrip.Children.Insert(sys, _pageEls[1]);
         _pageEls[CallsPage] = BuildCallsPage();
         PagesStrip.Children.Insert(1, _pageEls[CallsPage]);
+        _pageEls[WorkPage] = BuildWorkPage(); // NotchWindow.WorkPage
+        PagesStrip.Children.Insert(1, _pageEls[WorkPage]);
 
         // page dots (one per page, in the order they come)
         var hits = new Border[PageNames.Length];
@@ -139,6 +141,7 @@ public partial class NotchWindow
         if (PageHidden(page)) page = PageHidden(_page) ? 0 : _page; // switched off in Preferences
         bool changed = page != _page;
         if (changed) HideTip();
+        if (changed && _page == WorkPage) EndWorkTyping(giveBack: true);
         if (changed && _page == CallsPage && _call != null) _leftCallsPage = true; // you moved on: the next opening stays where you are
         _page = page;
         _pageX.Configure(SpringStyle.Page);
@@ -183,6 +186,7 @@ public partial class NotchWindow
         if (page == 4) OnColorsShown();
         if (page == 5) { SyncSettingsPage(); SyncSmartPage(); }
         if (page == CallsPage) OnCallsShown();
+        if (page == WorkPage) OnWorkShown();
     }
 
     void OnPagerDown(object sender, MouseButtonEventArgs e)

@@ -77,6 +77,8 @@ public static partial class OpenRouter
             }
         }
         catch { }
+        bool fetched = list.Count > 0;
+        if (!fetched && StoredModels().Gemini is { Count: > 0 } stored) list = stored.ToList(); // the last list Google gave
         if (list.Count == 0)
             list = new() // known names, in case the list can't be read
             {
@@ -90,7 +92,9 @@ public static partial class OpenRouter
         list = list.Where(m => !m.Id.Contains("latest") || !families.Contains(Tier(m.Id)))
                    .OrderByDescending(m => m.Rank).ThenBy(m => m.Id.Contains("preview")).ToList();
         _gemini = list;
-        _geminiAt = DateTime.UtcNow;
+        // read from Google: kept for 6 hours (and on disk); couldn't be read: asked again in 2 minutes
+        _geminiAt = fetched ? DateTime.UtcNow : DateTime.UtcNow - TimeSpan.FromHours(6) + TimeSpan.FromMinutes(2);
+        if (fetched) StoreModels(list, null);
         return list;
     }
 
@@ -191,16 +195,16 @@ public static partial class OpenRouter
     /// Google's free allowance by kind of model (requests a day and a minute, per model version, as AI Studio lists
     /// them for the free tier): Flash-Lite 500 / 15, Flash 20 / 5, Gemma 14,400 / 30. Every version has its own.
     /// </summary>
-    static (int Day, int Minute) GoogleFreeLimit(string tier) => tier switch { "lite" => (500, 15), "flash" => (20, 5), "gemma" => (14400, 30), _ => (0, 0) };
+    static (int Day, int Minute) GoogleFreeLimit(string tier) => tier switch { "lite" => (500, 10), "flash" => (20, 5), "gemma" => (14400, 30), _ => (0, 0) };
 
     /// <summary>
     /// Today's use of the Google key, by kind of model, from what this PC sent and what Google answered. A version
     /// Google turned away before any request went through isn't on the free tier for this key: it doesn't count.
     /// </summary>
-    public static async Task<List<TierUsage>> GeminiUsage()
+    public static async Task<List<TierUsage>> GeminiUsage(bool quick = false)
     {
         if (!HasGeminiKey) return new();
-        var models = await GeminiModels();
+        var models = quick ? GeminiModelsNow() : await GeminiModels();
         string? key = LoadGeminiKey();
         var list = new List<TierUsage>();
         foreach (var (tier, name) in new[] { ("lite", "Fast"), ("flash", "Smart"), ("gemma", "Backup") })

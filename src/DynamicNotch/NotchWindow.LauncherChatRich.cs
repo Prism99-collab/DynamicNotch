@@ -112,7 +112,8 @@ public partial class NotchWindow
     {
         string Clean(string s) => Regex.Replace(s, @"\*\*|__|`", "").Trim();
         var cells = rows.Where(r => !IsTableRule(r)).Select(r => Cells(r).Select(Clean).ToArray()).ToList();
-        return new BlockUIContainer(SmallButtons(
+        // a block in a document can't have a negative margin (it throws): the buttons themselves move up to the table
+        var buttons = SmallButtons(
             ("Copy", () => CopyText(string.Join("\r\n", cells.Select(c => string.Join("\t", c))), "Table copied: paste it in Excel or Sheets")),
             ("Excel", () =>
             {
@@ -122,7 +123,9 @@ public partial class NotchWindow
                 DocWriter.Write(file, string.Join("\n", rows.Select(Clean)));
                 Toast("Saved in Documents\\Dynamic Notch");
                 OpenLink(file);
-            }))) { Margin = new Thickness(0, -6, 0, 8) };
+            }));
+        buttons.Margin = new Thickness(0, -6, 2, 0);
+        return new BlockUIContainer(buttons) { Margin = new Thickness(0, 0, 0, 8) };
     }
 
     /// <summary>A click on a column's title sorts the table by it (again: the other way).</summary>

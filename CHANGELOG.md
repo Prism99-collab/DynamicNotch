@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.13.0] — 2026-11-19
+
+A new page for your work, right after Home.
+
+### Added
+- The Work page, with three tabs on a side rail:
+  - **Now**: the document, PDF, code or page you're on, how long you've spent on it, and buttons that fit it
+    (summarize, check the writing, chart a sheet, key points of a page…), answered right there. Or ask anything
+    about it.
+  - **Projects**: the files and pages you use together become projects by themselves. Pin, rename, set a stage, add
+    a note, drag files between them (or in from Explorer), reopen everything in one click, or ask a question about
+    the whole project.
+  - **Inbox**: who's waiting on an answer from you, with a reply drafted when you want one, "Catch me up" for a short
+    summary of what you missed, and two weeks of notifications by day, grouped, searchable, with mute per app.
+- Recent work can be cleared, hidden, or paused, and every item has an ×.
+
+### Changed
+- The AI's usage card counts everything you have left (every Google model and Groq), opens instantly, and marks
+  Google's numbers as an estimate until Google states them.
+
+### Fixed
+- Google's and Groq's daily counts no longer reset each other.
+- A chat with a table in it could fail to reopen.
+- Typing in the Work page no longer starts a search.
+- Short alerts and Work page answers keep their own instructions when Groq answers.
+
 ## [2.12.0] — 2026-11-19
 
 The AI chat understands you better, answers better, and works on what you're looking at.

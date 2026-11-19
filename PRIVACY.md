@@ -1,6 +1,6 @@
 # Privacy policy
 
-*Dynamic Notch · updated 19 November 2026 (version 2.12)*
+*Dynamic Notch · updated 19 November 2026 (version 2.13)*
 
 Dynamic Notch has no account, no ads, no analytics and no telemetry. Nothing about you or your PC is sent to the
 developer or to anyone else.
@@ -23,6 +23,7 @@ All of this stays on your PC.
 | The windows you have open | So the search can take you to them |
 | Your files, browser history and other PC details | Only when you ask the AI chat something that needs them |
 | How long each app is in front each day (never what you do in it) | For "what did I use most" and your day's summary |
+| The title of the window in front (a document's name, a page's title) | So the Work page knows what you're working on. Videos, chats and mail aren't kept, and you can pause it |
 | Text you've selected, and the page or window you're on | Only when you ask the AI about it ("explain this", "summarize this page") |
 | Documents and pictures you give the AI | Read on your PC; text in pictures and scans is read by Windows itself |
 
@@ -42,6 +43,9 @@ Only on your PC, in `%APPDATA%\DynamicNotch`:
 - your calendar's private link, if you add one (encrypted with your Windows account);
 - answers you marked with 👎;
 - today's notifications, and how long each app was in front over the last two weeks;
+- the last two weeks of notifications for the Work page's inbox (you can clear them, or mute an app);
+- the documents, PDFs and pages you worked on and your projects (names, titles and time spent: never what's in them);
+- the AI services' model lists, so the notch never waits for them;
 - the overload log;
 - technical logs (`app.log`, `error.log`).
 

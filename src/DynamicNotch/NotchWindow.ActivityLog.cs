@@ -83,6 +83,7 @@ public partial class NotchWindow
                 string day = DateTime.Today.ToString("yyyy-MM-dd");
                 if (!_appTime!.TryGetValue(day, out var apps)) _appTime[day] = apps = new();
                 apps[name] = apps.GetValueOrDefault(name) + 5;
+                TrackWork(fg, pid, name); // the document, PDF or page in front (NotchWindow.WorkPage)
                 if ((DateTime.UtcNow - _appSaved).TotalMinutes >= 2) SaveAppTime();
             }
             catch { }
@@ -110,6 +111,7 @@ public partial class NotchWindow
     void SaveAppTime()
     {
         _appSaved = DateTime.UtcNow;
+        _ = Task.Run(WorkLog.Save);
         if (_appTime == null) return;
         // two weeks are kept
         string oldest = DateTime.Today.AddDays(-14).ToString("yyyy-MM-dd");

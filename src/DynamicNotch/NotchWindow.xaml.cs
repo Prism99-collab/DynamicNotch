@@ -708,6 +708,7 @@ public partial class NotchWindow : Window
     void Collapse()
     {
         if (_mode != Mode.Expanded) return;
+        EndWorkTyping(giveBack: true);
         EndLauncher(giveBack: false);
         CloseCallSheet(instant: true);
         UpdateTypeToSearch(false);
@@ -782,6 +783,7 @@ public partial class NotchWindow : Window
         bool inside = p.X >= cxe - ex && p.X <= cxe + ex && p.Y >= _winTop && p.Y <= _winTop + (ExpandedSize.Height + _chatExtra + 16) * _scale;
         UpdateTypeToSearch(inside); // with the pointer on the open notch, typing starts a search
         if (_launcherOpen) return;   // the search stays until Esc, Enter or a click elsewhere
+        if (_workTyping && IsActive) { _leave = 0; return; } // typing in a box on the Work page: it stays while you type (a click elsewhere ends it)
         bool dragging = VolSlider.IsDragging || BriSlider.IsDragging || ExtBriSlider.IsDragging || AppVolSlider.IsDragging || ProgressSlider.IsDragging || _swiping || _dragOut;
 
         if (inside) { _entered = true; _leave = 0; return; }
@@ -918,6 +920,7 @@ public partial class NotchWindow : Window
         await SafeAsync("media", _media.InitAsync);
         // the optional browser extension: every playing tab, not just the one a browser tells Windows about
         Safe("browser link", () => { _media.AttachWeb(_webLink); _webLink.Start(); });
+        Safe("ai models", () => { if (_settings.AiChat) _ = OpenRouter.RefreshModelLists(); }); // the AI's usage card never waits for them
         await SafeAsync("network", _radio.InitAsync);
         _lastNetwork = _radio.NetworkName;
         Safe("media ui", OnMediaChanged);

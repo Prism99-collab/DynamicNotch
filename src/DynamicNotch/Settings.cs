@@ -133,6 +133,9 @@ public sealed class Settings
     public string SearchAssistant { get; set; } = "chatgpt";
     /// <summary>The AI chat inside the search (OpenRouter; the key is kept apart, encrypted).</summary>
     public bool AiChat { get; set; } = true;
+    /// <summary>The Work page: Recent folded away; what you work on not noted (paused).</summary>
+    public bool WorkRecentHidden { get; set; }
+    public bool WorkPaused { get; set; }
     /// <summary>The OpenRouter model id ("openrouter/free" picks a free one).</summary>
     public string AiModel { get; set; } = "openrouter/free";
     /// <summary>It may act on the PC (commands, files, clipboard, opening things).</summary>

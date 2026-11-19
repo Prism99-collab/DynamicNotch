@@ -145,7 +145,9 @@ public partial class NotchWindow
             reset.Text = (hasGroq ? $"Google resets in {inText} ({resetAt:HH:mm})  ·  Groq refills as you go" : $"Full reset in {inText}  ·  {resetAt:HH:mm}") + (minuteLimit > 0 && minuteUsed >= minuteLimit * 0.8 ? "  ·  busy this minute" : "");
         }
 
-        Border TierRow(string name, int leftCount, int limit, bool current, Color tone, int? sentToday = null)
+        const string EstimateTip = "≈ An estimate: counted from what this PC sent with this key. Google doesn't say how much is left, so uses of the same key elsewhere (AI Studio, another app or PC) aren't seen, and the daily limit is Google's published one until Google states this key's own (the first time a model runs out). Then the number is exact.";
+
+        Border TierRow(string name, int leftCount, int limit, bool current, Color tone, int? sentToday = null, bool estimate = false)
         {
             var row = new Grid { Margin = new Thickness(0, 1, 0, 1) };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(54) });
@@ -163,21 +165,24 @@ public partial class NotchWindow
             track.SizeChanged += (_, _) => bar.Width = Math.Max(share > 0 ? 3 : 0, track.ActualWidth * share);
             Grid.SetColumn(track, 1);
             row.Children.Add(track);
-            var value = new TextBlock { Text = sentToday is { } n ? $"{Compact(n)} today" : $"{Compact(leftCount)} / {Compact(limit)}", FontSize = 9.5, Foreground = current ? Frozen(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)) : DimBrush, FontFamily = font, VerticalAlignment = VerticalAlignment.Center };
+            var value = new TextBlock { Text = sentToday is { } n ? $"{Compact(n)} today" : $"{(estimate ? "≈" : "")}{Compact(leftCount)} / {Compact(limit)}", ToolTip = estimate ? EstimateTip : null, FontSize = 9.5, Foreground = current ? Frozen(Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)) : DimBrush, FontFamily = font, VerticalAlignment = VerticalAlignment.Center };
             Grid.SetColumn(value, 2);
             row.Children.Add(value);
             return new Border { Child = row };
         }
 
-        async void Fill()
+        async void Fill() => await FillFrom(quick: true);
+
+        async Task FillFrom(bool quick)
         {
             List<OpenRouter.TierUsage> usage;
             List<OpenRouter.TierUsage> groqUse = new();
             OpenRouter.KeyAccount? account = null;
             if (OpenRouter.IsGemini)
             {
-                try { usage = await OpenRouter.GeminiUsage(); } catch { usage = new(); }
-                try { groqUse = await OpenRouter.GroqUsage(); } catch { }
+                // never waits on the internet: the model lists known (saved on disk) are used at once
+                try { usage = await OpenRouter.GeminiUsage(quick); } catch { usage = new(); }
+                try { groqUse = await OpenRouter.GroqUsage(quick); } catch { }
                 resetAt = OpenRouter.GeminiReset;
                 string? keyPlan = OpenRouter.GeminiPlan;
                 if (usage.Count > 0)
@@ -237,7 +242,9 @@ public partial class NotchWindow
             bool none = usage.All(u => u.Left == 0);
             pct.Text = none ? "0%" : $"{Math.Round(current.LeftShare * 100):0}%";
             pctWord.Text = _cyber ? current.Name.ToUpperInvariant() : current.Name.ToLowerInvariant() + " left";
-            big.Text = none ? "Used up" : Compact(current.Left);
+            bool guess = OpenRouter.IsGemini && !current.Exact && current.Tier != "groq";
+            big.Text = none ? "Used up" : (guess ? "≈" : "") + Compact(current.Left);
+            big.ToolTip = guess ? EstimateTip : null;
             bigOf.Text = none ? "back at reset" : $"{(current.Left == 1 ? "request" : "requests")} left of {Compact(current.Limit)}";
             live.Fill = Frozen(none ? Warn : current.LeftShare < 0.2 ? Warn : Ok);
             int requests = usage.Sum(u => u.Used);
@@ -247,16 +254,24 @@ public partial class NotchWindow
             tiers.Children.Clear();
             var tones = new Dictionary<string, Color> { ["lite"] = acc, ["flash"] = AiSecond, ["gemma"] = StepTone("notch_data"), ["free"] = acc };
             if (usage.Count > 1 || hasGroq)
-                foreach (var u in usage) tiers.Children.Add(TierRow(u.Name, u.Left, u.Limit, u == current, tones.GetValueOrDefault(u.Tier, acc)));
+                foreach (var u in usage) tiers.Children.Add(TierRow(u.Name, u.Left, u.Limit, u == current, tones.GetValueOrDefault(u.Tier, acc), estimate: OpenRouter.IsGemini && !u.Exact));
             if (hasGroq)
             {
                 var q = groqUse[0];
                 tiers.Children.Add(TierRow("Groq", q.Left, q.Limit, false, groqTone));
-                int total = (none ? 0 : current.Left) + q.Left;
+                // everything the AI can still use today: every Google kind (it moves to the next as one runs out) and Groq
+                int total = usage.Sum(u => u.Left) + q.Left;
+                // today's requests: Google's and Groq's (Groq's own count, from what it says is left)
+                int all = requests + q.Used;
+                today.Text = $"Today: {all:#,0} request{(all == 1 ? "" : "s")}" + (tokens > 0 ? $"  ·  {(tokens >= 1000 ? $"{tokens / 1000.0:#,0.#}K" : tokens.ToString())} tokens" : "")
+                    + (OpenRouter.IsGemini && usage.All(u => u.Exact) ? "  ·  Google's exact limits" : "");
                 pct.Text = Compact(total);
                 pct.FontSize = total >= 1000 ? 14 : 17;
                 pctWord.Text = _cyber ? "LEFT" : "left";
-                big.Text = Compact(total);
+                // Groq's numbers are its own; Google's are counted here until Google states them: marked when they're an estimate
+                bool estimated = usage.Any(u => !u.Exact);
+                big.Text = (estimated ? "≈" : "") + Compact(total);
+                big.ToolTip = estimated ? EstimateTip : "Exact: Google's and Groq's own numbers";
                 bigOf.Text = "requests left · Google + Groq";
                 live.Fill = Frozen(total == 0 ? Warn : Ok);
                 long qTokens = q.Tokens;
@@ -276,6 +291,15 @@ public partial class NotchWindow
             target = none ? 0 : current.LeftShare;
             if (Eco) { shown = target; innerShown = innerTarget; Draw(target); }
             else { fillStart = DateTime.UtcNow; fill.Start(); }
+            // the lists were old or not read yet: once fresh ones come, drawn again (only if they change anything)
+            if (quick && OpenRouter.IsGemini && !OpenRouter.ModelListsFresh)
+            {
+                string before = Compact(usage.Sum(u => u.Limit)) + "|" + Compact(groqUse.Sum(u => u.Limit));
+                await OpenRouter.RefreshModelLists();
+                var g2 = await OpenRouter.GeminiUsage(true);
+                var q2 = await OpenRouter.GroqUsage(true);
+                if (Compact(g2.Sum(u => u.Limit)) + "|" + Compact(q2.Sum(u => u.Limit)) != before) await FillFrom(quick: false);
+            }
         }
 
         var clock = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(30) };

@@ -29,6 +29,12 @@ public static partial class OpenRouter
     /// <summary>The short version of the AI's instructions, for Groq (set by the chat window).</summary>
     public static Func<string>? CompactSystem;
 
+    /// <summary>
+    /// The request in progress is the chat's (set around its call): only then are its instructions swapped for the short
+    /// version. Anything else (a Work page card, an alert put in a few words) keeps its own instructions.
+    /// </summary>
+    public static readonly AsyncLocal<bool> ChatRequest = new();
+
     public sealed record GroqModel(string Id, string Name, int Rank);
     static List<GroqModel>? _groq;
     static DateTime _groqAt;
@@ -60,9 +66,12 @@ public static partial class OpenRouter
             }
         }
         catch { }
+        bool fetched = list.Count > 0;
+        if (!fetched && StoredModels().Groq is { Count: > 0 } stored) list = stored.ToList(); // the last list Groq gave
         if (list.Count == 0) list = new() { new("openai/gpt-oss-120b", "GPT-OSS 120B", 300), new("openai/gpt-oss-20b", "GPT-OSS 20B", 240) };
         _groq = list.OrderByDescending(m => m.Rank).ToList();
-        _groqAt = DateTime.UtcNow;
+        _groqAt = fetched ? DateTime.UtcNow : DateTime.UtcNow - TimeSpan.FromHours(6) + TimeSpan.FromMinutes(2);
+        if (fetched) StoreModels(null, _groq);
         return _groq;
     }
 
@@ -111,7 +120,8 @@ public static partial class OpenRouter
         int start = Math.Max(0, rest.Count - keep);
         while (start < rest.Count && rest[start]?["role"]?.ToString() != "user") start++;
         if (start >= rest.Count) start = Math.Max(0, rest.FindLastIndex(m => m?["role"]?.ToString() == "user"));
-        string system = CompactSystem?.Invoke() ?? (messages.FirstOrDefault()?["content"]?.ToString() is { } full ? (full.Length > 5000 ? full[..5000] : full) : "");
+        string own = messages.FirstOrDefault(m => m?["role"]?.ToString() == "system")?["content"]?.ToString() ?? "";
+        string system = ChatRequest.Value && CompactSystem != null ? CompactSystem() : own.Length > 12000 ? own[..12000] + "\n…(cut)" : own;
         var list = new JsonArray { new JsonObject { ["role"] = "system", ["content"] = system } };
         var used = new HashSet<string>();
         string ask = "";
@@ -226,10 +236,10 @@ public static partial class OpenRouter
     /// Groq's requests left, all its chat models together (each has its own ~1,000 a day). The numbers are Groq's own,
     /// from its last answer; its day refills a little every minute, so what's left grows back as time passes.
     /// </summary>
-    public static async Task<List<TierUsage>> GroqUsage()
+    public static async Task<List<TierUsage>> GroqUsage(bool quick = false)
     {
         if (GroqKeyIfUsable() is not { } key) return new();
-        var models = (await GroqModels()).Where(m => !AiUsage.Retired("groq:" + m.Id, key)).ToList();
+        var models = (quick ? GroqModelsNow() : await GroqModels()).Where(m => !AiUsage.Retired("groq:" + m.Id, key)).ToList();
         int limit = 0, left = 0, minuteLeft = 0, minuteLimit = 0;
         long tokens = 0;
         bool exact = false;

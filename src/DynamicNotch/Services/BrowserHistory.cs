@@ -9,7 +9,7 @@ namespace DynamicNotch.Services;
 /// browsers (Brave, Chrome, Edge, Vivaldi, Opera), every profile. Read from a copy (the browser keeps the file
 /// open), with Windows' own SQLite (winsqlite3.dll): nothing to install. Only read when the AI is asked to.
 /// </summary>
-public static class BrowserHistory
+public static partial class BrowserHistory
 {
     static readonly (string Name, string Folder)[] Browsers =
     {

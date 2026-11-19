@@ -143,6 +143,93 @@ var timeMention = (System.Text.RegularExpressions.Regex)typeof(DynamicNotch.Notc
 Check(timeMention.IsMatch("Your meeting is tomorrow at 9") && timeMention.IsMatch("the store opens at 9:30") && timeMention.IsMatch("call him at 6pm"), "reminders: a real time in an answer is offered");
 Check(!timeMention.IsMatch("temperatures peak at 23°C on Saturday") && !timeMention.IsMatch("battery at 50%") && !timeMention.IsMatch("it sells at 23 dollars"), "reminders: a number that isn't a time (23°C, 50%) isn't");
 
+// ───────── the Work page: what a window is, projects, the inbox ─────────
+string P(string exe, string title) => WorkLog.Parse(exe, title) is { } w ? $"{w.Kind}|{w.Name}" : "-";
+Check(P(@"C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE", "Pricing report.docx - Word") == "doc|Pricing report.docx", "work: a Word document");
+Check(P(@"C:\x\WINWORD.EXE", "Pricing report - Word") == "doc|Pricing report.docx", "work: a Word document whose extension is hidden");
+Check(P(@"C:\x\EXCEL.EXE", "Budget 2026.xlsx  -  Saved - Excel") == "sheet|Budget 2026.xlsx", "work: an Excel sheet (\"Saved\" left out)");
+Check(P(@"C:\x\WINWORD.EXE", "Document1 - Word") == "-", "work: a blank new document isn't work yet");
+Check(P(@"C:\x\brave.exe", "Market research on pricing - Brave") == "tab|Market research on pricing", "work: a browser tab");
+Check(P(@"C:\x\msedge.exe", "Q3 results.pdf and 2 more pages - Personal - Microsoft\u200B Edge") == "pdf|Q3 results.pdf", "work: a PDF open in Edge");
+Check(P(@"C:\x\chrome.exe", "Project plan - Google Docs - Google Chrome") == "doc|Project plan", "work: a Google Doc");
+Check(P(@"C:\x\brave.exe", "Lofi beats to study - YouTube - Brave") == "-" && P(@"C:\x\brave.exe", "New Tab - Brave") == "-", "work: videos and blank tabs aren't work");
+Check(P(@"C:\x\Code.exe", "● app.ts - website - Visual Studio Code") == "code|app.ts", "work: code, with its folder");
+Check(P(@"C:\x\AcroRd32.exe", "contract-final.pdf - Adobe Acrobat Reader (64-bit)") == "pdf|contract-final.pdf", "work: a PDF in Acrobat");
+Check(P(@"C:\x\Discord.exe", "#general | Server - Discord") == "-", "work: chat apps aren't work");
+Check(P(@"C:\x\brave.exe", "(67) WhatsApp - Brave") == "-" && P(@"C:\x\brave.exe", "Inbox (3) - me@gmail.com - Gmail - Brave") == "-", "work: chats with an unread count, and mail, aren't work");
+Check(WorkLog.TabTitle(@"C:\x\brave.exe", "(4) Instagram - Brave") == "Instagram" && WorkLog.TabTitle(@"C:\x\Code.exe", "x") == null, "work: the page in front still shows on Now (without its count)");
+
+string workDir = Path.Combine(Path.GetTempPath(), "dn-work-checks-" + Guid.NewGuid().ToString("N")[..6]);
+WorkLog.UseFolder(workDir);
+var t0 = DateTime.Now.AddHours(-3);
+void Use(string exe, string title, int minutes, ref DateTime at) { for (int i = 0; i < minutes * 12; i++) { WorkLog.Seen(exe, "App", title, 5, at); at = at.AddSeconds(5); } }
+var clock = t0;
+// a morning on the pricing report: the doc, its sheet, a PDF and a page about pricing, used together, twice
+for (int round = 0; round < 2; round++)
+{
+    Use(@"C:\x\WINWORD.EXE", "Pricing report.docx - Word", 6, ref clock);
+    Use(@"C:\x\EXCEL.EXE", "Pricing data.xlsx - Excel", 4, ref clock);
+    Use(@"C:\x\msedge.exe", "Competitor pricing 2026.pdf - Microsoft\u200B Edge", 3, ref clock);
+    Use(@"C:\x\brave.exe", "SaaS pricing models explained - Brave", 2, ref clock);
+    clock = clock.AddMinutes(25); // a break: a new stretch of work
+}
+// later, something else: a biology essay and its sources
+clock = clock.AddHours(1);
+Use(@"C:\x\WINWORD.EXE", "Biology essay.docx - Word", 8, ref clock);
+Use(@"C:\x\brave.exe", "Cell biology basics - Brave", 3, ref clock);
+Use(@"C:\x\brave.exe", "Mitochondria function in cells - Brave", 3, ref clock);
+var projects = WorkLog.Projects();
+var pricing = projects.FirstOrDefault(p => p.Items.Any(i => i.Name == "Pricing report.docx"));
+var bio = projects.FirstOrDefault(p => p.Items.Any(i => i.Name == "Biology essay.docx"));
+Check(pricing != null && pricing.Items.Count == 4 && pricing.Name == "Pricing", $"work: things used together become one project, named by what they share (got: {pricing?.Name} with {pricing?.Items.Count})");
+Check(bio != null && bio != pricing && !bio.Items.Any(i => i.Name.Contains("ricing")), $"work: another subject becomes another project (got: {bio?.Name})");
+// your edits win: rename and take a tab out
+var keptMeta = WorkLog.Keep(pricing!);
+keptMeta.Name = "Client X pricing";
+WorkLog.Remove(pricing!.Items.First(i => i.Kind == "tab").Key, keptMeta);
+var again = WorkLog.Projects().First(p => p.Id == keptMeta.Id);
+Check(again.Name == "Client X pricing" && again.Items.Count == 3 && again.Kept != null, "work: a renamed project keeps its name, and a tab taken out stays out");
+WorkLog.Save();
+WorkLog.UseFolder(workDir);
+Check(WorkLog.Projects().Any(p => p.Name == "Client X pricing" && p.Items.Count == 3), "work: projects and edits are kept after a restart");
+
+// hiding: a found project you don't want stays gone (even after a restart), and comes back only when asked
+var bioP = WorkLog.Projects().First(p => p.Items.Any(i => i.Name == "Biology essay.docx"));
+WorkLog.Hide(bioP);
+Check(!WorkLog.Projects().Any(p => p.Items.Any(i => i.Name == "Biology essay.docx")) && WorkLog.HiddenCount() == 1, "work: a hidden project is gone, and its things don't come back as a new project");
+WorkLog.Save(); WorkLog.UseFolder(workDir);
+Check(!WorkLog.Projects().Any(p => p.Items.Any(i => i.Name == "Biology essay.docx")), "work: a hidden project stays hidden after a restart");
+WorkLog.UnhideAll();
+Check(WorkLog.Projects().Any(p => p.Items.Any(i => i.Name == "Biology essay.docx")), "work: hidden projects come back when asked");
+var forgetKey = WorkLog.Recent(20).First(i => i.Name == "Cell biology basics").Key;
+WorkLog.ForgetItem(forgetKey);
+Check(WorkLog.Recent(20).All(i => i.Key != forgetKey) && WorkLog.Projects().All(p => p.Items.All(i => i.Key != forgetKey)), "work: a forgotten thing leaves Recent and every project");
+
+int projectsBefore = WorkLog.Projects().Count;
+WorkLog.ClearRecent();
+Check(WorkLog.Recent(20).Count == 0 && WorkLog.Projects().Count == projectsBefore, "work: clearing Recent empties it without touching projects");
+WorkLog.Seen(@"C:\x\WINWORD.EXE", "Word", "Pricing report.docx - Word", 5, DateTime.Now.AddSeconds(1));
+Check(WorkLog.Recent(20).Count == 1 && WorkLog.Recent(20)[0].Name == "Pricing report.docx", "work: after clearing, what you use again comes back to Recent");
+
+NotifHistory.UseFolder(workDir);
+NotifHistory.Add(DateTime.Now.AddMinutes(-31), "Snipping Tool", "Screenshot copied", "Select here to mark up and share");
+NotifHistory.Mute("Snipping Tool", true);
+NotifHistory.Add(DateTime.Now.AddMinutes(-30.5), "Snipping Tool", "Screenshot copied", "again");
+Check(NotifHistory.Recent().All(n => n.App != "Snipping Tool") && NotifHistory.Muted().Contains("Snipping Tool"), "inbox: a muted app's notifications are removed and no longer kept");
+NotifHistory.Mute("Snipping Tool", false);
+NotifHistory.Add(DateTime.Now.AddMinutes(-30), "Discord", "Sam", "can you send me the file before 6?");
+NotifHistory.Add(DateTime.Now.AddMinutes(-20), "Discord", "Sam", "thanks!");
+NotifHistory.Add(DateTime.Now.AddMinutes(-10), "WhatsApp", "Mom", "Are you coming for dinner?");
+NotifHistory.Add(DateTime.Now.AddMinutes(-5), "Gmail", "Security alert", "Your verification code is 123456. Can you confirm it was you?");
+NotifHistory.Add(DateTime.Now.AddMinutes(-4), "Windows", "Update available", "Restart to finish?");
+var waitingNow = NotifHistory.Waiting();
+Check(waitingNow.Count == 2 && waitingNow.Any(w => w.Title == "Mom") && waitingNow.Any(w => w.Title == "Sam"), $"inbox: people asking you something are waiting; codes and system alerts aren't (got: {string.Join(", ", waitingNow.Select(w => w.Title))})");
+NotifHistory.Done(waitingNow.First(w => w.Title == "Mom"));
+Check(NotifHistory.Waiting().All(w => w.Title != "Mom") && NotifHistory.Recent().Count == 5, "inbox: done takes it off the list, history keeps everything");
+NotifHistory.UseFolder(workDir);
+Check(NotifHistory.Recent().Count == 5 && NotifHistory.Waiting().All(w => w.Title != "Mom"), "inbox: history and done are kept after a restart");
+try { Directory.Delete(workDir, true); } catch { }
+
 // ───────── reading documents ─────────
 string dir = Path.Combine(Path.GetTempPath(), "dn-checks");
 Directory.CreateDirectory(dir);

@@ -108,6 +108,7 @@ public partial class NotchWindow
     {
         if (_pop != null) { _pop.Activate(); return; } // the chat is in its own window: that's where you go
         if (_launcherOpen) { if (seed != null && _launchBox != null) { _launchBox.Text += seed; _launchBox.CaretIndex = _launchBox.Text.Length; } return; }
+        EndWorkTyping(giveBack: false); // a box on the Work page lets go
         var fg = GetForegroundWindow();
         _launchPrevFg = fg != _hwnd ? fg : IntPtr.Zero;
         CaptureSelection(_launchPrevFg); // text selected there goes to the AI (NotchWindow.LauncherChatHere)
@@ -242,7 +243,7 @@ public partial class NotchWindow
     }
 
     /// <summary>For the message loop: while the search is open the notch takes the clicks it gets.</summary>
-    bool LauncherTakesClicks => _launcherOpen;
+    bool LauncherTakesClicks => _launcherOpen || _workTyping;
 
     // ───────────────────────────── the panel ─────────────────────────────
 
@@ -1048,7 +1049,7 @@ public partial class NotchWindow
 
     void UpdateTypeToSearch(bool pointerInside)
     {
-        bool want = pointerInside && _settings.SearchTypeToOpen && _mode == Mode.Expanded && !_launcherOpen && !_settings.Locked && _game == null;
+        bool want = pointerInside && _settings.SearchTypeToOpen && _mode == Mode.Expanded && !_launcherOpen && !_workTyping && !_settings.Locked && _game == null;
         if (want == (_typeHook != IntPtr.Zero)) return;
         if (want)
         {
@@ -1067,7 +1068,7 @@ public partial class NotchWindow
 
     IntPtr OnTypeHook(int code, IntPtr wParam, IntPtr lParam)
     {
-        if (code >= 0 && wParam.ToInt32() == 0x0100 /* WM_KEYDOWN */)
+        if (code >= 0 && wParam.ToInt32() == 0x0100 /* WM_KEYDOWN */ && !_workTyping) // typing in a box on the Work page: the keys are the box's
         {
             var k = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
             bool injected = (k.flags & 0x10) != 0;

@@ -85,7 +85,7 @@ public partial class NotchWindow
 
     internal static readonly int[] OptionalPages = { 6, 1, 2, 3, 4 };
 
-    bool PageHidden(int page) => (page is > 0 and < 5 || page == CallsPage) && _settings.HiddenPages.Contains(page);
+    bool PageHidden(int page) => (page is > 0 and < 5 || page == CallsPage || page == WorkPage) && _settings.HiddenPages.Contains(page);
 
     /// <summary>Where a page sits among the ones shown (the strip skips hidden pages).</summary>
     int PagePos(int page)

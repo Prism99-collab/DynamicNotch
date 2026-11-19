@@ -23,7 +23,7 @@ public static class AiUsage
     static readonly object Gate = new();
     static readonly string FilePath = Path.Combine(Settings.Folder, "ai-usage.json");
     static readonly Dictionary<string, List<DateTime>> Minute = new();
-    static Day? _day;
+    static Dictionary<string, Day>? _days; // today, one record per key (Google's, Groq's…)
     static int _saveVersion;
 
     /// <summary>Google's date now (Pacific time).</summary>
@@ -39,14 +39,30 @@ public static class AiUsage
 
     static string KeyTag(string? key) => key is { Length: > 8 } k ? Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(k)))[..12] : "";
 
-    /// <summary>Today's record for this key (a new day or a new key: a fresh one).</summary>
+    /// <summary>
+    /// Today's record for this key. Each key has its own (Google's and Groq's counts used to share one, and each wiped
+    /// the other); a new day starts them over.
+    /// </summary>
     static Day Today(string? key)
     {
         string date = GoogleDate(), tag = KeyTag(key);
-        if (_day == null)
-            try { if (File.Exists(FilePath)) _day = JsonSerializer.Deserialize<Day>(File.ReadAllText(FilePath)); } catch { }
-        if (_day == null || _day.Date != date || tag.Length > 0 && _day.Key != tag) _day = new Day { Date = date, Key = tag };
-        return _day;
+        if (_days == null)
+        {
+            _days = new();
+            try
+            {
+                if (File.Exists(FilePath))
+                {
+                    string json = File.ReadAllText(FilePath).TrimStart();
+                    var list = json.StartsWith("[") ? JsonSerializer.Deserialize<List<Day>>(json) : JsonSerializer.Deserialize<Day>(json) is { } one ? new List<Day> { one } : null; // the old file held one record
+                    foreach (var d in list ?? new()) _days[d.Key] = d;
+                }
+            }
+            catch { }
+        }
+        foreach (var old in _days.Where(d => d.Value.Date != date).Select(d => d.Key).ToList()) _days.Remove(old);
+        if (!_days.TryGetValue(tag, out var day)) _days[tag] = day = new Day { Date = date, Key = tag };
+        return day;
     }
 
     /// <summary>A request reached this model.</summary>
@@ -242,7 +258,7 @@ public static class AiUsage
         await Task.Delay(600);
         if (v != _saveVersion) return;
         string json;
-        lock (Gate) json = JsonSerializer.Serialize(_day);
+        lock (Gate) json = JsonSerializer.Serialize(_days?.Values.ToList() ?? new List<Day>());
         try
         {
             Directory.CreateDirectory(Settings.Folder);
