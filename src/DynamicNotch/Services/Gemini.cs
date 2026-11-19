@@ -328,7 +328,7 @@ public static partial class OpenRouter
             if (c.Groq ? skipGroq : skipGoogle) continue;
             if (!tried.Add(c.Mark) || Spent(c.Mark) || AiUsage.Retired(c.Mark, c.Groq ? qKey : gKey)) continue;
             // a slow start: someone else is asked alongside, the other engine first (it fails for other reasons)
-            Cand? backup = auto && c.Cheap
+            Cand? backup = auto
                 ? chain.Skip(i + 1).Where(x => x.Cheap && !tried.Contains(x.Mark) && !Spent(x.Mark) && !(x.Groq ? skipGroq : skipGoogle))
                        .OrderBy(x => x.Groq == c.Groq ? 1 : 0).FirstOrDefault() : null;
             var (turn, by) = await Race(c, backup, gKey, qKey, messages, tools, onText, onThinking, cancel, temperature, effort, smart, tried);
@@ -397,7 +397,8 @@ public static partial class OpenRouter
         var t1 = Ask(first, gKey, qKey, messages, tools, Writer(1), onThinking, c1.Token, temperature, effort, smart);
         if (backup == null) return (await t1, first);
         // Groq starts in well under a second: a shorter wait before asking someone else
-        try { await Task.WhenAny(t1, Task.Delay(first.Groq ? TimeSpan.FromSeconds(3) : HedgeAfter, cancel)); } catch { }
+        // a slower model (Flash thinks before it writes) gets a little longer, but never the whole 40 s on its own
+        try { await Task.WhenAny(t1, Task.Delay(first.Groq ? TimeSpan.FromSeconds(3) : first.Cheap ? HedgeAfter : TimeSpan.FromSeconds(8), cancel)); } catch { }
         if (t1.IsCompleted || Volatile.Read(ref owner) != 0 || cancel.IsCancellationRequested) return (await t1, first);
 
         tried.Add(backup.Mark);

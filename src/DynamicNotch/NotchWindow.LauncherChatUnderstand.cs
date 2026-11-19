@@ -45,8 +45,38 @@ public partial class NotchWindow
     /// <summary>Moroccan Darija words, as typed in Latin letters.</summary>
     static readonly Regex DarijaWords = new(@"\b(salam|slm|labas|lbas|wach|wesh|kidayr|kidayra|kidayrin|chno|chnou|achno|bghit|bghiti|dyal|dyali|dyalk|mzyan|mezyan|walo|safi|wakha|3afak|zwin|khoya|sahbi|hamdullah|lhamdullah|bzaf|daba|ghir|fin|m3ak|m3a|nta|nti|ana|3lach|kifach|imta|chhal|bslama|tbarkallah|inchallah)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    static readonly HashSet<string> ActingTools = new() { "use_app", "send_message", "play_music", "do_on_pc", "open", "run_powershell", "write_file", "youtube", "manage_window" };
+
+    /// <summary>
+    /// After a task's last step: is what the user asked for really done? Null when it looks done; else what to tell the
+    /// AI so it finishes (it gets one more go). Two signs it isn't: it typed or clicked and never looked at the result,
+    /// or the user named an app and the work happened outside it (only opened, then done elsewhere).
+    /// </summary>
+    string? GoalUnmet(string text, List<(string Tool, string Args, bool Ok)> steps)
+    {
+        if (steps.Count == 0 || !steps.Any(s => ActingTools.Contains(s.Tool))) return null; // nothing was done on the PC
+        if (_actUnchecked)
+            return "You typed or clicked in an app but didn't look at the result. Look now (use_app look, or see_screen): is the task really done the way the user meant? If not, finish it in that app. Then answer in one line with what the user now sees.";
+        // an app named in the request, open on this PC: was the work done in it?
+        foreach (Match w in Regex.Matches(text.ToLowerInvariant(), @"\p{L}[\p{L}\d+.]{2,}"))
+        {
+            string app = w.Value;
+            if (Regex.IsMatch(app, "^(the|and|then|open|run|test|make|with|for|from|this|that|send|play|search|find|start|ouvre|lance|dans|avec|pour)$")) continue;
+            if (RunningWindows(app).Count == 0) continue;
+            bool workedIn = steps.Any(s => s.Tool is "use_app" or "send_message" or "play_music" or "youtube" && s.Args.Contains(app, StringComparison.OrdinalIgnoreCase))
+                || steps.Any(s => s.Tool == "open" && Regex.IsMatch(s.Args, @"https?://", RegexOptions.IgnoreCase)); // a page opened (in the browser)
+            bool onlyOpened = steps.All(s => s.Tool is "do_on_pc" or "open" or "run_powershell" or "manage_window" or "see_screen" or "notch_data");
+            if (!workedIn && onlyOpened && MultiStep.IsMatch(text))
+                return $"The user wanted this done in {app}, but your steps only opened it and did the rest outside it. Do the task inside {app} (use_app look then click/type, or open the right page in it), check it on screen, then answer in one line.";
+        }
+        return null;
+    }
+
     /// <summary>Every letter in the message is a Latin one (English, French, Darija typed in Latin…).</summary>
     static bool LatinOnly(string text) => Regex.IsMatch(text, @"\p{L}") && !Regex.IsMatch(text, @"[^\u0000-ɏḀ-ỿ\s\p{P}\p{S}\p{N}]");
+
+    /// <summary>How any task on the PC is done (in every app, not one command): the goal first, the steps in the right app, then a look.</summary>
+    const string TaskMethod = "DOING A TASK ON THE PC (any app): 1) the goal: what the user should SEE when it's done, and in which app or site (the one they named; if none, the obvious one). 2) the steps to get there. 3) do them IN that app: an app already open is used, not started again; work inside it with use_app (look, click, type, keys) or open the right page in it; never swap the task for something else that only looks close (a PowerShell result in the chat instead of the page in the browser, a new empty window, an answer instead of doing it). 4) look at the result (use_app look, or see_screen) before saying done; if it isn't there yet, keep going. 5) one line: what the user now sees. Blocked: say exactly what stopped you.";
 
     /// <summary>Told to the AI with every message.</summary>
     const string ReadTheConversation = "Read each message with the conversation before it: a short reply right after your answer (no, wrong, it's X not Y, I meant…, thanks) is about that answer. Never take an app or a name in it as an order to open, close or play something. Do something on the PC only when the message asks for it. When you're unsure what's meant, ask one short question instead of guessing.";

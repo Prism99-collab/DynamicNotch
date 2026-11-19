@@ -180,8 +180,9 @@ public partial class NotchWindow
             var m = msgs[i];
             if (m == null) continue;
             string role = m["role"]?.ToString() ?? "";
-            bool old = i < msgs.Count - 8;
-            if (tools == null && role == "tool") { list.Add(new JsonObject { ["role"] = "user", ["content"] = "(result of an earlier step) " + Cut(m["content"]?.ToString() ?? "", old ? 1500 : 6000) }); continue; }
+            // the last few messages go in full; older ones shortened, so a long chat stays as quick as a new one
+            bool old = i < msgs.Count - 6;
+            if (tools == null && role == "tool") { list.Add(new JsonObject { ["role"] = "user", ["content"] = "(result of an earlier step) " + Cut(m["content"]?.ToString() ?? "", old ? 700 : 4000) }); continue; }
             var copy = m.DeepClone().AsObject();
             copy.Remove("shown");
             copy.Remove("auto");
@@ -190,7 +191,11 @@ public partial class NotchWindow
             copy.Remove("pictures");
             if (copy["content"] is JsonArray parts && !keepPictures.Contains(i))
                 copy["content"] = (parts.FirstOrDefault(p => p?["type"]?.ToString() == "text")?["text"]?.ToString() ?? "") + " [picture]";
-            if (role == "tool" && old && copy["content"]?.ToString() is { Length: > 1500 } long_) copy["content"] = long_[..1500] + "\n…(older result, shortened)";
+            if (role == "tool" && copy["content"]?.ToString() is { } result && result.Length > (old ? 700 : 4000)) copy["content"] = result[..(old ? 700 : 4000)] + "\n…(shortened)";
+            // an older answer: its start is enough to follow the conversation
+            if (role == "assistant" && old && copy["content"] is JsonValue && copy["content"]?.ToString() is { Length: > 900 } said) copy["content"] = said[..900] + " …(shortened)";
+            // an older question with a file attached: the question, not the whole file again
+            if (role == "user" && old && copy["content"] is JsonValue && copy["content"]?.ToString() is { Length: > 1500 } asked) copy["content"] = asked[..1500] + " …(shortened)";
             if (tools == null && copy.ContainsKey("tool_calls"))
             {
                 copy.Remove("tool_calls");
@@ -201,7 +206,7 @@ public partial class NotchWindow
         // too long for the model: the oldest exchanges go (a whole exchange at a time, so no step loses its answer)
         static int Size(JsonObject o) => o.ToJsonString().Length;
         int total = list.Sum(Size);
-        while (total > 90000)
+        while (total > 36000) // about 9,000 tokens: quick to answer, and small enough for the fast engine
         {
             int next = list.FindIndex(1, o => o["role"]?.ToString() == "user");
             if (next <= 0) break;

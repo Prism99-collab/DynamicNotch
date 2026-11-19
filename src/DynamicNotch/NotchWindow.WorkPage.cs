@@ -363,7 +363,7 @@ public partial class NotchWindow
 
     FrameworkElement AnswerButtons(string asked, string md, Action clear) =>
         SmallButtons(("Copy", () => { CopyText(md, "Copied"); WorkSay("Copied"); }),
-            ("Continue in chat", () => OpenChatWith(asked + "\n\n(About: " + Regex.Replace(md, @"\s+", " ")[..Math.Min(400, md.Length)] + ")")),
+            ("Continue in chat", () => ContinueInChat(asked, md)),
             ("Clear", clear));
 
     async void AskOnCard(StackPanel host, string asked, string question, Func<CancellationToken, Task<string>> context, Action<string>? keep = null, Action? cleared = null)
@@ -438,6 +438,27 @@ public partial class NotchWindow
         WebTools.Rank ??= url => TrustOf(url, _chatLastUser); // research reads the trusted pages first
         OpenRouter.Choose(_settings.AiProvider);
         _ = OpenRouter.IsGemini ? OpenRouter.GeminiModels() : (Task)OpenRouter.Models();
+    }
+
+    /// <summary>
+    /// The chat, opened on a new conversation that already holds this question and its answer: you just go on talking
+    /// (nothing is pasted, nothing is sent until you write).
+    /// </summary>
+    void ContinueInChat(string asked, string answer)
+    {
+        EndWorkTyping(giveBack: false);
+        OpenLauncher(null);
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+        {
+            var s = NewSession();
+            s.Title = TitleOf(asked);
+            s.Messages.Add(new JsonObject { ["role"] = "user", ["content"] = asked, ["shown"] = asked, ["at"] = DateTime.Now.ToString("o") });
+            s.Messages.Add(new JsonObject { ["role"] = "assistant", ["content"] = answer });
+            s.Updated = DateTime.Now;
+            StartSession(s);
+            _session = s;
+            EnterChat(null, resume: true);
+        });
     }
 
     /// <summary>The AI chat, opened on a question (it answers there, with its tools).</summary>
@@ -546,15 +567,27 @@ public partial class NotchWindow
         string ctxKey = subject.Key;
         _nowShownKey = ctxKey;
         Func<CancellationToken, Task<string>> context = ct => NowContext(subject, ct);
+        // under the card: Recent, or (while an answer is there) one short line for it, so the answer has the room
+        var recentHost = new ContentControl { Focusable = false };
+        void ShowRecent(bool folded) => recentHost.Content = folded && !_recentOpen ? RecentFolded(() => { _recentOpen = true; ShowRecent(true); }) : RecentStrip();
+        void Answered() => _recentOpen = false;
+        void Cleared() { _nowAnswers.Remove(ctxKey); _recentOpen = false; ShowRecent(false); }
+        void Ask(string asked, string prompt)
+        {
+            _recentOpen = false;
+            ShowRecent(true);
+            AskOnCard(body, asked, prompt, context, a => { _nowAnswers[ctxKey] = (asked, a, DateTime.Now); Answered(); }, Cleared);
+        }
         foreach (var (label, prompt) in NowActions.GetValueOrDefault(kind) ?? NowActions["app"])
-            acts.Children.Add(WorkChip(label, () => AskOnCard(body, label, prompt, context, a => _nowAnswers[ctxKey] = (label, a, DateTime.Now), () => _nowAnswers.Remove(ctxKey)), prompt));
+            acts.Children.Add(WorkChip(label, () => Ask(label, prompt), prompt));
         body.Children.Add(acts);
-        body.Children.Add(BoxHost(WorkBox(_cyber ? "ASK ABOUT IT…" : "Ask anything about it…", q => AskOnCard(body, q, q, context, a => _nowAnswers[ctxKey] = (q, a, DateTime.Now), () => _nowAnswers.Remove(ctxKey)))).Also(g => g.Margin = new Thickness(0, 2, 0, 0)));
+        body.Children.Add(BoxHost(WorkBox(_cyber ? "ASK ABOUT IT…" : "Ask anything about it…", q => Ask(q, q))).Also(g => g.Margin = new Thickness(0, 2, 0, 0)));
         // the last answer about it, still here (until you clear it)
-        if (_nowAnswers.TryGetValue(ctxKey, out var kept) && DateTime.Now - kept.At < TimeSpan.FromHours(6))
-            body.Children.Add(AnswerBlock(kept.Q, kept.Md, () => _nowAnswers.Remove(ctxKey)));
+        bool hasAnswer = _nowAnswers.TryGetValue(ctxKey, out var kept) && DateTime.Now - kept.At < TimeSpan.FromHours(6);
+        if (hasAnswer) body.Children.Add(AnswerBlock(kept.Q, kept.Md, Cleared));
         stack.Children.Add(WorkCard(body, hot: true));
-        stack.Children.Add(RecentStrip());
+        ShowRecent(hasAnswer);
+        stack.Children.Add(recentHost);
         return stack;
     }
 
@@ -587,6 +620,18 @@ public partial class NotchWindow
     }
 
     /// <summary>Under it: the last things you worked on, to jump back to.</summary>
+    bool _recentOpen;
+
+    /// <summary>Recent folded to one line ("Recent · 6 · Show") while an answer takes the room.</summary>
+    UIElement RecentFolded(Action open)
+    {
+        int n = WorkLog.Recent(8).Count;
+        var row = new Grid { Margin = new Thickness(2, 0, 0, 2) };
+        row.Children.Add(WorkText(Cap(n > 0 ? $"Recent · {n}" : "Recent"), 9.5, A(TextTone, 0x70), bold: true, wrap: false).Also(t => t.VerticalAlignment = VerticalAlignment.Center));
+        if (n > 0) row.Children.Add(SmallButtons(("Show", open)).Also(b => b.Margin = new Thickness(0)));
+        return row;
+    }
+
     UIElement RecentStrip()
     {
         var recent = WorkLog.Recent(8);
@@ -692,7 +737,7 @@ public partial class NotchWindow
         {
             Child = row, Padding = new Thickness(5, 2, 8, 3), Margin = new Thickness(0, 0, 5, 4), Cursor = Cursors.Hand, CornerRadius = new CornerRadius(_cyber ? 0 : 7),
             Background = Frozen(_cyber ? Color.FromArgb(0x60, 0x00, 0x00, 0x00) : Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF)), BorderBrush = Frozen(A(WorkAcc, 0x30)), BorderThickness = new Thickness(1),
-            ToolTip = $"{it.Name}\n{it.App}{(it.Seconds > 0 ? " · " + Spent(it.Seconds) : "")} · {WorkAgo(it.Last)}\n{(it.Path ?? it.Url ?? "")}\nClick: open · Drag: move to a project · Right-click: {(project != null ? "take it out" : "forget it")}".TrimEnd(),
+            ToolTip = $"{it.Name} · {WorkAgo(it.Last)}", // short: the × and a click say the rest
         };
         chip.MouseEnter += (_, _) => { chip.BorderBrush = Frozen(_cyber ? CyYellow : WorkAcc); x.Visibility = Visibility.Visible; };
         chip.MouseLeave += (_, _) => { chip.BorderBrush = Frozen(A(WorkAcc, 0x30)); x.Visibility = Visibility.Hidden; };

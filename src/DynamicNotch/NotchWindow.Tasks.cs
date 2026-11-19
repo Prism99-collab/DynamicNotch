@@ -385,6 +385,8 @@ public partial class NotchWindow
                 foreach (var n in t.Op == "switch" ? new List<string> { t.Text! } : OpenNames(t.Text!))
                 {
                     if (LauncherAnswers.For(n)?.Url is { } url) { OpenTarget(url); continue; }
+                    // already open: brought to the front, not started a second time (a new browser window, a second Spotify…)
+                    if (RunningWindows(n) is { Count: > 0 } running) { FocusWindow(running[0].Hwnd); await Task.Delay(120); continue; }
                     if (ResolveEntry(n) is { } e) { _index.Used(e); OpenTarget(e.Target); await Task.Delay(120); }
                 }
                 return null;

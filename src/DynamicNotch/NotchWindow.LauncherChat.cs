@@ -294,6 +294,9 @@ public partial class NotchWindow
 
     ChatSession NewSession() => new() { Model = ChatModel };
 
+    /// <summary>A command with several steps ("open brave and run a ping test", "ouvre word puis écris…").</summary>
+    static readonly System.Text.RegularExpressions.Regex MultiStep = new(@"\b(and|then|after that|et|puis|ensuite|w|o)\b\s+(?:then\s+)?(open|run|play|search|find|send|write|make|start|type|click|go|do|check|test|show|put|set|close|ouvre|lance|cherche|fais|écris|ecris|mets|joue|envoie|teste)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
     /// <summary>This question's brief (and what was searched for it), added to the AI's instructions for this answer only.</summary>
     string _turnBrief = "";
 
@@ -1104,12 +1107,15 @@ public partial class NotchWindow
         var startedAt = DateTime.Now;
         int stepCount = 0, tokenCount = 0;
         var turnSteps = new List<(string Tool, string Args, bool Ok)>(); // what it did, for what it learns (AiLearn)
+        bool goalChecked = false; // the "is it really done?" look, once per task
+        var turnLog = new StringBuilder(); // where the time went (app.log), to find what makes an answer slow
         int turnStart = _chatStack?.Children.Count ?? 0;
         var stepNames = new List<string>();
         DispatcherTimer? liveTick = null;
         var ask = AskKind(text); // what kind of question (NotchWindow.LauncherChatQuality)
         effort = EffortFor(ask, text, _settings.AiStyle == "detailed"); // thinks more only where it changes the answer
-        OpenRouter.SmartNext = ask == Ask.Correction || ScreenAsk.IsMatch(text) || effort != "low" || ask == Ask.Fact && HardWords.IsMatch(text); // getting these right matters more than a second
+        OpenRouter.SmartNext = ask == Ask.Correction || ScreenAsk.IsMatch(text) || effort != "low" || ask == Ask.Fact && HardWords.IsMatch(text) // getting these right matters more than a second
+            ; // tasks stay on the quick order: Groq's strongest model first (fast, ~1,000 a day); Google's Flash has ~20 a day
         // a harder PC task: the tested way to do it goes with the question, and the smart model takes it (Services/AiPlaybook)
         string? knowHow = ask is Ask.Fact or Ask.News or Ask.Correction ? null : AiPlaybook.Brief(text);
         if (knowHow != null) { _turnBrief += "\n" + knowHow; OpenRouter.SmartNext = true; }
@@ -1170,11 +1176,13 @@ public partial class NotchWindow
                 while (true)
                 {
                     var request = BuildRequest(session, tools);
+                    var roundClock = System.Diagnostics.Stopwatch.StartNew();
                     OpenRouter.ChatRequest.Value = true; // Groq gets the chat's short instructions (only the chat's)
                     turn = await OpenRouter.Stream(key, model, request, tools,
                         piece => Dispatcher.InvokeAsync(() => { live.Append(piece); dirty = true; }),
                         () => Dispatcher.InvokeAsync(() => bubble.Thinking(true)),
                         cancel, temperature, effort);
+                    turnLog.Append($" · AI {roundClock.Elapsed.TotalSeconds:0.0}s ({turn.Model ?? "?"}{(turn.Error != null ? ", " + turn.Error.Split(' ')[0] : "")})");
                     // busy or briefly down, before anything was written: tried once more on its own
                     if (turn.Error != null && live.Length == 0 && attempt == 0 && Retryable(turn.Error) && !cancel.IsCancellationRequested)
                     {
@@ -1210,6 +1218,15 @@ public partial class NotchWindow
                     else if (turn.Error.Contains("/key")) ChatProblem($"{OpenRouter.ProviderName} turned this request down, but the key itself is fine (it was checked). Try again in a moment.", round == 0 ? ("Try again", () => SendChat(text)) : null);
                     else ChatProblem(turn.Error, turn.Error.StartsWith("Today's 50") ? ("Add credit", () => OpenLink("https://openrouter.ai/settings/credits")) : turn.Error.StartsWith("Today's free Google") ? null : round == 0 ? ("Try again", () => SendChat(text)) : null);
                     break;
+                }
+                // it says it's done: is it? (once per task: it may have stopped short, or done it outside the app you meant)
+                if (turn.Calls.Count == 0 && !goalChecked && ask == Ask.Action && round < ChatToolRounds && GoalUnmet(text, turnSteps) is { } unmet)
+                {
+                    goalChecked = true;
+                    session.Messages.Add(new JsonObject { ["role"] = "assistant", ["content"] = said.Length > 0 ? said : "(steps done)" });
+                    session.Messages.Add(new JsonObject { ["role"] = "user", ["auto"] = true, ["content"] = "[Check before finishing] " + unmet });
+                    _chatStack?.Children.Remove(bubble.Root); // its "done" goes: the finished answer comes next
+                    continue;
                 }
                 if (turn.Calls.Count == 0)
                 {
@@ -1249,6 +1266,7 @@ public partial class NotchWindow
                     {
                         _pendingUndo = null;
                         _pendingCards.Clear();
+                        var stepClock = System.Diagnostics.Stopwatch.StartNew();
                         try
                         {
                             var running = RunTool(c.Name, c.Args.ToString(), cancel);
@@ -1258,6 +1276,7 @@ public partial class NotchWindow
                         }
                         catch (OperationCanceledException) when (cancel.IsCancellationRequested) { result = "Cancelled by the user."; }
                         catch (Exception ex) { result = "Error: " + ex.Message; }
+                        turnLog.Append($" · {c.Name} {stepClock.Elapsed.TotalSeconds:0.0}s");
                         if (_pendingUndo is { } u && !result.StartsWith("Error")) AttachUndo(step, u);
                         _pendingUndo = null;
                         if (_pendingCards.Count > 0 && !result.StartsWith("Error")) ShowCards(_pendingCards.ToList());
@@ -1295,6 +1314,7 @@ public partial class NotchWindow
         }
         finally
         {
+            if (turnLog.Length > 0) AppLog.Write($"ai answer {(DateTime.Now - startedAt).TotalSeconds:0.0}s [{ask}]{turnLog}");
             liveTick?.Stop();
             _turnBrief = "";
             OpenRouter.SmartNext = false;
@@ -1430,6 +1450,7 @@ public partial class NotchWindow
         sb.AppendLine("Before you answer: be sure what exactly is asked and what form fits it (one fact, a short list, a table, a file, an action). Answer exactly that, complete and correct, nothing around it.");
         sb.AppendLine(ReadTheConversation);
         sb.AppendLine(SoundHuman);
+        sb.AppendLine(TaskMethod);
         sb.AppendLine(ChartRule);
         if (_turnBrief.Length > 0) sb.AppendLine(_turnBrief);
         return sb.ToString().TrimEnd();

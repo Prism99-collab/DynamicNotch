@@ -81,7 +81,7 @@ public partial class NotchWindow
         Ask.HowTo => "THIS QUESTION asks HOW to do something: answer with the steps (numbered, short, 3-6 lines, the exact names of menus and buttons). If it's something on this PC your tools can do, end with one line: 'Want me to do it?'. Don't do it unasked.",
         Ask.Talk => "THIS MESSAGE is small talk. Reply like a friend texting back: one or two short sentences, warm and natural, in their language and tone (slang if they use it), maybe one light question back or an offer to help. You're an AI: no made-up personal life, but be friendly ('Doing good, thanks! What's up with you?'). No lists, no bold, no sources, no definitions, no tools.",
         Ask.Day => "THIS QUESTION: the user's day or schedule. Answer from MY DAY below (the calendar tool for other days): what's next first, then today as a short timeline (time · title · place), then reminders. A briefing: also missed notifications worth knowing, and one line on yesterday. Calendar not connected: say once, in one line, how to connect it.",
-        Ask.Action => "THIS QUESTION: something to do on the PC. Do it with the right tool, check it worked, then confirm in one short line.",
+        Ask.Action => "THIS QUESTION: something to do on the PC. Do what was meant, not just the words: when the message names the app to do it in ('open Brave and run a ping test', 'in Word, write…', 'on Spotify play…'), the task happens IN that app: a ping or speed test in a browser means opening a test site there (https://www.speedtest.net shows ping, download and upload), never PowerShell instead. An app that's already open is brought to the front, not started again. Do it with the right tool, check it worked, then confirm in one short line.",
         _ => "",
     };
 

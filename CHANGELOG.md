@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.13.1] — 2026-11-19
+
+The AI does what you meant, and doesn't keep you waiting.
+
+### Changed
+- Tasks are done in the app you name ("open Brave and run a speed test" opens the test in Brave), and the AI looks
+  at the result before saying it's done. If it stopped short, it goes back and finishes.
+- Opening an app that's already open brings it to the front instead of starting a second one.
+- Long chats stay as quick as new ones.
+- A slow AI model never holds an answer: a faster one is asked alongside after a few seconds.
+- "Continue in chat" on the Work page opens the chat with that answer in it, ready for your next message.
+- While an answer is on the Work page, Recent folds to one line to give it room.
+
 ## [2.13.0] — 2026-11-19
 
 A new page for your work, right after Home.

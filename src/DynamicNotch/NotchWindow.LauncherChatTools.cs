@@ -317,12 +317,12 @@ public partial class NotchWindow
                 p.StandardInput.Close();
                 var outTask = p.StandardOutput.ReadToEndAsync();
                 var errTask = p.StandardError.ReadToEndAsync();
-                bool done = p.WaitForExit(45000);
+                bool done = p.WaitForExit(25000); // long jobs (installs) are started in the background instead
                 if (!done) { try { p.Kill(entireProcessTree: true); } catch { } }
                 string output = outTask.Wait(2000) ? outTask.Result : "";
                 string errors = errTask.Wait(2000) ? errTask.Result : "";
                 var sb = new StringBuilder();
-                if (!done) sb.AppendLine("(stopped after 45 s)");
+                if (!done) sb.AppendLine("(stopped after 25 s: too slow. For a long job, start it with Start-Process so it runs on its own)");
                 sb.AppendLine("Exit code: " + (done ? p.ExitCode.ToString() : "-"));
                 if (output.Trim().Length > 0) sb.AppendLine(Cut(output.Trim(), 8000));
                 if (errors.Trim().Length > 0) sb.AppendLine("Errors:\n" + Cut(errors.Trim(), 3000));

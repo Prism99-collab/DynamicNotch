@@ -50,6 +50,7 @@ public partial class NotchWindow
         if (_settings.AiInstructions.Trim().Length > 0) sb.AppendLine("The user's own instructions: " + _settings.AiInstructions.Trim());
         sb.AppendLine(ReadTheConversation);
         sb.AppendLine(SoundHuman);
+        sb.AppendLine(TaskMethod);
         sb.AppendLine(ChartRule);
         if (_turnBrief.Length > 0) sb.AppendLine(_turnBrief);
         return sb.ToString().TrimEnd();
