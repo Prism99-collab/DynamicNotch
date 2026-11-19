@@ -93,6 +93,7 @@ public partial class NotchWindow
             }
             group.Rows.Add(row);
         }
+        MakeSortable(table, group, header, i => i % 2 == 1 ? Frozen(Color.FromArgb(0x0C, 0xFF, 0xFF, 0xFF)) : Brushes.Transparent); // NotchWindow.LauncherChatRich
         return table;
     }
 }

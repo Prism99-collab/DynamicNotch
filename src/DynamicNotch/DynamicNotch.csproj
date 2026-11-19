@@ -17,7 +17,7 @@
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
 
     <!-- What Windows shows in the exe's Properties > Details and in Settings > Apps -->
-    <Version>2.11.2</Version>
+    <Version>2.12.0</Version>
     <Product>Dynamic Notch</Product>
     <AssemblyTitle>Dynamic Notch</AssemblyTitle>
     <Description>A smooth animated notch and control center for Windows.</Description>
@@ -54,6 +54,7 @@
   <ItemGroup>
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+    <PackageReference Include="PdfPig" Version="0.1.11" />
     <PackageReference Include="System.Management" Version="10.0.0" />
   </ItemGroup>
 

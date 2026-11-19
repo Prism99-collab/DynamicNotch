@@ -94,8 +94,8 @@ public partial class NotchWindow
             sb.AppendLine(_media.Title.Length > 0 ? $"PLAYING: {_media.Title}{(_media.Artist.Length > 0 ? " — " + _media.Artist : "")} ({(_media.IsPlaying ? "playing" : "paused")})" : "PLAYING: nothing");
         if (Want("notif"))
         {
-            sb.AppendLine("NOTIFICATIONS (since the notch started):");
-            sb.AppendLine(RecentToastsText().Split('\n').Where(Match).Take(all ? 6 : 25).Aggregate(new StringBuilder(), (b, l) => b.AppendLine("- " + l)).ToString().TrimEnd());
+            sb.AppendLine("NOTIFICATIONS (today, newest first):");
+            sb.AppendLine(RecentToastsText().Split('\n').Where(Match).Take(all ? 8 : 60).Aggregate(new StringBuilder(), (b, l) => b.AppendLine("- " + l)).ToString().TrimEnd());
         }
         if (Want("clip") || Want("copied"))
         {
@@ -122,6 +122,8 @@ public partial class NotchWindow
         }
         if (Want("device") || Want("batter") || Want("mouse") || Want("headset") || Want("bluetooth") || Want("setup") || Want("system"))
             sb.AppendLine("DEVICES:\n" + DevicesText());
+        if (Want("app") || Want("usage") || Want("time") || Want("used") || Want("screen time"))
+            sb.AppendLine(AppTimeText(day));
         if (Want("system") || Want("health") || Want("pc") || Want("strain"))
         {
             sb.AppendLine("PC NOW: " + PcStatus().Replace("\n", " · "));
@@ -133,7 +135,7 @@ public partial class NotchWindow
                     sb.AppendLine($"- {When(e.At.ToLocalTime())} · {e.Name} {e.Value:0}{e.Unit} for {Long(e.Seconds)} · top: {string.Join(", ", e.TopCpu.Take(3).Select(p => p.Name))}{(e.Causes.Count > 0 ? " · likely: " + string.Join("; ", e.Causes.Take(2)) : "")}");
             }
         }
-        if (sb.Length == 0) return "Nothing called “" + what + "”. Ask for: today, calls, reminders, timer, focus, media, notifications, clipboard, shelf, downloads, devices, system.";
+        if (sb.Length == 0) return "Nothing called “" + what + "”. Ask for: today, calls, reminders, timer, focus, media, notifications, clipboard, shelf, downloads, devices, apps (time in each app), system.";
         return sb.ToString().TrimEnd();
     }
 

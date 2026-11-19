@@ -1,6 +1,6 @@
 # Privacy policy
 
-*Dynamic Notch · updated 18 November 2026 (version 2.11)*
+*Dynamic Notch · updated 19 November 2026 (version 2.12)*
 
 Dynamic Notch has no account, no ads, no analytics and no telemetry. Nothing about you or your PC is sent to the
 developer or to anyone else.
@@ -22,6 +22,9 @@ All of this stays on your PC.
 | Start menu apps, recent files, and the names of files and folders on your drives | For the search |
 | The windows you have open | So the search can take you to them |
 | Your files, browser history and other PC details | Only when you ask the AI chat something that needs them |
+| How long each app is in front each day (never what you do in it) | For "what did I use most" and your day's summary |
+| Text you've selected, and the page or window you're on | Only when you ask the AI about it ("explain this", "summarize this page") |
+| Documents and pictures you give the AI | Read on your PC; text in pictures and scans is read by Windows itself |
 
 ## What it keeps
 
@@ -35,6 +38,10 @@ Only on your PC, in `%APPDATA%\DynamicNotch`:
 - a list of file and folder names on your drives, with their dates (never what's inside them), so the search can find
   files anywhere. Windows, program and app-data folders are left out. You can turn this off in Preferences → Search;
 - your AI chats, the few facts you ask it to remember, and your AI key (encrypted with your Windows account);
+- what the AI learned from tasks that worked, and how much of each AI service you've used today;
+- your calendar's private link, if you add one (encrypted with your Windows account);
+- answers you marked with 👎;
+- today's notifications, and how long each app was in front over the last two weeks;
 - the overload log;
 - technical logs (`app.log`, `error.log`).
 
@@ -51,11 +58,13 @@ You can delete any of it, and uninstalling removes it.
   notch's own records), go to the AI services whose keys you entered (Google AI Studio, Groq, or OpenRouter),
   under their privacy policies. Web searches it runs go to Google, Brave, DuckDuckGo or Wikipedia. Video searches
   go to YouTube. Pictures it makes are drawn by Pollinations from the description. Each key is only ever sent to its
-  own service.
+  own service. When you ask about the page you're on, its text goes with your question.
+- **Calendar (only if you add it):** your calendar is downloaded from its private link (Google, Outlook, iCloud…).
+  The link itself is never sent anywhere else.
 - **Shorter alerts (with an AI key, can be turned off):** the text of a long alert from an app (never a message from a
   person) is sent to the same AI service to be put in a few words.
 - **Browser extension (optional):** talks to the app only on your own PC (`127.0.0.1`, port 47853), and only about
-  tabs that play media.
+  tabs that play media, or the tab in front when you ask the AI about it.
 
 The app doesn't check for updates and never contacts the developer.
 

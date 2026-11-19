@@ -6,6 +6,20 @@
   window.__dynamicNotchMedia = true;
   const api = globalThis.browser ?? globalThis.chrome;
 
+  // the notch's AI asks about this page ("summarize this", "what I selected"): its text and the selection, for the
+  // tab in front only, only when asked, and only to the notch on this PC
+  api.runtime.onMessage.addListener((msg, sender, reply) => {
+    if (!msg || msg.cmd !== 'read' || window !== window.top) return;
+    let sel = '';
+    try { sel = String(window.getSelection() || ''); } catch { }
+    const active = document.activeElement;
+    if (!sel && active && /^(TEXTAREA|INPUT)$/.test(active.tagName) && active.type !== 'password' && active.selectionEnd > active.selectionStart)
+      sel = active.value.slice(active.selectionStart, active.selectionEnd);
+    // just the selection (asked each time the notch's search opens): the page's text isn't gathered, that's heavy
+    const text = msg.only === 'sel' ? '' : (document.body?.innerText || '').slice(0, 60000);
+    reply({ title: document.title, url: location.href, text, sel: sel.slice(0, 20000) });
+  });
+
   let current = null;     // the media element this frame reports
   let lastSent = '';
   let sendTimer = 0;
@@ -90,7 +104,7 @@
 
   api.runtime.onMessage.addListener(msg => {
     const m = pick() || current;
-    if (!msg || !m) return;
+    if (!msg || !m || msg.cmd === 'read') return;
     switch (msg.cmd) {
       case 'toggle': m.paused ? m.play().catch(() => { }) : m.pause(); break;
       case 'play': m.play().catch(() => { }); break;

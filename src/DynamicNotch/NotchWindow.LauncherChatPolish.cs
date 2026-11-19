@@ -365,6 +365,7 @@ public partial class NotchWindow
             _typeGlow = new Border { Height = 1.5, VerticalAlignment = VerticalAlignment.Bottom, Background = brush, Opacity = 0, IsHitTestVisible = false, Tag = ChatAccent };
             if (!_cyber) _typeGlow.Effect = new System.Windows.Media.Effects.DropShadowEffect { Color = ChatAccent, BlurRadius = 8, ShadowDepth = 0, Opacity = 0.8 };
             Grid.SetColumnSpan(_typeGlow, 4);
+            Grid.SetRowSpan(_typeGlow, 2);
             ((Grid)_launchLineRow).Children.Add(_typeGlow);
         }
         if (on == _typeGlowOn) return;
@@ -500,7 +501,7 @@ public partial class NotchWindow
             var p = e.GetPosition(host);
             if (p.X <= 1 || p.Y <= 1 || p.X >= host.ActualWidth - 1 || p.Y >= host.ActualHeight - 1) Veil(false);
         };
-        host.Drop += (_, e) =>
+        host.Drop += async (_, e) =>
         {
             if (!Wanted(e)) return;
             e.Handled = true;
@@ -511,7 +512,7 @@ public partial class NotchWindow
                     foreach (var path in files.Take(5))
                     {
                         if (PictureExts.Contains(System.IO.Path.GetExtension(path).ToLowerInvariant())) { AddPictureFile(path); continue; }
-                        string text = ReadAnyText(path);
+                        string text = await Task.Run(() => ReadAnyText(path));
                         if (text.StartsWith("Error") || text.StartsWith("This is not a text file")) { Toast("Can't read " + System.IO.Path.GetFileName(path) + " as text"); continue; }
                         if (text.Length > 24000) text = text[..24000] + "\n…(cut)";
                         _chatAttach = (System.IO.Path.GetFileName(path), text);

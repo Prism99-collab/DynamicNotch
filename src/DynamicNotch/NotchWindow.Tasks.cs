@@ -466,6 +466,7 @@ public partial class NotchWindow
     LauncherIndex.Entry? ResolveEntry(string name)
     {
         string n = name.Trim();
+        if (KnownApp(n) is { } known) return known; // "cmd" is the Command Prompt, not "Git CMD"
         bool wantSetting = Regex.IsMatch(n, @"\bsettings?$");
         n = Regex.Replace(n, @"\s*\b(?:settings?|app|application|folder|window)$", "").Trim();
         if (n.Length < 2) return null;

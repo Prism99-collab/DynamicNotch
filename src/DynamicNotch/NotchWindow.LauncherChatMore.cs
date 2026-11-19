@@ -24,18 +24,22 @@ public partial class NotchWindow
     void KeepToast(ToastInfo t)
     {
         if (!_settings.AiChat) return;
+        LoadTodaysToasts();
         lock (_recentToasts)
         {
             _recentToasts.Add((DateTime.Now, t.App, t.Title, t.Body));
-            if (_recentToasts.Count > 25) _recentToasts.RemoveAt(0);
+            _recentToasts.RemoveAll(r => r.At.Date < DateTime.Today);
+            if (_recentToasts.Count > 200) _recentToasts.RemoveAt(0);
         }
+        SaveTodaysToasts(); // today's are kept on this PC until tomorrow
     }
 
     internal string RecentToastsText()
     {
+        LoadTodaysToasts();
         lock (_recentToasts)
         {
-            if (_recentToasts.Count == 0) return "No notifications since the notch started.";
+            if (_recentToasts.Count == 0) return "No notifications today.";
             return string.Join("\n", _recentToasts.AsEnumerable().Reverse().Select(t => $"{t.At:HH:mm} · {t.App}: {t.Title}{(t.Body.Length > 0 ? " — " + (t.Body.Length > 200 ? t.Body[..200] + "…" : t.Body) : "")}"));
         }
     }
@@ -250,6 +254,7 @@ public partial class NotchWindow
         };
         if (has)
         {
+            if (CalendarFeed.Connected) items.Add(("\uE787", "Disconnect the calendar", null, false, () => { CalendarFeed.Forget(); Toast("Calendar disconnected"); }));
             items.Add(("", "Rename this chat", null, false, RenameChat));
             items.Add(("", "Export as Markdown…", null, false, ExportChat));
             items.Add(("", "Copy the whole chat", null, false, () => CopyText(Transcript(), "Chat copied")));
@@ -261,9 +266,9 @@ public partial class NotchWindow
 
     // ───────────────────────────── attach, rename, export ─────────────────────────────
 
-    void AttachFile()
+    async void AttachFile()
     {
-        var dlg = new Microsoft.Win32.OpenFileDialog { Title = "Attach a file to your next message", Filter = "Text, documents and pictures|*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp;*.txt;*.md;*.csv;*.json;*.log;*.xml;*.html;*.docx;*.cs;*.py;*.js;*.ts;*.java;*.cpp;*.c;*.h;*.sql;*.ini;*.yaml;*.yml;*.ps1;*.bat|All files|*.*" };
+        var dlg = new Microsoft.Win32.OpenFileDialog { Title = "Attach a file to your next message", Filter = "Text, documents and pictures|*.pdf;*.xlsx;*.xlsm;*.pptx;*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp;*.txt;*.md;*.csv;*.json;*.log;*.xml;*.html;*.docx;*.cs;*.py;*.js;*.ts;*.java;*.cpp;*.c;*.h;*.sql;*.ini;*.yaml;*.yml;*.ps1;*.bat|All files|*.*" };
         _chatModal = true;
         bool ok;
         try { ok = dlg.ShowDialog(ChatPopped ? _pop : this) == true; }
@@ -272,7 +277,7 @@ public partial class NotchWindow
         _launchBox?.Focus();
         if (!ok) return;
         if (PictureExts.Contains(Path.GetExtension(dlg.FileName).ToLowerInvariant())) { AddPictureFile(dlg.FileName); return; }
-        string text = ReadAnyText(dlg.FileName);
+        string text = await Task.Run(() => ReadAnyText(dlg.FileName)); // a PDF or a scan can take a moment
         if (text.StartsWith("Error") || text.StartsWith("This is not a text file")) { Toast("Can't read that file as text"); return; }
         if (text.Length > 24000) text = text[..24000] + "\n…(cut)";
         _chatAttach = (Path.GetFileName(dlg.FileName), text);

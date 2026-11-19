@@ -13,7 +13,7 @@ namespace DynamicNotch.Services;
 /// article (menus, footers and scripts left out), research (search and read the best pages at once, one step instead
 /// of four), and the news (Google News, in your language).
 /// </summary>
-public static class WebTools
+public static partial class WebTools
 {
     public sealed record Hit(string Title, string Url, string Snippet, string Source = "", DateTime? When = null);
 
@@ -155,6 +155,17 @@ public static class WebTools
         return (title, text.Length > max ? text[..max] + "\n…" : text);
     }
 
+    static readonly Regex Wall = new(@"subscribe|subscription|log ?in\b|sign ?in\b|create (an|your) account|you are logged in|logout|accept (all )?cookies|enable javascript|javascript is (disabled|required)|access denied|verify you are human|are you a robot|captcha|paywall|abonnez|abonnement|connectez|se connecter|activer javascript", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>A login page, a paywall, a cookie wall or a robot check, not the article (reading it gives junk).</summary>
+    public static bool Blocked(string text)
+    {
+        if (text.Trim().Length < 250) return true;
+        int walls = Wall.Matches(text.Length > 3000 ? text[..3000] : text).Count;
+        int words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+        return walls >= 3 && words < 400 || walls >= 6;
+    }
+
     static string? Largest(string html, string tag)
     {
         var found = Regex.Matches(html, $@"<{tag}[\s>].*?</{tag}>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
@@ -164,32 +175,41 @@ public static class WebTools
 
     // ───────────────────────────── research: search and read, in one step ─────────────────────────────
 
+    /// <summary>How much a page can be trusted (set by the chat): trusted ones are read first, negative ones not at all.</summary>
+    public static Func<string, int>? Rank;
+
     public static async Task<(List<Hit> Hits, string Report)> Research(string query, CancellationToken cancel = default)
     {
         var hits = await Search(query, 8, cancel);
         if (hits.Count == 0) return (hits, "No results for “" + query + "”. Try other words.");
         // the best few pages, read at the same time (a slow one is left out rather than waited for)
         // news links are redirects that can't be read: their headline and source are what counts
-        var readable = hits.Where(h => !h.Url.Contains("news.google.com") && h.Title != "Google answer").Take(4).ToList();
+        // a few more pages than needed are read: a login page or a paywall is left out, the next one takes its place
+        var readable = hits.Where(h => !h.Url.Contains("news.google.com") && h.Title != "Google answer")
+            .Select((h, i) => (h, score: (Rank?.Invoke(h.Url) ?? 40) - i * 4)).Where(x => x.score >= 0)
+            .OrderByDescending(x => x.score).Take(6).Select(x => x.h).ToList();
         var reads = readable.Select(async h =>
         {
             try
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancel);
-                cts.CancelAfter(TimeSpan.FromSeconds(7));
-                var page = await Read(h.Url, 2800, cts.Token);
+                cts.CancelAfter(TimeSpan.FromSeconds(4.5)); // a slow page is left out: the answer doesn't wait for it
+                var page = await Read(h.Url, 2400, cts.Token);
                 return (Hit: h, Text: page.Text);
             }
             catch { return (Hit: h, Text: ""); }
         }).ToList();
-        var pages = await Task.WhenAll(reads);
+        var pages = (await Task.WhenAll(reads)).Select(p => Blocked(p.Text) ? (p.Hit, Text: "") : p).ToList();
+        // the good ones first, at most four read in full
+        var good = pages.Where(p => p.Text.Length > 0).Take(4).ToList();
+        pages = good.Concat(pages.Where(p => !good.Contains(p)).Select(p => (p.Hit, Text: ""))).ToList();
         var sb = new StringBuilder();
         sb.AppendLine($"Research for “{query}” ({DateTime.Now:d MMM yyyy}). Sources are numbered; use them, and say when they disagree.");
         int n = 1;
         foreach (var (h, text) in pages)
         {
             sb.AppendLine().AppendLine($"[{n++}] {h.Title} — {h.Url}");
-            sb.AppendLine(text.Length > 200 ? text : (h.Snippet.Length > 0 ? h.Snippet : "(couldn't read the page)"));
+            sb.AppendLine(text.Length > 200 ? text : (h.Snippet.Length > 0 ? h.Snippet + " (only the summary: the page itself wasn't readable)" : "(couldn't read the page: login or paywall)"));
         }
         foreach (var h in hits.Where(h => !readable.Contains(h))) sb.AppendLine().AppendLine($"[{n++}] {h.Title} — {h.Url}\n{h.Snippet}");
         return (hits, sb.ToString().TrimEnd());

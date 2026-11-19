@@ -250,6 +250,7 @@ public partial class NotchWindow
         _chatMode = true;
         OpenRouter.Warm(); // the first answer doesn't wait for the handshake
         OpenRouter.CompactSystem ??= CompactSystemPrompt; // Groq's short instructions
+        WebTools.Rank ??= url => TrustOf(url, _chatLastUser); // research reads the trusted pages first
         OpenRouter.Choose(_settings.AiProvider);
         _ = OpenRouter.IsGemini ? OpenRouter.GeminiModels() : (Task)OpenRouter.Models();
         WireWebSearch();
@@ -260,13 +261,8 @@ public partial class NotchWindow
         SetGhost(null);
         _chatRoot.Visibility = Visibility.Visible;
         StyleChat();
-        if (!Eco)
-        {
-            _chatRoot.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200)));
-            var rise = new TranslateTransform(0, 8);
-            _chatRoot.RenderTransform = rise;
-            rise.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(280)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
-        }
+        ChatIn(); // it glides in (NotchWindow.LauncherChatFeel)
+        _chatLineState = -1;
         _launchBox.Text = "";
         _launchBox.AcceptsReturn = true; // a pasted text keeps its lines
         if (!ChatPopped) SetChatExtra(_settings.AiChatExtra, save: false);
@@ -274,6 +270,7 @@ public partial class NotchWindow
         UpdatePopButtons();
         _chatFollow = true;
         if (_chatStack!.Children.Count == 0) RenderSession();
+        OfferSelection(); // text you'd selected goes with your message (NotchWindow.LauncherChatHere)
         if (first is { Length: > 0 }) SendChat(first);
         else Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => ChatScrollTo(double.MaxValue, 0));
         if (_cyber) CyberGlitch(strong: false, tint: CyCyan);
@@ -292,7 +289,7 @@ public partial class NotchWindow
         {
             if (!_chatMode && _launcherOpen && _launchBody is { ActualHeight: > 20, ActualWidth: > 20 } b) { b.Width = b.ActualWidth; b.Height = b.ActualHeight; }
         });
-        if (_chatRoot != null) _chatRoot.Visibility = Visibility.Collapsed;
+        ChatOut(); // it fades back into the search
         if (_launchBox != null) { _launchBox.AcceptsReturn = false; _launchBox.Text = ""; _launchBox.Focus(); }
         StyleLauncher();
         StyleEsc();
@@ -300,6 +297,9 @@ public partial class NotchWindow
     }
 
     ChatSession NewSession() => new() { Model = ChatModel };
+
+    /// <summary>This question's brief (and what was searched for it), added to the AI's instructions for this answer only.</summary>
+    string _turnBrief = "";
 
     /// <summary>Is the chat on screen (in the notch, or its own window, not minimised)?</summary>
     bool ChatOnScreen => _launcherOpen && _chatMode || _pop is { IsVisible: true, WindowState: not WindowState.Minimized };
@@ -980,7 +980,7 @@ public partial class NotchWindow
         if (!_chatMode) return;
         if (_chatView == ChatView.Chat && _launchBox?.Text == "/") CommandMenu();
         if (_chatView == ChatView.History) { _histSel = 0; _histArmed = null; LoadHistory(_launchBox?.Text ?? ""); }
-        StyleChatLine();
+        StyleChatLineIfChanged(); // not on every key
     }
 
     void SendTyped()
@@ -1043,6 +1043,7 @@ public partial class NotchWindow
 
     async void SendChat(string text)
     {
+        if (CalendarFeed.FindLink(text) is { } calLink && text.Trim().Length < calLink.Length + 60) { ConnectCalendar(calLink); return; } // never sent to the AI
         if (KeyIn(text) is { } groqKey && groqKey.StartsWith("gsk_") && text.Trim().Length < 120 && _keyBox == null) { if (_launchBox != null) _launchBox.Text = ""; GroqKeyPasted(groqKey); return; } // the second engine, added on the spot
         if (KeyIn(text) is { } pasted && text.Trim().Length < 120) { _chatAwaitingKey = true; if (_keyBox == null) ChatSetupCard(); if (_keyBox != null) _keyBox.Password = pasted; return; }
         if (text.StartsWith('/') && ChatCommand(text)) return;
@@ -1059,8 +1060,15 @@ public partial class NotchWindow
         if (session.Title.Length == 0) session.Title = TitleOf(text);
         session.Model = ChatModel;
         _chatLastUser = text;
+        // "what's on my screen?": a real picture of it goes with the question
+        if (ScreenAsk.IsMatch(text) && _chatPictures.Count == 0 && _settings.AiTools && await CaptureScreen() is { } screenShot) _chatPictures.Add(screenShot);
+        // the same question again right after itself (a retry): kept once
+        if (session.Messages.Count > 0 && session.Messages[^1] is System.Text.Json.Nodes.JsonObject lastQ && lastQ["role"]?.ToString() == "user" && lastQ["shown"]?.ToString() == text) session.Messages.RemoveAt(session.Messages.Count - 1);
         string? attachedName = null;
         string content = text;
+        // "what's on my screen?": the real app names go with the picture (Brave and Chrome look alike)
+        if (ScreenAsk.IsMatch(text) && _settings.AiTools && ScreenFacts() is { } facts) content = text + "\n\n" + facts;
+        TakeOfferedSelection(text, chip: false); // the selection goes only if the message is about it (NotchWindow.LauncherChatHere)
         if (_chatAttach is { } att)
         {
             attachedName = att.Name;
@@ -1086,13 +1094,14 @@ public partial class NotchWindow
         _chatBusy = true;
         _askedAt = DateTime.Now;
         _lastProblem = null;
+        _actUnchecked = false;
         ChatKeys();
         _chatCancel?.Dispose();
         _chatCancel = new CancellationTokenSource();
         var cancel = _chatCancel.Token;
         string model = pictures.Count > 0 ? await ModelForPictures(ChatModel) : ChatModel;
         double temperature = _settings.AiCreativity switch { "precise" => 0.2, "creative" => 1.0, _ => 0.6 };
-        string effort = _settings.AiStyle == "detailed" ? "medium" : "low"; // think less, answer sooner
+        string effort = "low";
         string finalAnswer = "";
         bool acted = false;
         _turnSources.Clear();
@@ -1102,11 +1111,42 @@ public partial class NotchWindow
         int turnStart = _chatStack?.Children.Count ?? 0;
         var stepNames = new List<string>();
         DispatcherTimer? liveTick = null;
+        var ask = AskKind(text); // what kind of question (NotchWindow.LauncherChatQuality)
+        effort = EffortFor(ask, text, _settings.AiStyle == "detailed"); // thinks more only where it changes the answer
+        OpenRouter.SmartNext = ask == Ask.Correction || ScreenAsk.IsMatch(text) || effort != "low" || ask == Ask.Fact && HardWords.IsMatch(text); // getting these right matters more than a second
+        // a harder PC task: the tested way to do it goes with the question, and the smart model takes it (Services/AiPlaybook)
+        string? knowHow = ask is Ask.Fact or Ask.News or Ask.Correction ? null : AiPlaybook.Brief(text);
+        if (knowHow != null) { _turnBrief += "\n" + knowHow; OpenRouter.SmartNext = true; }
+        if (LatinOnly(text) && DarijaWords.IsMatch(text)) _turnBrief += "\nThe user writes Darija in Latin letters: reply in Darija, in Latin letters (like 'Labas, hamdullah! W nta?'), never in Arabic script.";
+        else if (LatinOnly(text)) _turnBrief += "\nThe user typed in Latin letters: answer in the same language they wrote (French stays French, English stays English), in Latin letters only (Darija typed in Latin letters gets Latin letters back, never Arabic script).";
+        if (ChartWords.IsMatch(text)) _turnBrief += "\nTHIS MESSAGE wants a chart: write it as a chart block (see CHARTS) with the real numbers, never a picture.";
+        if (ThinkWords.IsMatch(text)) _turnBrief += "\nThe user asked for depth: a fuller answer (short sections, the key numbers, what's certain and what isn't), still no filler.";
+        _turnBrief = BriefFor(ask);
         try
         {
             for (int round = 0; round <= ChatToolRounds; round++)
             {
                 var bubble = ChatAssistant();
+                // a fact or the news: searched right away, so the answer comes in one go
+                if (round == 0 && ask is Ask.Fact or Ask.News && _settings.AiWeb && pictures.Count == 0 && attachedName == null)
+                {
+                    bubble.Thinking(true, _cyber ? (ask == Ask.News ? "FETCHING HEADLINES" : "SEARCHING") : ask == Ask.News ? "Getting the headlines" : "Searching the web");
+                    var ahead = await SearchAhead(ask, text, cancel);
+                    if (ahead != null) _turnBrief += "\n" + ahead;
+                    bubble.Thinking(true, _cyber ? "WRITING" : ahead != null ? $"Reading {Math.Max(1, _turnSources.Count)} sources" : "Thinking");
+                }
+                else if (round == 0 && ask == Ask.Day)
+                {
+                    bubble.Thinking(true, _cyber ? "SYNCING DAY" : "Checking your day");
+                    try { _turnBrief += "\n" + await MyDayText(); } catch { }
+                }
+                else if (round == 0 && HereAsk(text) is { } here && !(attachedName?.StartsWith("Selected in") ?? false))
+                {
+                    // "summarize this page": the window behind the notch, read before the AI is asked
+                    bubble.Thinking(true, _cyber ? "READING SCREEN" : here == "selection" ? "Reading the selection" : "Reading the page");
+                    try { _turnBrief += "\nWHAT THE USER IS LOOKING AT (read just now; 'this' means this):\n" + await ReadHere(here, cancel); } catch { }
+                }
+                else if (round == 0) bubble.Thinking(true, _cyber ? "UNDERSTANDING" : "Understanding");
                 var live = new StringBuilder();
                 var tick = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(50) };
                 bool dirty = false;
@@ -1127,7 +1167,8 @@ public partial class NotchWindow
                 };
                 tick.Start();
                 liveTick = tick;
-                var tools = round < ChatToolRounds ? ChatToolsFor() : null;
+                var tools = round < ChatToolRounds && ask != Ask.Talk ? ToolsForKind(ChatToolsFor(), knowHow != null ? Ask.Action : ask) : null; // only what this kind of question needs
+                if (tools != null && ChartWords.IsMatch(text)) tools = WithoutTool(tools, "create_image"); // a chart is drawn, not painted
                 OpenRouter.Turn turn;
                 int attempt = 0;
                 while (true)
@@ -1154,6 +1195,7 @@ public partial class NotchWindow
                 if (OpenRouter.IsGemini && turn.Error == null && turn.Model is { Length: > 0 } usedModel) model = usedModel; // the rest of this answer stays on it
                 tokenCount += turn.Tokens;
                 string said = KeepRealLinks(CleanAnswer(turn.Text), session); // a link no tool found and you didn't give can't reach you
+                if (turn.Calls.Count == 0) said = Honest(said); // cards only when asked; an unchecked "done" says so
                 if (said.Length > 0) { RenderMarkdown(bubble.Body, said); bubble.Answer = said; }
                 else _chatStack?.Children.Remove(bubble.Root);
 
@@ -1181,7 +1223,8 @@ public partial class NotchWindow
                         ShowSources(bubble);
                         AnswerFooter(bubble, turn.Model ?? model, DateTime.Now - startedAt, stepCount, tokenCount);
                         bubble.Finished?.Invoke();
-                        ShowFollowUps(bubble, FollowUps(turn.Text));
+                        if (said.Length > 80) ShowFollowUps(bubble, OnTopic(FollowUps(turn.Text))); // a one-line answer needs no "what next"
+                        ShowAnswerActions(bubble, said); // a reminder for a time it names, the file it names
                         // it got done: how, kept for next time
                         if (_settings.AiMemory && turnSteps.Count > 0 && turnSteps[^1].Ok) AiLearn.Record(text, turnSteps, (DateTime.Now - startedAt).TotalSeconds);
                         if (stepCount >= 2) FoldSteps(turnStart, stepCount, stepNames, DateTime.Now - startedAt);
@@ -1256,6 +1299,8 @@ public partial class NotchWindow
         finally
         {
             liveTick?.Stop();
+            _turnBrief = "";
+            OpenRouter.SmartNext = false;
             _chatBusy = false;
             session.Updated = DateTime.Now;
             if (_settings.AiHistory && session.UserTurns > 0)
@@ -1344,6 +1389,9 @@ public partial class NotchWindow
         sb.AppendLine("Reading between the lines: work out what the user means, not just the words. 'My setup', 'my gear', 'my stuff', 'my devices' = their peripherals (mouse, headset, keyboard, controller, earbuds), usually not the PC alone. A short follow-up ('not pc, I meant...', 'and the other one?', 'do it again', 'in French') changes the previous question: answer that again, corrected, without asking. When a question could mean several things, answer all of them in one table rather than picking one. Where to look, in this order: (1) LIVE NOW below, (2) notch_data, (3) the PC's tools, (4) the web. Never say the notch can't see something before checking LIVE NOW and notch_data. The user has no time to correct you twice: get it right the first time.");
         sb.AppendLine("Understanding commands: users type fast, casual, misspelled, in any language or mixed (English, French, Darija, Spanish...). Read the intent, not the words: 'baisse le son' / 'nkss sout' = volume down, 'skip' / 'next' = next song, 'ferme discord' = close Discord, 'mets le pc en sombre' = dark mode on, 'wifi off', 'lance spotify' = open Spotify. When a request has several parts ('open spotify, play lofi and set volume 40'), do every part, in order, in one go. If a word could be an app, a file or a website, prefer what's on this PC. Ask back only when two very different actions both fit, in one short question with the choices.");
         sb.AppendLine("Truth: never make up links, video IDs, file paths, names, numbers or facts. Use only what a tool returned or the user gave. Videos, clips, live streams: the youtube tool (real results), then give or open the one it found. If a tool found nothing, say so plainly.");
+        sb.AppendLine("Honesty about actions: say something was sent, played, opened or done only when a tool result says so. Messages to people: only when the user asked to send something, and always with send_message (it checks the message arrived). Never type through PowerShell. After typing or clicking in an app, look or see before saying it worked. If you couldn't check, say it's not confirmed. When the user asks what's on their screen, a picture of it is attached: describe what you actually see.");
+        sb.AppendLine("Web: today's news or headlines → news (not research). A page that turned out to be a login or paywall: use another source, never its menu text.");
+        sb.AppendLine("Language: answer in the same language AND the same alphabet the user wrote in (Darija in Latin letters gets Latin letters, never Arabic script, unless they wrote in Arabic script).");
         sb.AppendLine("Stay on topic: answer only what was asked. Mention LIVE NOW details (volume, music, batteries, calls) only when the question is about them.");
         sb.AppendLine("Answering after doing something: one short line that says what changed, with the result ('Volume 40%, Spotify playing lofi.'), never 'I have successfully...', never steps you already showed. If something failed, say what and the one thing that would fix it. Don't repeat what the step lines already show.");
         sb.AppendLine("LIVE NOW (fresh from the notch, no tool needed):\n" + LiveNow());
@@ -1382,6 +1430,11 @@ public partial class NotchWindow
             if (like.Count > 0) sb.AppendLine("Similar requests got done before like this (go straight to what worked, skip the failed steps, fewer looks):\n- " + string.Join("\n- ", like.Select(r => $"“{r.Ask}” → {r.Steps} ({r.Seconds:0} s{(r.Uses > 1 ? $", {r.Uses} times" : "")})")));
         }
         if (_settings.AiInstructions.Trim().Length > 0) sb.AppendLine("The user's own instructions (follow them): " + _settings.AiInstructions.Trim());
+        sb.AppendLine("Before you answer: be sure what exactly is asked and what form fits it (one fact, a short list, a table, a file, an action). Answer exactly that, complete and correct, nothing around it.");
+        sb.AppendLine(ReadTheConversation);
+        sb.AppendLine(SoundHuman);
+        sb.AppendLine(ChartRule);
+        if (_turnBrief.Length > 0) sb.AppendLine(_turnBrief);
         return sb.ToString().TrimEnd();
     }
 
@@ -1393,6 +1446,7 @@ public partial class NotchWindow
         {
             sb.AppendLine(DevicesText());
             sb.AppendLine($"- Volume {(int)Math.Round(_audio.Volume * 100)}%{(_audio.MicMuted ? ", mic muted" : "")}");
+            if (DefaultBrowser() is { } browser) sb.AppendLine($"- Default browser: {BrowserName(browser)} (web pages open there; use_app app \"{browser}\")");
             if (_media.Title.Length > 0) sb.AppendLine($"- {(_media.IsPlaying ? "Playing" : "Paused")}: {_media.Title}{(_media.Artist.Length > 0 ? " — " + _media.Artist : "")}");
             if (_call is { } call) sb.AppendLine($"- On a call in {call.Name}{(_callWith != null ? " with " + _callWith : "")}");
             if (_focus.IsOn) sb.AppendLine($"- Focus on for {(int)_focus.Elapsed.TotalMinutes} min");
@@ -1456,36 +1510,38 @@ public partial class NotchWindow
             stack.Children.Add(box);
             content = stack;
         }
+        // your message, without a box around it. Neon: the words on a wash lit from a bar on the right (the answer's bar is
+        // on the left), under a small "YOU // 10:41". Else: a soft bubble in the AI's colours, the time under the pointer.
+        string? when = at is { } sent ? (sent.Date == DateTime.Today ? sent.ToString("HH:mm") : sent.ToString("d MMM, HH:mm")) : null;
         var bubble = new Border
         {
-            Child = content, HorizontalAlignment = HorizontalAlignment.Right, MaxWidth = 320, Padding = new Thickness(10, 6, 10, 7),
-            CornerRadius = _cyber ? new CornerRadius(0) : new CornerRadius(12, 12, 3, 12), Background = Frozen(new LinearGradientBrush(A(acc, _cyber ? (byte)0x24 : (byte)0x48), A(AiSecond, _cyber ? (byte)0x16 : (byte)0x30), 0)),
-            BorderBrush = Frozen(A(acc, _cyber ? (byte)0x80 : (byte)0x30)), BorderThickness = new Thickness(1),
+            Child = content, HorizontalAlignment = HorizontalAlignment.Right, MaxWidth = 320,
+            Padding = _cyber ? new Thickness(14, 4, 10, 5) : new Thickness(11, 6, 11, 7),
+            CornerRadius = _cyber ? new CornerRadius(0) : new CornerRadius(14, 14, 4, 14),
+            Background = Frozen(_cyber ? new LinearGradientBrush(A(CyYellow, 0x00), A(CyYellow, 0x1C), 0) : new LinearGradientBrush(A(acc, 0x3C), A(AiSecond, 0x2A), 0)),
+            BorderBrush = _cyber ? CyYellowBrush : null, BorderThickness = new Thickness(0, 0, _cyber ? 2 : 0, 0),
         };
-        // a soft light along its top edge, and a faint glow of its colour around it
-        if (!Eco && !_cyber) bubble.Effect = new System.Windows.Media.Effects.DropShadowEffect { Color = acc, BlurRadius = 12, ShadowDepth = 0, Opacity = 0.22 };
-        var sheen = new Border
-        {
-            Height = 1, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(_cyber ? 0 : 8, 0, _cyber ? 0 : 8, 0), IsHitTestVisible = false,
-            Background = Frozen(new LinearGradientBrush(Color.FromArgb(0x00, 0xFF, 0xFF, 0xFF), Color.FromArgb(0x50, 0xFF, 0xFF, 0xFF), 0) { GradientStops = { new GradientStop(Color.FromArgb(0x00, 0xFF, 0xFF, 0xFF), 0), new GradientStop(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF), 0.5), new GradientStop(Color.FromArgb(0x00, 0xFF, 0xFF, 0xFF), 1) } }),
-        };
-        var face2 = new Grid { HorizontalAlignment = HorizontalAlignment.Right };
-        face2.Children.Add(bubble);
-        face2.Children.Add(sheen);
+        if (_cyber) NeonCorner(bubble, 0, 7);
         var column = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right };
-        column.Children.Add(face2);
-        // when you sent it, small under it
-        if (at is { } sent)
+        if (_cyber)
             column.Children.Add(new TextBlock
             {
-                Text = sent.Date == DateTime.Today ? sent.ToString("HH:mm") : sent.ToString("d MMM, HH:mm"), FontSize = 9, HorizontalAlignment = HorizontalAlignment.Right,
-                Foreground = Frozen(Color.FromArgb(0x60, 0xFF, 0xFF, 0xFF)), Margin = new Thickness(0, 3, 4, 0), FontFamily = _cyber ? CyFont : UiText,
+                Text = when != null ? "YOU // " + when : "YOU", FontSize = 8.5, FontFamily = CyFont, Foreground = Frozen(A(acc, 0x90)),
+                HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 4, 2),
             });
-        var root = new Grid { Margin = new Thickness(36, 10, 0, 2), Tag = "user", Background = Brushes.Transparent };
+        column.Children.Add(bubble);
+        TextBlock? stamp = null;
+        if (!_cyber && when != null)
+        {
+            stamp = new TextBlock { Text = when, FontSize = 9, HorizontalAlignment = HorizontalAlignment.Right, Foreground = Frozen(Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF)), Margin = new Thickness(0, 3, 4, 0), FontFamily = UiText, Opacity = 0 };
+            column.Children.Add(stamp);
+        }
+        var root = new Grid { Margin = new Thickness(36, 16, 0, 2), Tag = "user", Background = Brushes.Transparent };
         root.Children.Add(column);
+        if (stamp != null) { root.MouseEnter += (_, _) => stamp.Opacity = 1; root.MouseLeave += (_, _) => stamp.Opacity = 0; }
         root.Children.Add(Actions(root, HorizontalAlignment.Right, ("\uE8C8", "Copy", () => CopyText(text, "Copied")), ("\uE70F", "Edit", () => EditMessage(text))));
         _chatStack.Children.Add(root);
-        if (animate) Arrive(root, fromRight: true);
+        if (animate) { if (_cyber) GlitchIn(root); else Arrive(root, fromRight: true); }
         FollowChat(force: true);
     }
 
@@ -1530,6 +1586,9 @@ public partial class NotchWindow
             dots.Children.Add(new Ellipse { Width = 5, Height = 5, Margin = new Thickness(0, 0, 4, 0), Fill = Frozen(acc), Opacity = 0.3 });
         var label = new TextBlock { Text = _cyber ? "PROCESSING" : "Thinking", FontFamily = _cyber ? CyFont : UiText, FontSize = _cyber ? 9.5 : 10.5, Foreground = Frozen(A(acc, 0xB0)), Margin = new Thickness(4, -2, 0, 0) };
         dots.Children.Add(label);
+        TextBlock? caret = null; // Neon: a block cursor blinking after what it's doing
+        if (_cyber && !Eco) { caret = new TextBlock { Text = "\u258C", FontSize = 9, Foreground = Frozen(acc), Margin = new Thickness(3, -2, 0, 0), VerticalAlignment = VerticalAlignment.Center }; dots.Children.Add(caret); }
+        Action<bool>? shimmer = null;
         var since = DateTime.UtcNow;
         string word = _cyber ? "PROCESSING" : "Thinking";
         var clock = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
@@ -1548,8 +1607,27 @@ public partial class NotchWindow
             Child = column, BorderBrush = Frozen(new LinearGradientBrush(A(acc, _cyber ? (byte)0xE0 : (byte)0xB0), A(AiSecond, _cyber ? (byte)0x50 : (byte)0x30), 90)), BorderThickness = new Thickness(2, 0, 0, 0),
             Padding = new Thickness(10, 0, 0, 0),
         };
-        var root = new Grid { Margin = new Thickness(0, 10, 18, 2), Background = Brushes.Transparent };
+        var root = new Grid { Margin = new Thickness(0, 16, 18, 2), Background = Brushes.Transparent };
         root.Children.Add(rail);
+        if (!Eco)
+        {
+            // the line saying what it's doing has a light running through it
+            var glow = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
+            var dim = A(acc, 0xA0);
+            var g1 = new GradientStop(dim, -0.3); var g2 = new GradientStop(Lighten(acc, 0.55), -0.15); var g3 = new GradientStop(dim, 0);
+            glow.GradientStops.Add(new GradientStop(dim, 0)); glow.GradientStops.Add(g1); glow.GradientStops.Add(g2); glow.GradientStops.Add(g3); glow.GradientStops.Add(new GradientStop(dim, 1));
+            label.Foreground = glow;
+            shimmer = on =>
+            {
+                foreach (var (stop, from) in new[] { (g1, -0.3), (g2, -0.15), (g3, 0.0) })
+                {
+                    if (!on) { stop.BeginAnimation(GradientStop.OffsetProperty, null); continue; }
+                    var run = new DoubleAnimation(from, from + 1.5, TimeSpan.FromMilliseconds(1400)) { RepeatBehavior = RepeatBehavior.Forever };
+                    Timeline.SetDesiredFrameRate(run, 30);
+                    stop.BeginAnimation(GradientStop.OffsetProperty, run);
+                }
+            };
+        }
         // when it's done: a light runs down the edge, once
         var shine = new Border
         {
@@ -1559,9 +1637,21 @@ public partial class NotchWindow
         if (!_cyber) shine.Effect = new System.Windows.Media.Effects.DropShadowEffect { Color = acc, BlurRadius = 10, ShadowDepth = 0, Opacity = 0.9 };
         root.Children.Add(shine);
         var bubble = new ChatBubble { Root = root, Body = body, Dots = dots, Extras = extras };
+        string asked = _chatLastUser; // the question this answers (for 👎)
         bubble.Finished = () =>
         {
             if (Eco) return;
+            if (_cyber)
+            {
+                // Neon: the edge flickers on once, like a signal locking in
+                var flick = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(700) };
+                flick.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+                flick.KeyFrames.Add(new DiscreteDoubleKeyFrame(0.2, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(50))));
+                flick.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(100))));
+                flick.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(700))));
+                shine.BeginAnimation(OpacityProperty, flick);
+                return;
+            }
             var glow = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(900) };
             glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(220)), new CubicEase { EasingMode = EasingMode.EaseOut }));
             glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(900)), new CubicEase { EasingMode = EasingMode.EaseIn }));
@@ -1573,7 +1663,8 @@ public partial class NotchWindow
             ("\uE710", "More detail", () => SendChat("Go into more detail on that.")),
             ("\uE767", "Read aloud", () => { if (VoiceOut.Speaking) VoiceOut.Stop(); else Speak(Plain()); }),
             ("\uE8C8", "Copy", () => CopyText(Plain(), "Copied")),
-            ("\uE72C", "Retry", Retry)));
+            ("\uE72C", "Retry", Retry),
+            ("\uE8E0", "Bad answer (kept for the AI's checks)", () => BadAnswer(asked, Plain()))));
         bubble.OnWord = w => { word = w; label.Text = w; };
         bubble.OnThinking = on =>
         {
@@ -1581,6 +1672,18 @@ public partial class NotchWindow
             if (on) clock.Start(); else clock.Stop();
             if (dots.Visibility == v) return;
             dots.Visibility = v;
+            shimmer?.Invoke(on);
+            if (caret != null)
+            {
+                if (!on) caret.BeginAnimation(OpacityProperty, null);
+                else
+                {
+                    var blink = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(900), RepeatBehavior = RepeatBehavior.Forever };
+                    blink.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+                    blink.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(450))));
+                    caret.BeginAnimation(OpacityProperty, blink);
+                }
+            }
             for (int i = 0; i < 3; i++)
             {
                 var e = (Ellipse)dots.Children[i];
@@ -1592,7 +1695,7 @@ public partial class NotchWindow
         };
         _chatStack!.Children.Add(root);
         bubble.Thinking(animate);
-        if (animate) Arrive(root);
+        if (animate) { if (_cyber) GlitchIn(root); else Arrive(root); }
         FollowChat();
         return bubble;
     }
@@ -1615,7 +1718,7 @@ public partial class NotchWindow
         }
         var plate = new Border
         {
-            Child = row, HorizontalAlignment = side, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, -13, -4, 0),
+            Child = row, HorizontalAlignment = side, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, -19, -4, 0),
             CornerRadius = new CornerRadius(_cyber ? 0 : 8), Background = Frozen(_cyber ? Color.FromArgb(0xF0, 0x06, 0x12, 0x1A) : Color.FromArgb(0xF0, 0x26, 0x26, 0x2C)),
             BorderBrush = Frozen(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(1), Opacity = 0, IsHitTestVisible = false,
         };
@@ -1631,7 +1734,7 @@ public partial class NotchWindow
         "research" or "web_search" or "read_webpage" or "news" or "browser_history" => _cyber ? CyCyan : Color.FromRgb(0x5A, 0xB4, 0xFF),
         "find_files" or "read_file" or "list_folder" or "write_file" or "open" or "create_image" => _cyber ? CyYellow : Color.FromRgb(0xFF, 0xC4, 0x5A),
         "notch_data" or "notch_page" or "notify" or "recent_notifications" => _cyber ? CyMagenta : Color.FromRgb(0xC0, 0x8C, 0xFF),
-        "run_powershell" or "do_on_pc" or "manage_window" or "use_app" or "play_music" or "youtube" or "learn" or "clipboard" or "pc_status" or "undo_last" => _cyber ? Color.FromRgb(0x00, 0xFF, 0xA3) : Color.FromRgb(0x5A, 0xE0, 0x9A),
+        "run_powershell" or "do_on_pc" or "manage_window" or "use_app" or "send_message" or "see_screen" or "play_music" or "youtube" or "learn" or "clipboard" or "pc_status" or "undo_last" => _cyber ? Color.FromRgb(0x00, 0xFF, 0xA3) : Color.FromRgb(0x5A, 0xE0, 0x9A),
         _ => A(ChatAccent, 0xC0),
     };
 
@@ -1816,12 +1919,26 @@ public partial class NotchWindow
         void EmitTable()
         {
             if (tableRows.Count == 0) return;
-            if (tableRows.Count >= 2) doc.Blocks.Add(MarkdownTable(tableRows.ToList()));
+            if (tableRows.Count >= 2)
+            {
+                doc.Blocks.Add(MarkdownTable(tableRows.ToList()));
+                if (!streaming) doc.Blocks.Add(TableTools(tableRows.ToList())); // copy, Excel (NotchWindow.LauncherChatRich)
+            }
             else { para.Append(tableRows[0]); Flush(); }
             tableRows.Clear();
         }
         void Code(string body, string language, bool open)
         {
+            if (language.Trim().Equals("chart", StringComparison.OrdinalIgnoreCase))
+            {
+                if (open || streaming)
+                {
+                    var wait = new Paragraph(new Run(_cyber ? "RENDERING CHART…" : "Drawing the chart…") { Foreground = Frozen(A(acc, 0xB0)), FontStyle = FontStyles.Italic }) { Margin = new Thickness(0, 2, 0, 6), FontSize = 11 };
+                    doc.Blocks.Add(wait);
+                    return;
+                }
+                if (ChartBlock(body) is { } chart) { doc.Blocks.Add(chart); return; } // NotchWindow.LauncherChatRich
+            }
             var bar = new Grid { Margin = new Thickness(9, 4, 8, 0) };
             bar.Children.Add(new TextBlock { Text = language.Length > 0 ? language : "code", FontSize = 9.5, Foreground = Frozen(A(acc, 0xB0)), FontFamily = ChatMono });
             if (!open)
@@ -1843,6 +1960,14 @@ public partial class NotchWindow
             var stack = new StackPanel();
             stack.Children.Add(bar);
             stack.Children.Add(text);
+            if (!open && !streaming && Runnable(language))
+            {
+                var run = new TextBlock { Text = _cyber ? "\u25B6 RUN" : "\u25B6 Run", FontSize = 9.5, Foreground = Frozen(A(acc, 0xE0)), HorizontalAlignment = HorizontalAlignment.Right, Cursor = Cursors.Hand, Margin = new Thickness(0, 0, 44, 0), ToolTip = "Run it on this PC (anything risky asks first)" };
+                run.MouseEnter += (_, _) => run.Foreground = Frozen(Lighten(acc, 0.3));
+                run.MouseLeave += (_, _) => run.Foreground = Frozen(A(acc, 0xE0));
+                run.MouseLeftButtonUp += (_, e) => { e.Handled = true; if (run.IsEnabled) RunCodeBlock(body, stack, run); };
+                bar.Children.Add(run);
+            }
             doc.Blocks.Add(new BlockUIContainer(new Border
             {
                 Background = Frozen(Color.FromArgb(0x50, 0x00, 0x00, 0x00)), BorderBrush = Frozen(A(acc, _cyber ? (byte)0x50 : (byte)0x2A)), BorderThickness = new Thickness(_cyber ? 1 : 1, 1, 1, 1),

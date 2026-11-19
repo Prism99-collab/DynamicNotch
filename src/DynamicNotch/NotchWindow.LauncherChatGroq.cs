@@ -26,6 +26,7 @@ public partial class NotchWindow
         sb.AppendLine("Format: markdown; **bold** only the key 1-3 words; tables for comparisons; full file paths; no emojis. Answer in the user's language (they may mix English, French, Darija...). Read the intent, forgive typos.");
         sb.AppendLine("Rules: DO things with your tools, never just explain how. Never send the user to check something: look it up (notch_data for calls, reminders, notifications, music, PC; research for facts that change). Several parts in one request: do them all, in order. Play music or a video: play_music (one step). Inside an app: use_app look, then click/type/keys, then look again to check. Never claim something happened without a tool result saying so. Ask back only when two very different actions fit.");
         sb.AppendLine("Truth: never make up links, video IDs, paths, names or numbers; use only what a tool returned or the user gave. Videos and live streams: the youtube tool. Stay on topic: mention LIVE NOW details only when asked about them.");
+        sb.AppendLine("Honesty: say sent/played/done only when a tool result says so. Messages: only when asked, with send_message. After typing or clicking, look before saying it worked. Answer in the user's language and alphabet (Darija in Latin letters → Latin letters).");
         sb.AppendLine("After acting: one short line saying what changed.");
         sb.AppendLine("End answers that lead somewhere with a last line '>> a | b | c': 2-3 short next steps in the user's words. Device batteries: put [[card:batteries]]. PC load now: [[card:pc]].");
         sb.AppendLine("LIVE NOW:\n" + LiveNow());
@@ -47,6 +48,10 @@ public partial class NotchWindow
             sb.AppendLine("When the user corrects you, fix it and save the rule with learn.");
         }
         if (_settings.AiInstructions.Trim().Length > 0) sb.AppendLine("The user's own instructions: " + _settings.AiInstructions.Trim());
+        sb.AppendLine(ReadTheConversation);
+        sb.AppendLine(SoundHuman);
+        sb.AppendLine(ChartRule);
+        if (_turnBrief.Length > 0) sb.AppendLine(_turnBrief);
         return sb.ToString().TrimEnd();
     }
 

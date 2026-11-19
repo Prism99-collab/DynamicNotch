@@ -120,8 +120,12 @@ public static partial class OpenRouter
     /// explaining, maths, a document to work on) does; quick questions, commands and lookups go to the fast tier,
     /// which answers in a second or two and has many more free requests.
     /// </summary>
+    /// <summary>This turn needs the smart model whatever its length (a correction, the screen): set by the chat for one answer.</summary>
+    public static bool SmartNext;
+
     public static bool NeedsSmart(JsonArray messages)
     {
+        if (SmartNext) return true;
         var last = messages.LastOrDefault(m => m?["role"]?.ToString() == "user");
         string text = last?["content"] is JsonArray parts ? string.Join(" ", parts.Select(p => p?["text"]?.ToString() ?? "")) : last?["content"]?.ToString() ?? "";
         if (text.Contains("[Attached file:") || text.Length > 350) return true;

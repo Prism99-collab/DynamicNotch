@@ -118,50 +118,6 @@ public partial class NotchWindow
     }
 
     /// <summary>Under an answer: the sites it drew on, as small chips.</summary>
-    void ShowSources(ChatBubble bubble)
-    {
-        if (_turnSources.Count == 0) return;
-        var acc = ChatAccent;
-        var row = new WrapPanel { Margin = new Thickness(0, 4, 0, 0) };
-        row.Children.Add(new TextBlock { Text = _cyber ? "SOURCES" : "Sources", FontSize = 9.5, Foreground = DimBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 4), FontFamily = _cyber ? CyFont : UiText });
-        foreach (var s in _turnSources.GroupBy(s => s.Kind == "news" ? s.Sub.Split(" · ")[0] : WebTools.Domain(s.Target)).Take(5).Select(g => g.First()))
-        {
-            string name = s.Kind == "news" ? s.Sub.Split(" · ")[0] : WebTools.Domain(s.Target);
-            var line = new StackPanel { Orientation = Orientation.Horizontal };
-            var ic = new Border { Width = 12, Height = 12, Margin = new Thickness(0, 0, 5, 0), Child = Favicon(s.Target, acc), VerticalAlignment = VerticalAlignment.Center };
-            line.Children.Add(ic);
-            line.Children.Add(new TextBlock { Text = name.Length > 26 ? name[..25] + "…" : name, FontSize = 10, Foreground = Frozen(Color.FromArgb(0xD8, 0xFF, 0xFF, 0xFF)), VerticalAlignment = VerticalAlignment.Center });
-            var chip = new Border
-            {
-                Child = line, Padding = new Thickness(6, 2, 8, 3), Margin = new Thickness(0, 0, 5, 4), CornerRadius = new CornerRadius(_cyber ? 0 : 9), Cursor = Cursors.Hand, ToolTip = s.Title + "\n" + s.Target,
-                Background = Frozen(A(acc, 0x16)), BorderBrush = Frozen(A(acc, 0x45)), BorderThickness = new Thickness(1),
-            };
-            string target = s.Target;
-            chip.MouseEnter += (_, _) => chip.Background = Frozen(A(acc, 0x30));
-            chip.MouseLeave += (_, _) => chip.Background = Frozen(A(acc, 0x16));
-            chip.MouseLeftButtonUp += (_, e) => { e.Handled = true; OpenLink(target); };
-            row.Children.Add(chip);
-        }
-        bubble.Extras.Children.Add(row);
-    }
-
-    /// <summary>Under an answer: which model wrote it, how long it took, how many steps it took (small, dim).</summary>
-    void AnswerFooter(ChatBubble bubble, string? model, TimeSpan took, int steps, int tokens = 0)
-    {
-        string name = model == null || model == OpenRouter.DefaultModel ? "" : model.StartsWith("groq:") ? OpenRouter.GroqName(model) : OpenRouter.IsGemini && !model.Contains('/') ? OpenRouter.GeminiName(model) : model.Contains('/') ? model[(model.IndexOf('/') + 1)..] : model;
-        var parts = new List<string>();
-        if (name.Length > 0) parts.Add(name);
-        parts.Add(took.TotalSeconds < 10 ? $"{took.TotalSeconds:0.0} s" : $"{took.TotalSeconds:0} s");
-        if (steps > 0) parts.Add(steps == 1 ? "1 step" : $"{steps} steps");
-        if (tokens > 0) parts.Add(tokens >= 1000 ? $"{tokens / 1000.0:0.#}K tokens" : $"{tokens} tokens");
-        var line = new TextBlock
-        {
-            Text = string.Join("  ·  ", parts), FontSize = 9.5, Margin = new Thickness(0, 4, 0, 0), FontFamily = _cyber ? CyFont : UiText,
-            Foreground = Frozen(Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF)), ToolTip = model,
-        };
-        bubble.Extras.Children.Add(line);
-    }
-
     /// <summary>An answer's steps, once it's there: folded into one line ("3 steps · web, notch"), a click unfolds them.</summary>
     void FoldSteps(int from, int count, List<string> names, TimeSpan took)
     {

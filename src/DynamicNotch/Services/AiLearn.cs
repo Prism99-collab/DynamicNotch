@@ -6,8 +6,8 @@ namespace DynamicNotch.Services;
 
 /// <summary>
 /// What the AI learns on this PC, as it works, so it gets it right faster each time:
-///  • recipes: for a request that got done, the steps that did it ("call nox on discord" → use_app keys ctrl+k, type
-///    "nox", keys enter, click "Start Voice Call"). A similar request later gets them as a head start;
+///  • recipes: for a request that got done, the steps that did it ("call sam on discord" → use_app keys ctrl+k, type
+///    "sam", keys enter, click "Start Voice Call"). A similar request later gets them as a head start;
 ///  • lessons: short rules it saved itself after a correction or after finding what works on this PC;
 ///  • habits: what this person reaches for (their music app, the apps they open, the people they call).
 /// All on this PC (ai-learn.json), small, and wiped with one button in Preferences.

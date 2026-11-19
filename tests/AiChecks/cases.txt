@@ -1,0 +1,130 @@
+# How the AI must read a message. One per line:  kind | know-how | message
+#   kind: Chat, Fact, News, FindOnPc, Build, Action, Correction, HowTo, Day, or * (any)
+#   know-how: the playbook entry that must come with it, - (none must come), or empty (don't check)
+# A mistake seen in real use becomes a line here, so it can't come back.
+
+# corrections are about the last answer, never orders
+Correction | - | its brave not chrome
+Correction | - | it's brave, not chrome
+Correction | - | no its firefox
+Correction | - | no
+Correction | - | wrong, it's a youtube video not twitch
+Correction | - | that's not what i asked
+Correction | - | i meant the other one
+Correction | - | actually it's 2025 not 2024
+Correction | - | c'est brave pas chrome
+Correction | - | you got it wrong
+Correction | - | nope
+Correction | - | not chrome, its brave
+Correction | - | this is spotify not deezer
+Correction | - | its not chrome
+Correction |   | no open spotify instead
+
+# chat
+Chat | - | what do u see on screen?
+Talk | - | how are you
+Talk | - | thanks
+Chat | - | brave
+Chat | - | what's 15% of 80
+
+# commands
+Action | - | open brave
+Action | - | close chrome
+Action | - | play something chill on spotify
+Action | - | pls open spotify
+Action | - | lance spotify
+Action | install an app | install vlc
+Action | install an app | can you install discord for me
+Action | uninstall or update apps | uninstall candy crush
+Action | uninstall or update apps | update all my apps
+Action | change the wallpaper | change my wallpaper to the beach picture
+Action | free up space | free up some space on my pc
+Action | free up space | empty the recycle bin
+Action | sort or tidy a folder | organize my downloads folder
+Action | files: zip, convert, rename | zip the files on my desktop
+Action | power: shut down later, restart, sleep | shut down the pc in 30 minutes
+Action | power: shut down later, restart, sleep | restart my pc
+Action | power: shut down later, restart, sleep | éteins le pc
+Action | a browser, a site, private window | open youtube in brave incognito
+Action | what slows the PC | kill discord it's frozen
+Action | a Windows setting | turn on night light
+*      | Windows look and files view | show file extensions
+Action | - | set a timer for 10 minutes
+
+# questions about the PC
+Chat | what slows the PC | why is my pc so slow
+Chat | what slows the PC | what's using my ram
+Chat | what's in this PC | which gpu do i have
+Chat | what's in this PC | how much ram do i have
+Chat | network | what's my ip address
+Chat | free up space | my disk is almost full
+Chat | battery health | how is my battery health
+Chat | startup and background apps | what apps open when my pc starts
+
+# how-to: steps, not done unasked
+HowTo | a Windows setting | how do i change my default browser
+HowTo |   | how to take a screenshot on windows
+HowTo | install an app | comment installer python
+HowTo | files: zip, convert, rename | how can i convert png to jpg
+
+# facts, news, files, documents
+Fact     | - | who won the ballon d'or 2026
+Fact     | - | whast the budget that nasa used to build the moon rocket
+Fact     | - | la casa de papel season 6 release date
+News     | - | top news today
+FindOnPc | - | find the pdf i downloaded yesterday
+Build    | - | make me an excel table of the 5 biggest cities in morocco
+
+# the day and the calendar
+Day | - | what's my day
+Day | - | do i have meetings today
+Day | - | what do i have tomorrow
+Day | - | am i free at 3pm
+Day | - | brief me
+Day | - | qu'est-ce que j'ai aujourd'hui
+
+# "this": what's on screen, not a web search
+Chat | - | summarize this page
+Chat | - | what's this article about
+Chat | - | translate this
+Chat | - | explain what i selected
+Chat | - | résume cette page
+
+# words that must NOT pull in PC know-how
+* | - | get me the news
+* | - | convert 5 km to miles
+* | - | play a slow song
+* | - | i can't sleep
+* | - | restart the song
+* | - | print hello world in python
+* | - | translate this to french language
+* | - | extract the main points of this text
+* | - | clean up this paragraph
+* | - | a startup idea for morocco
+* | - | the stadium was full
+* | - | what's on my screen
+
+# deep search: the web, thoroughly
+Fact | - | deep search the best laptop for students
+Fact | - | research the history of the moroccan dirham
+
+# small talk: a friend's reply, never a search
+Talk | - | hey hru today
+Talk | - | hey how are you doing today
+Talk | - | good morning
+Talk | - | thanks bro
+Talk | - | what's up
+Talk | - | yo wsg
+Talk | - | ça va ?
+Talk | - | salam labas
+Talk | - | lol nice
+Fact | - | hey what's the weather today
+Fact | - | hey who won the match today
+Action | - | hey open spotify
+
+# a short yes to the AI's question is not small talk (small talk can't act)
+Chat | - | ok
+Chat | - | perfect
+Chat | - | yes
+Talk | - | ok thanks
+Talk | - | cool

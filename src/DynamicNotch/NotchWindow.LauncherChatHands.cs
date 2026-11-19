@@ -30,11 +30,18 @@ public partial class NotchWindow
         if (hwnd != _uiHwnd) _uiSeen.Clear();
         _uiHwnd = hwnd;
         string title = WindowTitle(hwnd);
+        // a chat app: nothing is written (or sent with Enter) unless the user asked to send something
+        bool chat = ChatApps.IsMatch(app + " " + title);
+        if (chat && !UserAskedToSend && (action is "type" or "write" || action is "keys" or "key" or "shortcut" && Regex.IsMatch(text + target, @"enter|return", RegexOptions.IgnoreCase)))
+            return "Error: the user didn't ask to send a message, so nothing is typed in a chat app. Don't write to people unless asked.";
+        if (chat && action is "type" or "write" && UserAskedToSend)
+            return "Error: to send a message use send_message (it opens the chat, types in the message box, sends, and checks it arrived).";
 
         switch (action)
         {
             case "look":
             case "read":
+                _actUnchecked = false;
                 return await Limited(() => LookAt(hwnd, title), "Error: the app isn't responding (its window couldn't be read). Try 'see', or wait a moment.");
 
             case "see":
@@ -44,6 +51,7 @@ public partial class NotchWindow
                 var jpeg = await Limited(() => Snap(hwnd), (byte[]?)null);
                 if (jpeg == null) return "Error: couldn't take a picture of the window.";
                 _pendingSight = jpeg;
+                _actUnchecked = false;
                 return $"A picture of {title} comes right after this, as an image: look at it to check.";
             }
 
@@ -59,7 +67,8 @@ public partial class NotchWindow
                 if (!await Front(hwnd)) return $"Error: couldn't bring {title} to the front.";
                 string how = await Limited(() => Press(el, kind), "Error: the app didn't respond to the press.");
                 await Task.Delay(450, cancel); // the app reacts
-                return how.StartsWith("Error") ? how : $"{how} {kind} “{name}”. Look or see to check what happened.";
+                if (!how.StartsWith("Error")) _actUnchecked = true;
+                return how.StartsWith("Error") ? how : $"{how} {kind} “{name}”. Not checked yet: look or see before saying it worked.";
             }
 
             case "type":
@@ -77,6 +86,7 @@ public partial class NotchWindow
                 if (!StillFront(hwnd)) return "Error: the app lost the front, so nothing was typed.";
                 TypeText(text);
                 await Task.Delay(200, cancel);
+                _actUnchecked = true;
                 return $"Typed “{(text.Length > 60 ? text[..60] + "…" : text)}”. It isn't sent: press enter (keys) if that's what the user wants.";
             }
 
@@ -94,7 +104,8 @@ public partial class NotchWindow
                     if (!PressCombo(one)) return $"Error: don't know the key “{one}”.";
                     await Task.Delay(260, cancel);
                 }
-                return $"Pressed {combo} in {AppOf(title)}. Look or see to check.";
+                _actUnchecked = true;
+                return $"Pressed {combo} in {AppOf(title)}. Not checked yet: look or see before saying it worked.";
             }
 
             case "scroll":
@@ -127,6 +138,8 @@ public partial class NotchWindow
     {
         if (app.Trim().Length == 0) return _uiHwnd != IntPtr.Zero && IsWindow(_uiHwnd) ? _uiHwnd : IntPtr.Zero;
         var wins = RunningWindows(app);
+        if (wins.Count == 0 && System.Text.RegularExpressions.Regex.IsMatch(app, @"^(browser|web|navigateur|chrome|google chrome|edge|msedge|brave|firefox|opera)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) && DefaultBrowser() is { } own)
+            wins = RunningWindows(own);
         if (wins.Count == 0) return IntPtr.Zero;
         // the one you used last, else the biggest (the main window, not a small helper)
         if (wins.Any(w => w.Hwnd == _uiHwnd)) return _uiHwnd;
@@ -176,9 +189,9 @@ public partial class NotchWindow
         {
             try
             {
-                string kind = el.Cached.ControlType.LocalizedControlType ?? "";
-                if (kind.Length == 0) kind = el.Cached.ControlType.ProgrammaticName.Replace("ControlType.", "").ToLowerInvariant();
-                kind = kind.ToLowerInvariant();
+                // the element's type in English whatever Windows' language ("ControlType.ListItem" → "list item"):
+                // the localized name would be "bouton", "élément de liste"… on a French Windows and nothing would match
+                string kind = Regex.Replace(el.Cached.ControlType.ProgrammaticName.Replace("ControlType.", ""), @"(?<=[a-z])(?=[A-Z])", " ").ToLowerInvariant();
                 string name = Regex.Replace(el.Cached.Name ?? "", @"\s+", " ").Trim();
                 if (name.Length > 90) name = name[..90] + "…";
                 if (el.Cached.BoundingRectangle.IsEmpty || el.Cached.BoundingRectangle.Width < 2) continue;
@@ -201,7 +214,7 @@ public partial class NotchWindow
             var labels = found.Where(f => !Interactive.Contains(f.Kind) && f.Name.Length > 1).Select(f => f.Name).Distinct().Take(60).ToList();
             _uiSeen = shown;
             var sb = new StringBuilder();
-            sb.AppendLine($"Window: {title}. What's on screen (use the number to click or type):");
+            sb.AppendLine($"Window: {title}. What's on screen (use the number to click or type). Only what's listed here is readable: if what you need isn't in this list, use 'see' (a picture) and never guess.");
             for (int i = 0; i < shown.Count; i++)
             {
                 var (el, kind, name) = shown[i];

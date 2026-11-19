@@ -99,7 +99,7 @@ public static partial class OpenRouter
 
     // ───────────────────────────── a request, made to fit ─────────────────────────────
 
-    static readonly string[] GroqCoreTools = { "do_on_pc", "play_music", "use_app", "notch_data", "open", "find_files", "research", "run_powershell", "manage_window", "learn" };
+    static readonly string[] GroqCoreTools = { "read_here", "do_on_pc", "play_music", "use_app", "notch_data", "open", "find_files", "research", "run_powershell", "manage_window", "learn" };
 
     /// <summary>
     /// The conversation as Groq gets it: the short instructions, the recent messages (from a question on, so no step
@@ -143,7 +143,10 @@ public static partial class OpenRouter
             If(@"file|folder|document|word|excel|pdf|docx|xlsx|csv|save|write|create a|make a|txt", "write_file", "read_file", "list_folder");
             If(@"picture|image|photo|draw|wallpaper|logo|dessin", "create_image");
             If(@"news|headline|actu", "news");
+            If(@"calendar|agenda|meeting|schedule|my day|appointment|rendez|r[ée]union|brief|free (today|tomorrow|at)|busy", "calendar");
             If(@"video|youtube|stream|watch|clip|live|vidéo|regarde", "youtube");
+            If(@"send|message|dm|tell|say|write|reply|envoie|écris|ecris|dis|b3at|sift|kteb|discord|whatsapp|teams|slack|telegram", "send_message");
+            If(@"screen|écran|ecran|see|vois|look", "see_screen");
             If(@"remember|forget|souviens|oublie", "remember", "forget");
             If(@"notification|missed|miss|alert", "recent_notifications");
             If(@"download|visited|history|historique|website i", "browser_history");

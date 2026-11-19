@@ -1,5 +1,33 @@
 # Changelog
 
+## [2.12.0] — 2026-11-19
+
+The AI chat understands you better, answers better, and works on what you're looking at.
+
+### Added
+- Select text anywhere, then open the search: the AI offers to explain, summarize, fix, rewrite, translate or reply to
+  it. "Summarize this page" reads the page you're on.
+- It reads PDFs (scans too), Excel sheets, PowerPoint files and the text in pictures, all on your PC.
+- Paste your calendar's private link in the chat once, then ask "what's my day" or "am I free at 3".
+- Charts: ask for a graph and it's drawn right in the chat, with the exact values under the pointer. Tables can be
+  sorted, copied or saved as Excel, and PowerShell in an answer gets a Run button.
+- Deeper search: several searches at once, trusted sources first, and only the parts of pages that answer you. Say
+  "think carefully" for the hard questions.
+- Know-how for bigger PC jobs: installing apps, freeing up space, finding what slows the PC, tidying a folder, and more.
+- 👎 on an answer keeps it on your PC, so it can be fixed.
+
+### Changed
+- It tells a command from a question, a how-to or a correction ("it's Brave, not Chrome"), and "hey, how are you"
+  gets a friendly reply instead of a search.
+- Replies keep your language and the letters you type in.
+- A clear New chat button, a typing line that grows with long messages, smoother animations, and a cleaner look for
+  your own messages. Weaker PCs get lighter motion on their own.
+- "What's on my screen" knows the real names of the apps.
+- The browser extension is now 1.1.0: reload it so the AI can read the page you ask about, signed-in pages included.
+
+### Fixed
+- Controlling apps works on Windows in any language.
+
 ## [2.11.2] — 2026-11-18
 
 A fix for the search.

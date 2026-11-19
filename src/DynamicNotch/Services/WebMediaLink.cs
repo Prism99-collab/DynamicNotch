@@ -9,6 +9,9 @@ using System.Windows.Threading;
 
 namespace DynamicNotch.Services;
 
+/// <summary>The page in front in a browser, as the extension reads it when the AI asks.</summary>
+public sealed record WebPage(string Url, string Title, string Text, string Selected);
+
 /// <summary>One browser tab that plays, as the "Dynamic Notch Media" extension reports it.</summary>
 public sealed record WebTab(string Key, int Link, int TabId, string Browser, string Title, string Artist, string Site,
     string? Art, string? Icon, bool Playing, double Pos, double Dur, bool CanNext, bool CanPrev, DateTime At);
@@ -38,6 +41,7 @@ public sealed class WebMediaLink : IDisposable
         public int Id;
         public WebSocket Ws = null!;
         public string Browser = "Chrome";
+        public int Version = 1;
         public List<WebTab> Tabs = new();
         public readonly SemaphoreSlim Sending = new(1, 1);
     }
@@ -167,8 +171,16 @@ public sealed class WebMediaLink : IDisposable
         {
             string b = Str(root, "browser", 16);
             link.Browser = Browsers.FirstOrDefault(x => x.Equals(b, StringComparison.OrdinalIgnoreCase)) ?? "Chrome";
+            link.Version = root.TryGetProperty("v", out var ver) && ver.TryGetInt32(out int vn) ? vn : 1;
             AppLog.Write($"browser link: {link.Browser} connected");
             Publish();
+            return;
+        }
+        if (t == "page")
+        {
+            if (root.TryGetProperty("id", out var pid) && pid.TryGetInt32(out int rid) && _reads.TryRemove(rid, out var waiting))
+                waiting.TrySetResult(Str(root, "err", 40).Length > 0 ? null
+                    : new WebPage(Str(root, "url", 2048), Str(root, "title", 300), Str(root, "text", 60000), Str(root, "sel", 20000)));
             return;
         }
         if (t != "tabs" || !root.TryGetProperty("tabs", out var arr) || arr.ValueKind != JsonValueKind.Array) return;
@@ -216,6 +228,41 @@ public sealed class WebMediaLink : IDisposable
             Changed?.Invoke();
         });
     }
+
+    readonly System.Collections.Concurrent.ConcurrentDictionary<int, TaskCompletionSource<WebPage?>> _reads = new();
+    int _readId;
+
+    /// <summary>
+    /// The page in front in a browser (the one named, else any connected): its address, title, text and selection.
+    /// Null when no extension answers in time (not installed, an older version, a page it can't run in).
+    /// </summary>
+    public async Task<WebPage?> ReadPage(string? browser, TimeSpan wait, bool selectionOnly = false)
+    {
+        Link? link;
+        lock (_gate)
+            link = _links.Values.FirstOrDefault(l => browser != null && l.Browser.Equals(browser, StringComparison.OrdinalIgnoreCase))
+                ?? (browser == null || _links.Count == 1 ? _links.Values.FirstOrDefault() : null);
+        if (link == null || link.Version < 2) return null; // version 1 can't read pages: not waited for
+        int id = Interlocked.Increment(ref _readId);
+        var answer = new TaskCompletionSource<WebPage?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _reads[id] = answer;
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(new { t = "read", id, only = selectionOnly ? "sel" : "" });
+        try
+        {
+            await link.Sending.WaitAsync();
+            try { if (link.Ws.State == WebSocketState.Open) await link.Ws.SendAsync(bytes, WebSocketMessageType.Text, true, _cts.Token); }
+            finally { link.Sending.Release(); }
+            return await Task.WhenAny(answer.Task, Task.Delay(wait)) == answer.Task ? answer.Task.Result : null;
+        }
+        catch { return null; }
+        finally { _reads.TryRemove(id, out _); }
+    }
+
+    /// <summary>"Brave Browser" → "Brave": the link's name for a browser app.</summary>
+    public static string? LinkNameOf(string app) =>
+        app.Contains("brave", StringComparison.OrdinalIgnoreCase) ? "Brave" : app.Contains("edge", StringComparison.OrdinalIgnoreCase) ? "MSEdge"
+        : app.Contains("firefox", StringComparison.OrdinalIgnoreCase) ? "Firefox" : app.Contains("opera", StringComparison.OrdinalIgnoreCase) ? "Opera"
+        : app.Contains("vivaldi", StringComparison.OrdinalIgnoreCase) ? "Vivaldi" : app.Contains("chrome", StringComparison.OrdinalIgnoreCase) ? "Chrome" : null;
 
     /// <summary>A button on the notch for one tab: "toggle", "play", "pause", "next", "prev", "seek" (seconds), "focus".</summary>
     public void Send(WebTab tab, string cmd, double pos = 0)

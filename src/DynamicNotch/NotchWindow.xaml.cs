@@ -182,6 +182,7 @@ public partial class NotchWindow : Window
             ApplyPowerProfile();
         };
         AddClipboardFormatListener(_hwnd);
+        StartAppTime(); // how long each app is in front, for the AI (NotchWindow.ActivityLog)
         _shellMsg = RegisterWindowMessage("SHELLHOOK");
         RegisterShellHookWindow(_hwnd);
 
@@ -390,6 +391,9 @@ public partial class NotchWindow : Window
         try
         {
             if ((System.Windows.Media.RenderCapability.Tier >> 16) == 0) return true;
+            // a weak PC: two cores or less, or under 4 GB of memory (animations would take time from the apps in use)
+            if (Environment.ProcessorCount <= 2) return true;
+            if (GC.GetGCMemoryInfo().TotalAvailableMemoryBytes is > 0 and < 3_800_000_000L) return true;
             using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Avalon.Graphics");
             return key?.GetValue("DisableHWAcceleration") is int v && v != 0;
         }

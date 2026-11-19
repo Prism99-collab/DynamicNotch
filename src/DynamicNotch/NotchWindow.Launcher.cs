@@ -110,6 +110,7 @@ public partial class NotchWindow
         if (_launcherOpen) { if (seed != null && _launchBox != null) { _launchBox.Text += seed; _launchBox.CaretIndex = _launchBox.Text.Length; } return; }
         var fg = GetForegroundWindow();
         _launchPrevFg = fg != _hwnd ? fg : IntPtr.Zero;
+        CaptureSelection(_launchPrevFg); // text selected there goes to the AI (NotchWindow.LauncherChatHere)
         BuildLauncher();
         if (_launch == null || _launchBox == null) return;
         if (_mode != Mode.Expanded) Expand(byHotkey: true);
@@ -251,13 +252,15 @@ public partial class NotchWindow
     {
         if (_launch != null) return;
         var root = new Grid { Margin = new Thickness(18, 10, 18, 8) };
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(40) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = 40 }); // grows with a long message
         root.RowDefinitions.Add(new RowDefinition());
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(20) });
 
         // the search line: a prompt, what you type, a hint on the right
         var line = new Grid { RenderTransform = new TranslateTransform() };
         _launchLineRow = line;
+        line.RowDefinitions.Add(new RowDefinition { Height = new GridLength(40) }); // the first line: the prompt, mic and send stay level with it
+        line.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // the lines a long message wraps onto
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
         line.ColumnDefinitions.Add(new ColumnDefinition());
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -269,11 +272,14 @@ public partial class NotchWindow
         {
             FontSize = 17, Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = Brushes.White,
             VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(0), FocusVisualStyle = null,
+            TextWrapping = TextWrapping.Wrap, MaxHeight = 118, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
         };
         _launchBox.TextChanged += (_, _) => QueueSearch();
         _launchBox.SelectionChanged += (_, _) => { if (_launcherOpen && _ghost != null && _launchBox.CaretIndex != _launchBox.Text.Length) SetGhost(null); };
         _launchBox.PreviewKeyDown += OnLauncherKey;
         Grid.SetColumn(_launchBox, 1);
+        Grid.SetRowSpan(_launchBox, 2);
+        _launchBox.SizeChanged += OnLineGrew;
         line.Children.Add(_launchBox);
         _launchHint = new TextBlock { FontSize = 13, Foreground = DimBrush, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false, Margin = new Thickness(2, 0, 0, 1) };
         Grid.SetColumn(_launchHint, 1);
@@ -294,6 +300,7 @@ public partial class NotchWindow
         var underline = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Bottom, Background = Frozen(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF)), Tag = "line" };
         _launchLine = underline;
         Grid.SetColumnSpan(underline, 4);
+        Grid.SetRowSpan(underline, 2);
         line.Children.Add(underline);
         root.Children.Add(line);
 
@@ -910,6 +917,7 @@ public partial class NotchWindow
             return;
         }
         if (e.Key == Key.Tab && _launchBox.Text.Length == 0 && _settings.AiChat) { e.Handled = true; EnterChat(null, resume: true); return; }
+        if (e.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control && _settings.AiChat) { e.Handled = true; StartSession(null); EnterChat(null); return; } // a new chat
         if (e.Key is Key.Enter or Key.Tab or Key.Up or Key.Down or Key.Right or Key.PageUp or Key.PageDown) SearchNowIfBehind();
         int count = _hits.Count;
         bool atEnd = _launchBox.CaretIndex == _launchBox.Text.Length && _launchBox.SelectionLength == 0;

@@ -518,6 +518,9 @@ public static partial class OpenRouter
     static extern bool CryptUnprotectData(ref Blob input, IntPtr desc, IntPtr entropy, IntPtr reserved, IntPtr prompt, int flags, out Blob output);
     [DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr p);
 
+    /// <summary>Encrypted for this Windows account only (other secrets: the calendar's address).</summary>
+    public static byte[]? Seal(byte[] data) => Protect(data);
+    public static byte[]? Unseal(byte[] data) => Unprotect(data);
     static byte[]? Protect(byte[] data) => Crypt(data, true);
     static byte[]? Unprotect(byte[] data) => Crypt(data, false);
 

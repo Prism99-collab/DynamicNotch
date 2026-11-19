@@ -52,7 +52,7 @@ function connect() {
   ws.onopen = () => {
     open = true;
     retry = 0;
-    post({ t: 'hello', app: 'dynamic-notch-media', v: 1, browser: browserName() });
+    post({ t: 'hello', app: 'dynamic-notch-media', v: 2, browser: browserName() });
     sendSoon();
     // a message every 20 s keeps the link (and this worker) awake while the notch is there
     clearInterval(pingTimer);
@@ -61,6 +61,14 @@ function connect() {
   ws.onmessage = e => {
     let m;
     try { m = JSON.parse(e.data); } catch { return; }
+    // the AI asks about the tab in front: its page answers (content.js)
+    if (m.t === 'read' && typeof m.id === 'number') {
+      api.tabs.query({ active: true, lastFocusedWindow: true })
+        .then(([tab]) => tab ? api.tabs.sendMessage(tab.id, { cmd: 'read', only: m.only || '' }, { frameId: 0 }) : null)
+        .then(r => post({ t: 'page', id: m.id, ...(r || { err: 'no page' }) }))
+        .catch(() => post({ t: 'page', id: m.id, err: 'not readable' }));
+      return;
+    }
     if (m.t !== 'cmd' || typeof m.tab !== 'number') return;
     if (m.cmd === 'focus') {
       api.tabs.update(m.tab, { active: true }).then(t => t && api.windows.update(t.windowId, { focused: true })).catch(() => { });

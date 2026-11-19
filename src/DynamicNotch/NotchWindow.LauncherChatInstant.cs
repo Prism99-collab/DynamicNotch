@@ -49,7 +49,7 @@ public partial class NotchWindow
             return await RunInstant(session, "youtube", new JsonObject { ["query"] = watch.Query, ["live"] = watch.Live }.ToJsonString(), () => YouTubeTool(watch.Query, watch.Live, open: true, CancellationToken.None));
         // "play X (on spotify / youtube)": straight there, checked (NotchWindow.LauncherChatPlay)
         if (_settings.AiTools && text.Length <= 90 && !text.Contains('?') && PlayRequest(text) is { } play)
-            return await RunInstant(session, "play_music", new JsonObject { ["query"] = play.Query, ["where"] = play.Where }.ToJsonString(), () => PlayMusic(play.Query, play.Where));
+            return await RunInstant(session, "play_music", new JsonObject { ["query"] = play.Where == "liked" ? "your Liked Songs" : play.Query, ["where"] = play.Where == "liked" ? "spotify" : play.Where }.ToJsonString(), () => PlayMusic(play.Query, play.Where));
         if (!_settings.AiTools || text.Length > 90 || text.Contains('?') || text.Contains('\n') || NotACommand.IsMatch(text)) return false;
         IReadOnlyList<LauncherIntent.Intent> list;
         try { list = LauncherIntent.Parse(text, DateTime.Now); } catch { return false; }
@@ -82,7 +82,8 @@ public partial class NotchWindow
             try { result = await act(); } catch (Exception ex) { result = "Error: " + ex.Message; }
             if (_pendingUndo is { } u && !result.StartsWith("Error")) AttachUndo(step, u);
             _pendingUndo = null;
-            bool ok = !result.StartsWith("Error") && !result.Contains(": couldn't") && !result.Contains("didn't show up") && !result.Contains("couldn't be started");
+            bool ok = !result.StartsWith("Error") && !result.Contains(": couldn't") && !result.Contains("didn't show up") && !result.Contains("couldn't be started") && !result.Contains("isn't confirmed") && !result.Contains("didn't load");
+            if (!ok && result.Contains("Say it isn't confirmed")) result = result.Replace(" Say it isn't confirmed.", " (not confirmed)");
             step.Done(ok, null);
             if (ok && _settings.AiMemory && _chatLastUser.Length > 0) AiLearn.Record(_chatLastUser, new[] { (tool, args, true) }, (DateTime.Now - started).TotalSeconds); // habits learn from these too
 

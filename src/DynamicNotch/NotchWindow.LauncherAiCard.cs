@@ -51,7 +51,7 @@ public partial class NotchWindow
         });
         words.Children.Add(new TextBlock
         {
-            Text = !connected ? "Connect it once with a free key" : title != null ? $"Continue · {title} · {ChatAgo(when)}" : _settings.AiTools ? "Answers, writes, and does things on your PC" : "Answers and writes for you",
+            Text = !connected ? "Connect it once with a free key" : _hereSelection is { } picked ? $"Selected text from {picked.App} · Tab to ask about it" : title != null ? $"Continue · {title} · {ChatAgo(when)}" : _settings.AiTools ? "Answers, writes, and does things on your PC" : "Answers and writes for you",
             FontSize = 10.5, Foreground = Frozen(A(acc, 0xC8)), TextTrimming = TextTrimming.CharacterEllipsis, FontFamily = _cyber ? CyFont : UiText,
         });
         Grid.SetColumn(words, 1);
@@ -62,14 +62,16 @@ public partial class NotchWindow
         side.Children.Add(KeyCap("Tab", acc));
         if (connected && title != null)
         {
+            var plus = new TextBlock { Text = "\uE710", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 9, Foreground = Frozen(acc), VerticalAlignment = VerticalAlignment.Center };
+            var label = new TextBlock { Text = _cyber ? "NEW LINK" : "New chat", FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = Frozen(acc), FontFamily = _cyber ? CyFont : UiText, Margin = new Thickness(5, 0, 0, 1), VerticalAlignment = VerticalAlignment.Center };
             var fresh = new Border
             {
-                Child = new TextBlock { Text = "", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 10, Foreground = Frozen(acc), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
-                Width = 22, Height = 22, Margin = new Thickness(6, 0, 0, 0), Cursor = Cursors.Hand, ToolTip = "New chat",
-                CornerRadius = new CornerRadius(_cyber ? 0 : 11), Background = Frozen(A(acc, 0x18)), BorderBrush = Frozen(A(acc, 0x60)), BorderThickness = new Thickness(1),
+                Child = new StackPanel { Orientation = Orientation.Horizontal, Children = { plus, label } },
+                Height = 22, Padding = new Thickness(8, 0, 9, 0), Margin = new Thickness(6, 0, 0, 0), Cursor = Cursors.Hand, ToolTip = "Start a new chat  ·  Ctrl+N",
+                CornerRadius = new CornerRadius(_cyber ? 0 : 11), Background = Frozen(A(acc, 0x18)), BorderBrush = Frozen(A(acc, 0x70)), BorderThickness = new Thickness(1),
             };
-            fresh.MouseEnter += (_, _) => fresh.Background = Frozen(A(acc, 0x38));
-            fresh.MouseLeave += (_, _) => fresh.Background = Frozen(A(acc, 0x18));
+            fresh.MouseEnter += (_, _) => { fresh.Background = Frozen(A(acc, 0x40)); label.Foreground = plus.Foreground = Brushes.White; };
+            fresh.MouseLeave += (_, _) => { fresh.Background = Frozen(A(acc, 0x18)); label.Foreground = plus.Foreground = Frozen(acc); };
             fresh.MouseLeftButtonUp += (_, e) => { e.Handled = true; StartSession(null); EnterChat(null); };
             side.Children.Add(fresh);
         }
