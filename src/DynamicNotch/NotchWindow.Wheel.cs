@@ -119,7 +119,7 @@ public partial class NotchWindow
             {
                 UIElement u => u.RaiseEvent,
                 ContentElement c => c.RaiseEvent,
-                _ => Pill.RaiseEvent,
+                _ => _mode == Mode.Expanded ? Expanded.RaiseEvent : Pill.RaiseEvent, // nothing there: the open panel takes it
             };
             var preview = new MouseWheelEventArgs(Mouse.PrimaryDevice, Environment.TickCount, delta) { RoutedEvent = UIElement.PreviewMouseWheelEvent };
             raise(preview);

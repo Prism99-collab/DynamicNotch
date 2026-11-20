@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.1.1] — 2026-11-20
+
+Smoother page switching.
+
+### Fixed
+- Scrolling over the page dots moves one page per notch, and works between the dots too.
+- Switching pages no longer shows a strip of the page next to it.
+
+### Added
+- A Home button next to the page dots, to jump back from any page.
+
 ## [3.1.0] — 2026-11-20
 
 Pixo reacts to everything now, and it's quicker when you push it.

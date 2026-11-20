@@ -85,6 +85,27 @@ public partial class NotchWindow
             hits[i] = hit;
         }
         foreach (int i in PageOrder) Dots.Children.Add(hits[i]);
+        // each page draws only inside itself: a glow, a side rail or a row arriving can never bleed onto the
+        // page next to it while the strip slides (or after it settles)
+        foreach (var el in PagesStrip.Children.OfType<FrameworkElement>()) el.ClipToBounds = true;
+        // Home: a small round button on the left of the dots, on every page but Home
+        if (Dots.Parent is Grid bottom)
+        {
+            var catcher = new Border { Background = Brushes.Transparent };
+            Grid.SetRow(catcher, Grid.GetRow(Dots));
+            bottom.Children.Insert(0, catcher); // under the dots: the wheel between two dots still turns the page
+            Dots.Background = Brushes.Transparent;
+            _homeBtn = new Button
+            {
+                Style = (Style)FindResource("CircleButton"), Width = 18, Height = 18, Padding = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(30, -6, 0, 0), // clear of the rounded corner
+                Content = Glyph("", 9.5, Brushes.White), ToolTip = Loc.T("Home"), Opacity = 0, IsHitTestVisible = false,
+                RenderTransform = new TranslateTransform(-6, 0),
+            };
+            Grid.SetRow(_homeBtn, Grid.GetRow(Dots));
+            _homeBtn.Click += (_, _) => GoToPage(0);
+            bottom.Children.Add(_homeBtn);
+        }
         UpdateDots(animate: false);
         ApplyPageVisibility(); // pages switched off in Preferences
 
@@ -160,9 +181,21 @@ public partial class NotchWindow
         if (page != 0) ShowDevices(false);
     }
 
+    Button? _homeBtn;
+
     void UpdateDots(bool animate)
     {
         PageTitle.Text = Loc.T(PageNames[_page]);
+        if (_homeBtn != null)
+        {
+            // the Home button slides in away from Home, and out on it
+            bool show = _page != 0;
+            _homeBtn.IsHitTestVisible = show;
+            var t = TimeSpan.FromMilliseconds(animate && !Eco ? 220 : 1);
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            _homeBtn.BeginAnimation(OpacityProperty, new DoubleAnimation(show ? 1 : 0, t));
+            ((TranslateTransform)_homeBtn.RenderTransform).BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(show ? 0 : -6, t) { EasingFunction = ease });
+        }
         RenderSwitch();
         RenderDeviceRings();
         for (int i = 0; i < _dots.Count; i++)
@@ -268,16 +301,27 @@ public partial class NotchWindow
         _lastWheelPage = DateTime.UtcNow;
     }
 
+    int _vwheel;
+    DateTime _vwheelAt;
+
     void OnExpandedWheel(object sender, MouseWheelEventArgs e)
     {
         var src = e.OriginalSource as DependencyObject;
         if (FindParent<PillSlider>(src) != null || FindParent<ScrollViewer>(src) != null) return;
         bool overChrome = e.GetPosition(Expanded).Y < 34 || e.GetPosition(Expanded).Y > 34 + 216;
         if (Keyboard.Modifiers != ModifierKeys.Shift && !overChrome) return;
-        if ((DateTime.UtcNow - _lastWheelPage).TotalMilliseconds < 300) { e.Handled = true; return; }
-        GoToPage(StepPage(e.Delta < 0 ? 1 : -1));
-        _lastWheelPage = DateTime.UtcNow;
         e.Handled = true;
+        var now = DateTime.UtcNow;
+        // one notch, one page: smooth-scrolling mice and touchpads send many small turns for one notch, so the turns
+        // add up until they make a notch; right after a page change the wheel rests a moment (a spin doesn't race on)
+        if ((now - _lastWheelPage).TotalMilliseconds < 280) { _vwheel = 0; return; }
+        if ((now - _vwheelAt).TotalMilliseconds > 400) _vwheel = 0; // a new gesture starts from zero
+        _vwheelAt = now;
+        _vwheel += e.Delta;
+        if (Math.Abs(_vwheel) < 100) return;
+        GoToPage(StepPage(_vwheel < 0 ? 1 : -1));
+        _vwheel = 0;
+        _lastWheelPage = now;
     }
 
     static T? FindParent<T>(DependencyObject? d) where T : DependencyObject
