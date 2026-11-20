@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.1.2] — 2026-11-20
+
+Pixo joins your calls, and it's safer with the AI.
+
+### Added
+- The face joins your calls: it talks when you talk, looks over when they talk, and zips its mouth when you're muted.
+- Right-click any text box for Cut, Copy, Paste and Select all.
+
+### Changed
+- The Pixo logo is now in the tray and in Preferences.
+- The AI asks before running programs or scripts it wasn't sure about, and only follows what you tell it, never
+  instructions hidden in a web page or a file.
+
+### Fixed
+- Typing in the Settings box no longer goes to the search, and the cursor shows.
+- Small fixes that keep animations steady.
+
 ## [3.1.1] — 2026-11-20
 
 Smoother page switching.

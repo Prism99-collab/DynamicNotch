@@ -73,6 +73,9 @@ public sealed class WebMediaLink : IDisposable
             TcpClient client;
             try { client = await _listener!.AcceptTcpClientAsync(_cts.Token); }
             catch { break; }
+            int open;
+            lock (_gate) open = _links.Count;
+            if (open >= 8) { client.Dispose(); continue; } // a browser or two connect; dozens is something else
             _ = Task.Run(() => Serve(client));
         }
     }
@@ -178,7 +181,9 @@ public sealed class WebMediaLink : IDisposable
         }
         if (t == "page")
         {
-            if (root.TryGetProperty("id", out var pid) && pid.TryGetInt32(out int rid) && _reads.TryRemove(rid, out var waiting))
+            // only the browser that was asked may answer (another extension can't slip text into what the AI reads)
+            if (root.TryGetProperty("id", out var pid) && pid.TryGetInt32(out int rid) && _readFrom.TryGetValue(rid, out int asked) && asked == link.Id
+                && _reads.TryRemove(rid, out var waiting) && _readFrom.TryRemove(rid, out _))
                 waiting.TrySetResult(Str(root, "err", 40).Length > 0 ? null
                     : new WebPage(Str(root, "url", 2048), Str(root, "title", 300), Str(root, "text", 60000), Str(root, "sel", 20000)));
             return;
@@ -230,6 +235,7 @@ public sealed class WebMediaLink : IDisposable
     }
 
     readonly System.Collections.Concurrent.ConcurrentDictionary<int, TaskCompletionSource<WebPage?>> _reads = new();
+    readonly System.Collections.Concurrent.ConcurrentDictionary<int, int> _readFrom = new(); // read id → the link it was sent to
     int _readId;
 
     /// <summary>
@@ -246,6 +252,7 @@ public sealed class WebMediaLink : IDisposable
         int id = Interlocked.Increment(ref _readId);
         var answer = new TaskCompletionSource<WebPage?>(TaskCreationOptions.RunContinuationsAsynchronously);
         _reads[id] = answer;
+        _readFrom[id] = link.Id;
         var bytes = JsonSerializer.SerializeToUtf8Bytes(new { t = "read", id, only = selectionOnly ? "sel" : "" });
         try
         {
@@ -255,7 +262,7 @@ public sealed class WebMediaLink : IDisposable
             return await Task.WhenAny(answer.Task, Task.Delay(wait)) == answer.Task ? answer.Task.Result : null;
         }
         catch { return null; }
-        finally { _reads.TryRemove(id, out _); }
+        finally { _reads.TryRemove(id, out _); _readFrom.TryRemove(id, out _); }
     }
 
     /// <summary>"Brave Browser" → "Brave": the link's name for a browser app.</summary>

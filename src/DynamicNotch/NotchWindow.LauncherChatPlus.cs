@@ -376,6 +376,10 @@ public partial class NotchWindow
         // harmless names that look like the dangerous ones: clearing the screen, a variable, a job of its own
         s = Regex.Replace(s, @"\b(Clear-Host|Clear-Variable|Remove-Variable|Remove-Job|Remove-PSDrive|Remove-TypeData|Disable-PSBreakpoint|Enable-PSBreakpoint)\b", " ", RegexOptions.IgnoreCase);
         // what can't be read here (a command inside cmd or another PowerShell, encoded, run as admin, the registry) always asks
+        // a command whose name is built while it runs, or a shell / script host started indirectly: what it does can't be
+        // read here, so it always asks (a page the AI read could try to slip one in)
+        var indirect = Regex.Matches(s, @"&\s*[\$\(\[]|\.Invoke(?:Script|Command)?\s*\(|\bInvoke-(?:Command|Item)\b|\[scriptblock\]::Create|\bNew-Object\s+-ComObject\b|\bStart-Process\b[^\n;|]*\b(?:cmd|powershell|pwsh|wscript|cscript|mshta|rundll32|regsvr32|msiexec|bash|wsl)\b|\bStart-Process\b[^\n;|]*\.(?:bat|cmd|ps1|vbs|js|hta|msi|scr)\b|\bStart-Process\b[^\n;|]*-Verb\b", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+        if (indirect.Count > 0) return (Risk.Danger, "indirect");
         var hidden = Regex.Matches(s, @"\bcmd(?:\.exe)?\s+/[ck]\b|\b(?:powershell|pwsh)(?:\.exe)?\b[^\n;|]*\s-(?:e|ec|enc|encodedcommand|c|command|f|file)\b|-Verb\s+'?""?RunAs|\b(?:New-Item|Copy-Item|Move-Item|Rename-Item)\b(?=[^\n;|]*(?:\bHK(?:LM|CU|CR|U|CC):|Registry::))|\b(?:Set-Item|Set-Date|Set-TimeZone|Rename-Computer|Add-Type|Start-Job|Add-LocalGroupMember|New-LocalUser|Set-LocalUser|Add-AppxPackage|Remove-AppxPackage)\b|(?:^|[;|&({]|\n)\s*&?\s*(?:kill|spps|spsv|ri|rni|certutil|bitsadmin|mshta|rundll32|regsvr32|cscript|wscript)(?=[\s.]|$)", RegexOptions.IgnoreCase | RegexOptions.Multiline);
         if (hidden.Count > 0) return (Risk.Danger, string.Join(",", hidden.Select(m => Regex.Replace(m.Value, @"^[\s;|&({]+", "").Trim().ToLowerInvariant()).Distinct()));
         var danger = Regex.Matches(s,

@@ -163,60 +163,24 @@ public partial class App : Application
         Shutdown();
     }
 
-    static Drawing.Icon CreateTrayIcon(bool cyber = false)
+    static Drawing.Icon? _trayIcon;
+
+    /// <summary>
+    /// The tray icon: Pixo's own logo (the app's icon file, at the size Windows uses for the tray on this screen).
+    /// Made once and reused: drawing a new one for every theme change left Windows icon handles behind.
+    /// </summary>
+    static Drawing.Icon CreateTrayIcon(bool neon = false)
     {
-        var icon = cyber ? DrawCyberTrayIcon() : DrawTrayIcon();
+        if (_trayIcon != null) return _trayIcon;
         try
         {
-            WindowIcon = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty,
-                System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+            var info = GetResourceStream(new Uri("pack://application:,,,/Assets/app.ico"));
+            using var stream = info.Stream;
+            _trayIcon = new Drawing.Icon(stream, Forms.SystemInformation.SmallIconSize);
         }
-        catch { }
-        return icon;
-    }
-
-    /// <summary>The neon notch: a cut black plate with a yellow frame and a cyan trace.</summary>
-    static Drawing.Icon DrawCyberTrayIcon()
-    {
-        const int s = 64;
-        using var bmp = new Drawing.Bitmap(s, s);
-        using (var g = Drawing.Graphics.FromImage(bmp))
-        {
-            g.SmoothingMode = Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            g.Clear(Drawing.Color.Transparent);
-            var pts = new[] { new Drawing.PointF(3, 18), new(61, 18), new(61, 37), new(52, 46), new(11, 46), new(3, 38) };
-            using var black = new Drawing.SolidBrush(Drawing.Color.FromArgb(0, 6, 14));
-            g.FillPolygon(black, pts);
-            using var yellow = new Drawing.Pen(Drawing.Color.FromArgb(0xFE, 0xE8, 0x01), 4) { LineJoin = Drawing.Drawing2D.LineJoin.Miter };
-            g.DrawPolygon(yellow, pts);
-            using var cyan = new Drawing.SolidBrush(Drawing.Color.FromArgb(0x3C, 0xD5, 0xFF));
-            g.FillRectangle(cyan, 12, 30, 22, 4);
-            using var dot = new Drawing.SolidBrush(Drawing.Color.FromArgb(0xFE, 0xE8, 0x01));
-            g.FillRectangle(dot, 44, 28, 7, 7);
-        }
-        return Drawing.Icon.FromHandle(bmp.GetHicon());
-    }
-
-    static Drawing.Icon DrawTrayIcon()
-    {
-        const int s = 64;
-        using var bmp = new Drawing.Bitmap(s, s);
-        using (var g = Drawing.Graphics.FromImage(bmp))
-        {
-            g.SmoothingMode = Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            g.Clear(Drawing.Color.Transparent);
-            using var path = new Drawing.Drawing2D.GraphicsPath();
-            var r = new Drawing.RectangleF(4, 20, 56, 24);
-            float d = 24;
-            path.AddArc(r.X, r.Y, d, d, 90, 180);
-            path.AddArc(r.Right - d, r.Y, d, d, 270, 180);
-            path.CloseFigure();
-            using var white = new Drawing.SolidBrush(Drawing.Color.White);
-            g.FillPath(white, path);
-            using var black = new Drawing.SolidBrush(Drawing.Color.Black);
-            g.FillEllipse(black, 40, 27, 10, 10);
-        }
-        return Drawing.Icon.FromHandle(bmp.GetHicon());
+        catch { _trayIcon = Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? "") ?? Drawing.SystemIcons.Application; }
+        try { WindowIcon = new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Assets/app.ico")); } catch { }
+        return _trayIcon;
     }
 
     void ExitApp()

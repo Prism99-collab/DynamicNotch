@@ -93,6 +93,10 @@ public partial class NotchWindow
             path = ExpandPath(path);
             if (!Path.IsPathRooted(path)) path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), path);
             if (Path.GetExtension(path).Length == 0) path += ".txt";
+            // a program or script, or a file where it would run by itself or touch the system: your OK first
+            if ((CodeTypes.Contains(Path.GetExtension(path)) || SensitivePlace(path)) && _settings.AiAsk != "never"
+                && await ConfirmInChat("Write " + Path.GetFileName(path), path, cancel) == 0)
+                return "The user declined: the file was not written.";
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             bool exists = File.Exists(path);
             if (mode == "append")

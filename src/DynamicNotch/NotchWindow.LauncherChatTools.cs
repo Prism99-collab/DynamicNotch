@@ -116,6 +116,10 @@ public partial class NotchWindow
                 if (url && !Real(t, Seen(_session))) return "Error: that link wasn't found by a search or given by the user (it may not exist). For videos and streams use the youtube tool; for anything else, research first.";
                 string path = url ? t : ExpandPath(t);
                 if (!url && !File.Exists(path) && !Directory.Exists(path)) return "Error: not found: " + path;
+                // a program or script that isn't an installed app (one in Downloads, on the desktop...): your OK first
+                if (!url && RunsCode(path) && !InstalledPlace(path) && _settings.AiAsk != "never"
+                    && await ConfirmInChat("Run " + Path.GetFileName(path), path, cancel) == 0)
+                    return "The user declined: it was not opened.";
                 try
                 {
                     Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
@@ -289,6 +293,41 @@ public partial class NotchWindow
     /// A PowerShell script, run hidden with a time limit; its output (and errors) come back. One that changes things
     /// (deletes, installs, settings, downloads, starting programs...) waits for your OK first, unless Preferences say not to.
     /// </summary>
+    static readonly HashSet<string> CodeTypes = new(StringComparer.OrdinalIgnoreCase)
+        { ".exe", ".com", ".scr", ".pif", ".bat", ".cmd", ".ps1", ".psm1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh", ".hta", ".msi", ".msp", ".cpl", ".jar", ".reg" }; // (shortcuts aren't here: they're how people open their own apps)
+
+    /// <summary>A file that runs code when it's opened (a program, a script, a shortcut).</summary>
+    static bool RunsCode(string path) => File.Exists(path) && CodeTypes.Contains(Path.GetExtension(path));
+
+    /// <summary>Where installed apps live (Program Files, Windows, the user's installed programs, the Start menu).</summary>
+    static bool InstalledPlace(string path)
+    {
+        string full = Path.GetFullPath(path);
+        string[] roots =
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "WindowsApps"),
+            Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu),
+        };
+        return roots.Any(r => r.Length > 0 && full.StartsWith(r.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Folders where a new file runs by itself or changes the system (autostart, Windows, Program Files).</summary>
+    static bool SensitivePlace(string path)
+    {
+        string full = Path.GetFullPath(path);
+        string[] roots =
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.Startup), Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup),
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "WindowsPowerShell"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "PowerShell"),
+        };
+        return roots.Any(r => r.Length > 0 && full.StartsWith(r.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase));
+    }
+
     async Task<string> RunPowerShell(string script, string why, CancellationToken cancel)
     {
         if (script.Trim().Length == 0) return "Error: empty script.";

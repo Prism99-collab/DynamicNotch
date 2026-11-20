@@ -199,10 +199,19 @@ public sealed class PreferencesWindow : Window
         RenderContent();
     }
 
+    /// <summary>Pixo's logo, at a size.</summary>
+    static FrameworkElement PixoLogo(double size)
+    {
+        var img = new System.Windows.Controls.Image { Width = size, Height = size, VerticalAlignment = VerticalAlignment.Center };
+        try { img.Source = new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Assets/logo.png")); } catch { }
+        RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+        return img;
+    }
+
     FrameworkElement Brand()
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(20, 24, 16, 14) };
-        panel.Children.Add(MiniNotch(46, 14, _s.Neon));
+        panel.Children.Add(PixoLogo(40));
         var names = new StackPanel { Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         names.Children.Add(new TextBlock { Text = "Pixo", FontSize = 15, FontWeight = FontWeights.SemiBold, FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI") });
         names.Children.Add(new TextBlock { Text = Loc.T("Preferences") + " · " + Version, FontSize = 11, Foreground = Dim });
@@ -1526,7 +1535,7 @@ public sealed class PreferencesWindow : Window
     void About()
     {
         var hero = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 22, 0, 22) };
-        var mark = MiniNotch(120, 30, _s.Neon);
+        var mark = PixoLogo(76);
         mark.HorizontalAlignment = HorizontalAlignment.Center;
         hero.Children.Add(mark);
         hero.Children.Add(new TextBlock { Text = "Pixo", FontSize = 24, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 0), FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI") });

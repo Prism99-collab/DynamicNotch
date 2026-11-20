@@ -16,7 +16,7 @@ namespace DynamicNotch.Controls;
 /// </summary>
 public sealed class NotchFace : FrameworkElement
 {
-    public enum Mood { Idle, Thinking, Searching, Working, Error, Sleep, Focus, Music }
+    public enum Mood { Idle, Thinking, Searching, Working, Error, Sleep, Focus, Music, Talk, Listen, Muted }
     public enum Emote { Happy, Hello, Love, Surprised, Proud, Done, Annoyed, Tired, Wink, Dizzy, Yawn, Wave, Sad, Alert, Excited, Gulp, Overload }
     /// <summary>What it can wear on its head ("auto" is decided outside: by the season).</summary>
     public static readonly string[] Outfits = { "none", "beanie", "cap", "party", "crown", "santa", "witch" };
@@ -66,6 +66,10 @@ public sealed class NotchFace : FrameworkElement
     bool _neon;
     public Color Accent { get => _accent; set { if (_accent == value) return; _accent = value; _fill = null; InvalidateVisual(); } }
     public Mood Current => _mood;
+
+    double _levelTo, _level;
+    /// <summary>How loud the voice is right now (0..1): in a call, its mouth moves with yours, its nod with theirs.</summary>
+    public double Level { get => _levelTo; set { _levelTo = Math.Clamp(value, 0, 1); if (_mood is Mood.Talk or Mood.Listen) Kick(); } }
 
     Color? _wear;
     double _wearUntil, _bounceUntil;
@@ -386,7 +390,7 @@ public sealed class NotchFace : FrameworkElement
     /// <summary>Frames a second: asleep only its breath moves; a loop (searching) needs fewer than a hop.</summary>
     int Fps => _tw.Count > 0 || _bits.Count > 0 ? (Eco ? 30 : 60) : _mood == Mood.Sleep ? 15 : Eco ? 20 : 30;
 
-    bool Moving => _t < _waveUntil || _t < _bounceUntil || _wear != null && _t < _wearUntil + .3 || _hatNext != null || Math.Abs(_phones - (_mood == Mood.Music ? 1 : 0)) > .01 || _mood is Mood.Searching or Mood.Working or Mood.Sleep || _mood == Mood.Music && !Eco || _t < _dizzyUntil || _t < _glitchUntil || Badge;
+    bool Moving => _mood is Mood.Talk or Mood.Listen || _t < _waveUntil || _t < _bounceUntil || _wear != null && _t < _wearUntil + .3 || _hatNext != null || Math.Abs(_phones - (_mood == Mood.Music ? 1 : 0)) > .01 || _mood is Mood.Searching or Mood.Working or Mood.Sleep || _mood == Mood.Music && !Eco || _t < _dizzyUntil || _t < _glitchUntil || Badge;
     bool Badge => _s >= 16 && _mood is Mood.Thinking or Mood.Searching or Mood.Working;
 
     bool Busy
@@ -418,13 +422,16 @@ public sealed class NotchFace : FrameworkElement
             case Mood.Working: x *= .4; y = -.2; break;
             case Mood.Focus: x *= .4; y = -.34; break;
             case Mood.Sleep: x = 0; y = -.14; break;
+            case Mood.Listen: x = -.55 + Math.Sin(t * 1.3) * .08; y = .05; break;   // toward the caller (their icon is on the left)
+            case Mood.Talk: x *= .3; y = .1; break;
+            case Mood.Muted: x *= .3; y = -.1; break;
             case Mood.Music when !Eco: x = x * .4 + Math.Sin(t * Math.PI * Beat / 2) * .3; break;
         }
         if (_t < _dizzyUntil) x = Math.Sin(t * 9) * .25;
         return (x, y);
     }
 
-    double TiltTarget() => _t < _dizzyUntil ? Math.Sin(_t * 8) * .16 : _mood == Mood.Thinking ? .1 : _mood == Mood.Music && !Eco ? Math.Sin(_t * Math.PI * Beat / 2) * .12 : 0;
+    double TiltTarget() => _mood == Mood.Listen ? Math.Sin(_t * 3.2) * (.04 + _level * .06) : _t < _dizzyUntil ? Math.Sin(_t * 8) * .16 : _mood == Mood.Thinking ? .1 : _mood == Mood.Music && !Eco ? Math.Sin(_t * Math.PI * Beat / 2) * .12 : 0;
 
     /// <summary>Beats a second it bobs to with music (about 112 a minute).</summary>
     const double Beat = 1.87;
@@ -447,7 +454,8 @@ public sealed class NotchFace : FrameworkElement
         _pitch += (tp - _pitch) * look;
 
         // what its mood does to its body: a busy little bob, the breath of sleep
-        double oy = _t < _bounceUntil ? -Math.Abs(Math.Sin(t * 11)) * .16 : _mood == Mood.Working ? -Math.Abs(Math.Sin(t * 7)) * .04 : _mood == Mood.Music && !Eco ? -Math.Abs(Math.Sin(t * Math.PI * Beat)) * .09 : 0;
+        _level += (_levelTo - _level) * (1 - Math.Pow(.0004, dt)); // the voice, smoothed
+        double oy = _mood == Mood.Talk ? -_level * .07 : _t < _bounceUntil ? -Math.Abs(Math.Sin(t * 11)) * .16 : _mood == Mood.Working ? -Math.Abs(Math.Sin(t * 7)) * .04 : _mood == Mood.Music && !Eco ? -Math.Abs(Math.Sin(t * Math.PI * Beat)) * .09 : 0;
         double sy = 1, sx = 1;
         if (_mood == Mood.Sleep) { sy = 1 + Math.Sin(t * 1.8) * .045; sx = 1 - Math.Sin(t * 1.8) * .026; }
         if (_mood == Mood.Music && !Eco) { double land = Math.Pow(1 - Math.Abs(Math.Sin(t * Math.PI * Beat)), 6); sy = 1 - .07 * land; sx = 1 + .05 * land; } // it lands on each beat
@@ -496,14 +504,16 @@ public sealed class NotchFace : FrameworkElement
         Mood.Working => Color.FromRgb(0x3B, 0x9E, 0xFF),
         Mood.Error => Color.FromRgb(0xF4, 0x50, 0x5E),
         Mood.Sleep => Color.FromRgb(0x94, 0xA3, 0xB8),
-        Mood.Focus or Mood.Music => _accent,
+        Mood.Focus or Mood.Music or Mood.Listen => _accent,
+        Mood.Talk => Color.FromRgb(0x30, 0xD1, 0x58),
+        Mood.Muted => Color.FromRgb(0xFF, 0x45, 0x3A),
         _ => _neon ? _accent : Colors.White,
     };
 
     double MoodTint(Mood m) => _wear != null && _t < _wearUntil ? Math.Max(.6, BaseTint(m)) : BaseTint(m);
     static double BaseTint(Mood m) => m switch
     {
-        Mood.Idle => 0, Mood.Focus => .3, Mood.Music => .3, Mood.Sleep => .32, Mood.Error => .78, _ => .7,
+        Mood.Idle => 0, Mood.Focus => .3, Mood.Music => .3, Mood.Talk => .45, Mood.Listen => .25, Mood.Muted => .45, Mood.Sleep => .32, Mood.Error => .78, _ => .7,
     };
 
     // ───────────────────────────── drawing ─────────────────────────────
@@ -905,9 +915,22 @@ public sealed class NotchFace : FrameworkElement
 
     void DrawMouth(DrawingContext dc, double rx, double ry, Color ink)
     {
-        if (_mouth == Mouth.None) return;
         double s = _s, x = Math.Sin(_yaw) * rx * .75, y = ry * .4 - _pitch * ry * .5;
         var brush = Br(ink);
+        if (_mouth == Mouth.None)
+        {
+            // in a call: talking, the mouth opens with the voice; muted, it's zipped
+            if (_mood == Mood.Talk)
+                dc.DrawEllipse(brush, null, new Point(x, y + s * .03), s * (.06 + .02 * _level), s * (.015 + .09 * _level));
+            else if (_mood == Mood.Muted)
+            {
+                var pen = new Pen(brush, Math.Max(.9, s * .045)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+                double w = s * .11;
+                dc.DrawLine(pen, new Point(x - w, y + s * .03), new Point(x + w, y + s * .03));
+                for (int i = -1; i <= 1; i++) dc.DrawLine(pen, new Point(x + i * w * .55, y - s * .005), new Point(x + i * w * .55, y + s * .065));
+            }
+            return;
+        }
         switch (_mouth)
         {
             case Mouth.Smile:

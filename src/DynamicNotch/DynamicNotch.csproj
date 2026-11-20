@@ -18,7 +18,7 @@
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
 
     <!-- What Windows shows in the exe's Properties > Details and in Settings > Apps -->
-    <Version>3.1.1</Version>
+    <Version>3.1.2</Version>
     <Product>Pixo</Product>
     <AssemblyTitle>Pixo</AssemblyTitle>
     <Description>A smooth animated notch and control center for Windows.</Description>
@@ -61,6 +61,8 @@
 
   <ItemGroup>
     <None Remove="Assets\notification.wav" />
+    <Resource Include="Assets\app.ico" />
+    <Resource Include="Assets\logo.png" />
     <EmbeddedResource Include="Assets\notification.wav" LogicalName="DynamicNotch.Assets.notification.wav" />
     <!-- the Neon theme's default page backgrounds (a picture in the user's Backgrounds folder wins) -->
     <EmbeddedResource Include="Assets\Backgrounds\page*.*" LogicalName="DynamicNotch.Backgrounds.%(Filename)%(Extension)" />

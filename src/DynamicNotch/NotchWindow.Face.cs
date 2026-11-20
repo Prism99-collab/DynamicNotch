@@ -29,6 +29,13 @@ public partial class NotchWindow
     uint _faceLastInput;
     POINT _faceLastCursor;
 
+    /// <summary>Its pace, changed only when it really changes (setting it restarts the timer: done every tick, the rhythm stuttered).</summary>
+    void FaceInterval(int ms)
+    {
+        var t = TimeSpan.FromMilliseconds(ms);
+        if (_faceTimer.Interval != t) _faceTimer.Interval = t;
+    }
+
     void WireFace()
     {
         _faceTimer.Tick += (_, _) => FaceTick();
@@ -38,7 +45,7 @@ public partial class NotchWindow
         WireFacePokes();
     }
 
-    bool FaceAllowed() => _settings.NotchFace && _mode is Mode.Idle or Mode.Media && !_hidden && !_offScreen && !_fgFullscreen && !_dodged;
+    bool FaceAllowed() => _settings.NotchFace && (_mode is Mode.Idle or Mode.Media || InCallPill) && !_hidden && !_offScreen && !_fgFullscreen && !_dodged;
 
     NotchFace FaceGet()
     {
@@ -98,12 +105,33 @@ public partial class NotchWindow
         _facePendingUntil = DateTime.UtcNow.AddSeconds(8);
     }
 
+    /// <summary>The notch shows a call (its small pill): the face joins it.</summary>
+    bool InCallPill => _mode == Mode.Activity && CurrentActivity == LiveActivity.Call;
+    bool _faceInCall;
+
+    /// <summary>
+    /// In a call, the face follows it: excited when it starts; talking (its mouth moving with your voice) while you
+    /// speak; looking over at the caller and nodding while they speak; zipped and red while you're muted.
+    /// </summary>
+    void FaceCall(NotchFace face)
+    {
+        if (!_faceInCall) { _faceInCall = true; face.Play(NotchFace.Emote.Excited, 1.6); }
+        float mic = 0, left = 0, right = 0;
+        bool muted = CallMuted;
+        if (!muted) _audio.TryGetMicPeak(out mic);
+        _audio.TryGetPeaks(out left, out right);
+        float them = Math.Max(left, right);
+        var mood = muted ? NotchFace.Mood.Muted : mic > 0.05f ? NotchFace.Mood.Talk : them > 0.04f ? NotchFace.Mood.Listen : NotchFace.Mood.Idle;
+        face.SetMood(mood);
+        face.Level = mood == NotchFace.Mood.Talk ? Math.Sqrt(mic) : mood == NotchFace.Mood.Listen ? Math.Sqrt(them) : 0;
+    }
+
     void FaceTick()
     {
         GetCursorPos(out var cur);
         RestTick(cur);
         bool allowed = FaceAllowed();
-        if (!allowed) { if (_faceShown) FaceShow(false); _faceTimer.Interval = TimeSpan.FromMilliseconds(400); return; }
+        if (!allowed) { if (_faceShown) FaceShow(false); FaceInterval(400); return; }
         var face = FaceGet();
         face.Neon = _cyber;
         face.Visor = _cyber; // Neon: the notch is its visor, just the eyes glowing
@@ -116,7 +144,7 @@ public partial class NotchWindow
             if (_facePending is { } waiting && DateTime.UtcNow < _facePendingUntil) face.Play(waiting);
             _facePending = null;
         }
-        _faceTimer.Interval = TimeSpan.FromMilliseconds(Eco ? 400 : 100);
+        FaceInterval(Eco ? 400 : 100);
         face.SetOutfit(FaceOutfitNow());
         // typing: input keeps coming while the pointer stays put (which keys is never looked at)
         var li = new LASTINPUTINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<LASTINPUTINFO>() };
@@ -128,6 +156,8 @@ public partial class NotchWindow
         int keys = _faceKeys.Count(k => k);
 
         double idle = IdleTime().TotalSeconds;
+        if (InCallPill) { FaceCall(face); return; }
+        _faceInCall = false;
         // with music on it dances along (and never dozes off)
         bool music = _mode == Mode.Media && _media.IsPlaying;
         bool woke = face.Current == NotchFace.Mood.Sleep && idle < 180;

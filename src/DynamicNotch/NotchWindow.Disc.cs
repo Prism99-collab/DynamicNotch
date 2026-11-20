@@ -184,6 +184,7 @@ public partial class NotchWindow
         {
             // the glow pulses with the music itself (the sound's level, 20 times a second)
             _discBeat ??= NewDiscBeat();
+            DiscGlow.BeginAnimation(OpacityProperty, null); // the beat drives it now (once, not every tick)
             _discBeat.Start();
         }
         else
@@ -201,7 +202,6 @@ public partial class NotchWindow
         {
             double now = _audio.TryGetPeaks(out float l, out float r) ? Math.Sqrt(Math.Max(l, r)) : 0;
             level = now > level ? level + (now - level) * 0.6 : level + (now - level) * 0.18; // quick up, slow down: a pulse
-            DiscGlow.BeginAnimation(OpacityProperty, null);
             DiscGlow.Opacity = 0.5 + 0.5 * level;
             _glowBeat.ScaleX = _glowBeat.ScaleY = 1 + 0.09 * level;
         };
