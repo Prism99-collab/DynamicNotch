@@ -216,7 +216,7 @@ public partial class NotchWindow
         if (error != null && text.Length == 0)
         {
             _launchBox.Text = _beforeVoice.TrimEnd();
-            if (error is "NoRecognition" or "TimeoutExceeded" or "UserCanceled") Toast("Didn't catch that");
+            if (error is "NoRecognition" or "TimeoutExceeded" or "UserCanceled") Toast("Sorry, I didn't catch that");
             else ChatNote("", "Voice: " + error, tone: Warn);
             return;
         }

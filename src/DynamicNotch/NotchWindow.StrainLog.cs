@@ -71,7 +71,10 @@ public partial class NotchWindow
         catch { return null; }
     }
 
-    string LogName => Loc.T(_cyber ? "Overload log" : "Strain log");
+    string LogName => Loc.T("Overload log");
+    Controls.NotchFace? _logFace;
+    StackPanel? _logLive;
+    System.Windows.Threading.DispatcherTimer? _logLiveTimer;
 
     // ───────────── the button and the panel ─────────────
 
@@ -117,7 +120,9 @@ public partial class NotchWindow
         _logBack.Click += (_, _) => RenderLogList();
         _logTitle = new TextBlock { FontSize = 12, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 0, 0) };
         var titleRow = new StackPanel { Orientation = Orientation.Horizontal };
+        _logFace = new Controls.NotchFace(11) { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 2, 0) };
         titleRow.Children.Add(_logBack);
+        titleRow.Children.Add(_logFace);
         titleRow.Children.Add(_logTitle);
         head.Children.Add(titleRow);
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
@@ -149,14 +154,18 @@ public partial class NotchWindow
         root.Children.Add(head);
 
         _logBody = new StackPanel { Margin = new Thickness(4, 0, 4, 10) };
-        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, PanningMode = PanningMode.VerticalOnly, Content = _logBody };
+        _logLive = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 0, 0, 6) };
+        var bodyStack = new StackPanel();
+        bodyStack.Children.Add(_logLive);
+        bodyStack.Children.Add(_logBody);
+        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, PanningMode = PanningMode.VerticalOnly, Content = bodyStack };
         Grid.SetRow(scroll, 1);
         root.Children.Add(scroll);
 
         // a solid panel over the whole page: nothing of the tiles underneath shows through
         _logPanel = new Border
         {
-            Margin = new Thickness(16, 0, 16, 4), CornerRadius = new CornerRadius(18), Padding = new Thickness(6, 4, 6, 0),
+            Margin = new Thickness(18, 2, 18, 6), CornerRadius = new CornerRadius(16), Padding = new Thickness(6, 2, 6, 0),
             Background = Frozen(Color.FromArgb(0xF7, 0x12, 0x13, 0x17)), BorderBrush = Frozen(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(1),
             Child = root, Visibility = Visibility.Collapsed, Opacity = 0,
         };
@@ -175,6 +184,8 @@ public partial class NotchWindow
         RenderLogList();
         _logPanel.Visibility = Visibility.Visible;
         Fade(_logPanel, 1, 160);
+        if (_logFace != null) { _logFace.Neon = _cyber; _logFace.Visor = false; _logFace.Accent = PalAccent(); _logFace.Eco = Eco; }
+        LogLive(true);
         StrainLog.MarkSeen();
         RefreshLogDot();
         CyberSkinSoon();
@@ -184,6 +195,7 @@ public partial class NotchWindow
     void CloseStrainLog()
     {
         if (_logPanel == null || _logPanel.Visibility != Visibility.Visible) return;
+        LogLive(false);
         var a = new DoubleAnimation(0, TimeSpan.FromMilliseconds(120));
         a.Completed += (_, _) => { if (_logPanel.Opacity < 0.05) _logPanel.Visibility = Visibility.Collapsed; };
         _logPanel.BeginAnimation(OpacityProperty, a);
@@ -209,21 +221,30 @@ public partial class NotchWindow
         if (_logBody == null || _logTitle == null || _logBack == null) return;
         _logBack.Visibility = Visibility.Collapsed;
         _logTitle.Text = LogName;
+        if (_logLive != null) _logLive.Visibility = Visibility.Visible;
         _logBody.Children.Clear();
         var events = StrainLog.Events;
+        _logFace?.SetMood(Controls.NotchFace.Mood.Idle);
         if (events.Count == 0)
         {
-            _logBody.Children.Add(new TextBlock
+            var calm = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 10, 0, 0) };
+            calm.Children.Add(new TextBlock { Text = Loc.T("All calm"), FontSize = 13, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center });
+            calm.Children.Add(new TextBlock
             {
-                Text = Loc.T(_cyber
-                    ? "No overload episodes yet. When one hits, everything that led to it is kept here: the readings, the minute before, the apps behind it."
-                    : "Nothing yet. When a strain warning comes, everything that led to it is kept here: the readings, the minute before, the apps behind it."),
-                TextWrapping = TextWrapping.Wrap, FontSize = 11.5, Foreground = DimBrush, Margin = new Thickness(6, 8, 6, 0),
+                Text = Loc.T("No overloads so far. If your PC is pushed too hard, Pixo keeps what led to it here."),
+                TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, FontSize = 11, Foreground = DimBrush, MaxWidth = 300, Margin = new Thickness(0, 3, 0, 0),
             });
             if (!_settings.StrainWarnings)
-                _logBody.Children.Add(new TextBlock { Text = Loc.T("Strain warnings are off: turn them on in Preferences → Alerts."), TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = Orange, Margin = new Thickness(6, 8, 6, 0) });
+            {
+                var on = new Button { Style = (Style)FindResource("Capsule"), Content = Loc.T("Turn on overload warnings"), Height = 24, Padding = new Thickness(12, 0, 12, 0), FontSize = 11, Margin = new Thickness(0, 10, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
+                on.Click += (_, _) => { PrefSetStrain("all", true); _settings.Save(); OnSettingsChanged(); RenderLogList(); };
+                calm.Children.Add(on);
+            }
+            _logBody.Children.Add(calm);
+            _logFace?.Play(Controls.NotchFace.Emote.Happy, 1.2);
             return;
         }
+        if (StrainLog.Unseen > 0) _logFace?.Play(Controls.NotchFace.Emote.Overload, 1.6);
         foreach (var e in events)
         {
             var c = KindColor(e.Key);
@@ -245,10 +266,45 @@ public partial class NotchWindow
             var chev = new TextBlock { Text = "", FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 9, Foreground = DimBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 4, 0) };
             Grid.SetColumn(chev, 2);
             row.Children.Add(chev);
-            var btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = 38, Margin = new Thickness(0, 1, 0, 1) };
+            var btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = 34, Margin = new Thickness(0, 1, 0, 1) };
             var ev = e;
             btn.Click += (_, _) => RenderLogDetail(ev);
             _logBody.Children.Add(btn);
+        }
+    }
+
+    /// <summary>While the log is open: the processor and memory right now, as two small live chips.</summary>
+    void LogLive(bool on)
+    {
+        if (_logLive == null) return;
+        if (!on) { _logLiveTimer?.Stop(); return; }
+        if (_logLiveTimer == null)
+        {
+            _logLiveTimer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1.5) };
+            _logLiveTimer.Tick += async (_, _) =>
+            {
+                if (_logPanel?.Visibility != Visibility.Visible || _mode != Mode.Expanded) { _logLiveTimer.Stop(); return; }
+                var snap = await _monitor.SampleAsync();
+                if (snap == null || _logLive == null) return;
+                double cpu = snap.Cpu > 1.5 ? snap.Cpu : snap.Cpu * 100, mem = snap.Memory > 1.5 ? snap.Memory : snap.Memory * 100;
+                _logLive.Children.Clear();
+                _logLive.Children.Add(Chip("CPU", cpu, KindColor("cpu")));
+                _logLive.Children.Add(Chip(Loc.T("Memory"), mem, KindColor("ram")));
+            };
+        }
+        _ = _monitor.SampleAsync(); // the processor is measured between two readings
+        _logLiveTimer.Start();
+
+        Border Chip(string name, double value, Color c)
+        {
+            var hot = value >= 85;
+            var tone = hot ? ((SolidColorBrush)Red).Color : c;
+            return new Border
+            {
+                CornerRadius = new CornerRadius(_cyber ? 0 : 9), Padding = new Thickness(8, 2, 8, 3), Margin = new Thickness(0, 0, 6, 0),
+                Background = Frozen(Color.FromArgb(0x22, tone.R, tone.G, tone.B)), BorderBrush = Frozen(Color.FromArgb(0x50, tone.R, tone.G, tone.B)), BorderThickness = new Thickness(1),
+                Child = new TextBlock { Text = $"{name}  {value:0}%", FontSize = 10.5, FontWeight = FontWeights.SemiBold, Foreground = Frozen(Lighten(tone, 0.3)) },
+            };
         }
     }
 
@@ -257,6 +313,7 @@ public partial class NotchWindow
         if (_logBody == null || _logTitle == null || _logBack == null) return;
         _logBack.Visibility = Visibility.Visible;
         _logTitle.Text = When(e.At);
+        if (_logLive != null) _logLive.Visibility = Visibility.Collapsed; // the live chips belong to the list, not to one event
         _logBody.Children.Clear();
         var c = KindColor(e.Key);
         var hot = Frozen(Color.FromRgb(0xFF, 0x45, 0x3A));

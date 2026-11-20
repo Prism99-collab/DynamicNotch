@@ -141,7 +141,7 @@ public partial class NotchWindow
         if (PageHidden(page)) page = PageHidden(_page) ? 0 : _page; // switched off in Preferences
         bool changed = page != _page;
         if (changed) HideTip();
-        if (changed && _page == WorkPage) EndWorkTyping(giveBack: true);
+        if (changed && (_page == WorkPage || _page == 5)) EndWorkTyping(giveBack: true); // the Work page's or Settings' box had the keyboard
         if (changed && _page == CallsPage && _call != null) _leftCallsPage = true; // you moved on: the next opening stays where you are
         _page = page;
         HeaderPage(); // the quick buttons fold or open, the page's name refits
@@ -497,7 +497,7 @@ public partial class NotchWindow
             else
             {
                 if (_focusRounds >= 4) _focusRounds = 0; // the long break closes the set
-                ShowOsd("timer", "", null, "Break's over", "Click to start a 25 min focus round", null,
+                ShowOsd("timer", "", null, "Break's over", "Click to start another 25-minute focus", null,
                     glyphBrush: Green, seconds: 8, force: true, prio: Prio.High,
                     onClick: () => { SetTimerMode(breakTime: false); StartTimer(); });
             }
@@ -632,22 +632,17 @@ public partial class NotchWindow
         FilesList.Children.Clear();
         if (items.Count == 0)
         {
-            FilesList.Children.Add(new TextBlock { Text = "Nothing new in Downloads, Screenshots or Desktop.", TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromArgb(0x66, 255, 255, 255)), Margin = new Thickness(4, 8, 4, 8) });
+            FilesList.Children.Add(ClipEmptyState(Loc.T("No new files"), Loc.T("New downloads, screenshots and desktop files appear here.")));
             return;
         }
         foreach (var (file, icon) in items)
         {
-            var row = new Grid();
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
-            row.ColumnDefinitions.Add(new ColumnDefinition());
-            row.Children.Add(new Border { Width = 22, Height = 22, CornerRadius = new CornerRadius(5), Background = IconBrush(icon), HorizontalAlignment = HorizontalAlignment.Left });
-            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            text.Children.Add(new TextBlock { Text = file.Name, FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis });
-            text.Children.Add(new TextBlock { Text = $"{Ago(file.LastWriteTime)} · {SystemMonitor.Bytes(file.Length)}", FontSize = 10, Foreground = DimBrush });
-            Grid.SetColumn(text, 1);
-            row.Children.Add(text);
-            var btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = 36, ToolTip = "Click to open · drag into any app" };
             string path = file.FullName;
+            var (nice, tag) = NiceFileName(file.Name, file.LastWriteTime);
+            var row = ClipLine(new Border { Width = 20, Height = 20, CornerRadius = new CornerRadius(4), Background = IconBrush(icon) }, nice, tag, ShortAgo(file.LastWriteTime),
+                ClipAction("\uE838", Loc.T("Show in folder"), () => Launch("explorer.exe", $"/select,\"{path}\"")));
+            var btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = ClipRowHeight + 2,
+                ToolTip = $"{file.Name}\n{SystemMonitor.Bytes(file.Length)}\n\n{Loc.T("Click to open, or drag it into any app")}" };
             btn.Click += (_, _) => { if (!_dragOut) Launch(path); };
             btn.MouseRightButtonUp += (_, e) => { e.Handled = true; Launch("explorer.exe", $"/select,\"{path}\""); };
             btn.PreviewMouseLeftButtonDown += (_, e) => _fileDown = e.GetPosition(this);
@@ -666,6 +661,7 @@ public partial class NotchWindow
             };
             FilesList.Children.Add(btn);
         }
+        ClipCascade(FilesList);
     }
 
     static string Ago(DateTime t)
@@ -705,12 +701,14 @@ public partial class NotchWindow
         Add("Face sounds", () => _settings.FaceSounds, v => _settings.FaceSounds = v);
         Add("Tuck pills into the notch", () => _settings.TuckPills, v => { _settings.TuckPills = v; RefreshIslands(); });
         BuildSettingsTabs(); // Smart is the third tab (its switches are built with the Smart page code)
+        CompactSettings(); // short rows, the ask box on top (NotchWindow.SettingsAsk)
 
         void Add(string label, Func<bool> get, Action<bool> set)
         {
-            var cell = new Grid { Margin = new Thickness(4, 0, 10, 0) };
-            cell.Children.Add(Localized(new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 40, 0) }, label));
-            var sw = new ToggleButton { Style = (Style)FindResource("Switch"), IsChecked = get(), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            var cell = new Grid { Margin = new Thickness(4, 0, 10, 0), Height = 25 };
+            cell.Children.Add(Localized(new TextBlock { FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 36, 0) }, label));
+            var sw = new ToggleButton { Style = (Style)FindResource("Switch"), IsChecked = get(), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, LayoutTransform = new ScaleTransform(0.8, 0.8) };
+            RegisterSetting(label, "", grid == SettingsGrid ? 0 : 1, get, set); // findable from the ask box
             sw.Click += (_, _) =>
             {
                 set(sw.IsChecked == true);

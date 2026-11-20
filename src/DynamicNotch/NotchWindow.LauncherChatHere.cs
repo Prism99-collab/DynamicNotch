@@ -405,7 +405,7 @@ public partial class NotchWindow
             }.ToJsonString();
             System.IO.Directory.CreateDirectory(Settings.Folder);
             System.IO.File.AppendAllText(FeedbackFile, line + "\n");
-            Toast("Noted: it goes into the AI's checks");
+            Toast("Thanks, Pixo will learn from this");
         }
         catch { Toast("Couldn't save that"); }
     }

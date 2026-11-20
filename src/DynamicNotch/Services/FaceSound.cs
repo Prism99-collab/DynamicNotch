@@ -44,12 +44,17 @@ public static class FaceSound
             1 => new Syl[] { new('o', 430, 320, 95, Breath: .1) },    // oof
             _ => new Syl[] { new('e', 760, 920, 58) },                // bip
         },
+        "sad" => new Syl[] { new('o', 440, 300, 360, Vib: .03, VibHz: 5) },                                  // "aww…"
+        "alert" => new Syl[] { new('a', 620, 940, 95) },                                                      // "ah!"
+        "excited" => new Syl[] { new('i', 760, 780, 55, Gap: 26), new('i', 900, 920, 55, Gap: 26), new('i', 1060, 1180, 90) }, // "wee-ee-ee"
+        "gulp" => new Syl[] { new('u', 300, 220, 70, Gap: 45), new('m', 280, 300, 110, Vol: .7) },            // "gulp. mm"
+        "overload" => new Syl[] { new('o', 700, 260, 680, Vib: .11, VibHz: 9, Breath: .15) },                  // a sparking wobble
         "think" => new Syl[] { new('m', 260, 270, 320, Mid: 300, Vol: .6) },
         "sleep" => new Syl[] { new('m', 200, 170, 420, Breath: .3, Vol: .45) },
         _ => Array.Empty<Syl>(),
     };
 
-    static readonly string[] All = { "hello", "happy", "love", "surprised", "proud", "done", "annoyed", "tired", "wink", "dizzy", "yawn", "poke", "think", "sleep" };
+    static readonly string[] All = { "hello", "happy", "love", "surprised", "proud", "done", "annoyed", "tired", "wink", "dizzy", "yawn", "poke", "think", "sleep", "sad", "alert", "excited", "gulp", "overload" };
 
     /// <summary>Makes every sound ahead of time (a fraction of a second, off the screen's thread), and opens the device.</summary>
     public static void Warm() => Task.Run(() =>

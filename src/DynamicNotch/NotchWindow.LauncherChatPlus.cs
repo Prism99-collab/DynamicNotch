@@ -61,7 +61,7 @@ public partial class NotchWindow
 
     bool AddPicture(BitmapSource src, string label)
     {
-        if (_chatPictures.Count >= 4) { Toast("Four pictures at most per message"); return false; }
+        if (_chatPictures.Count >= 4) { Toast("Up to 4 pictures per message"); return false; }
         if (Shrink(src) is not { } jpeg) { Toast("Couldn't read that picture"); return false; }
         _chatPictures.Add(jpeg);
         ShowAttachments();

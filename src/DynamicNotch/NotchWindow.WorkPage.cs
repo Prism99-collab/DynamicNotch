@@ -660,7 +660,7 @@ public partial class NotchWindow
             WorkSay(_settings.WorkPaused ? "Paused: what you work on isn't noted" : "Noting what you work on again");
             RenderWorkTab(animate: false);
         }));
-        head.Children.Add(SmallButtons(tools.ToArray()).Also(b => { b.Margin = new Thickness(0); ((FrameworkElement)b).ToolTip = "Clear: start Recent over (nothing is deleted) · Hide: fold it away · Pause: stop noting what you work on"; }));
+        head.Children.Add(SmallButtons(tools.ToArray()).Also(b => { b.Margin = new Thickness(0); ((FrameworkElement)b).ToolTip = "Clear restarts Recent (nothing is deleted). Hide folds it away. Pause stops noting what you work on."; }));
         panel.Children.Add(head);
         if (_settings.WorkRecentHidden) return panel;
         if (recent.Count == 0)

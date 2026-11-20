@@ -292,43 +292,25 @@ public partial class NotchWindow
         ShelfList.Children.Clear();
         if (_shelf.Count == 0)
         {
-            ShelfList.Children.Add(new TextBlock
-            {
-                Text = "Drag a file, a picture or some text up to the notch: it waits here until you drag it out.",
-                TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromArgb(0x66, 255, 255, 255)), Margin = new Thickness(4, 8, 4, 8),
-            });
+            ShelfList.Children.Add(ClipEmptyState(Loc.T("Your shelf is empty"), Loc.T("Drop a file, a picture or text on the notch to keep it here.")));
             return;
         }
         foreach (var item in _shelf.ToList())
         {
-            var row = new Grid();
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
-            row.ColumnDefinitions.Add(new ColumnDefinition());
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
-            var icon = new Border { Width = 22, Height = 22, CornerRadius = new CornerRadius(5), HorizontalAlignment = HorizontalAlignment.Left,
-                Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2E)), Child = item.Path == null ? Glyph("", 11, DimBrush) : null };
-            row.Children.Add(icon);
+            var icon = new Border { Width = 20, Height = 20, CornerRadius = new CornerRadius(4),
+                Background = (Brush)FindResource("Tile"), Child = item.Path == null ? Glyph("\uE8C8", 9, DimBrush) : null };
             if (item.Path is { } p)
                 _ = Task.Run(() => IconHelper.ForFile(p)).ContinueWith(t => Dispatcher.InvokeAsync(() => { if (t.Result != null) icon.Background = IconBrush(t.Result); }));
-            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            text.Children.Add(new TextBlock { Text = item.Name, FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis });
             long size = item.Path != null && File.Exists(item.Path) ? SafeLength(item.Path) : -1;
-            text.Children.Add(new TextBlock { Text = item.Path == null ? "Text" : size >= 0 ? SystemMonitor.Bytes(size) : "Folder", FontSize = 10, Foreground = DimBrush });
-            Grid.SetColumn(text, 1);
-            row.Children.Add(text);
-            // copy: for Ctrl+V into anything that pastes (cells, documents, chats...)
-            var copy = new Button { Style = (Style)FindResource("CircleButton"), Width = 22, Height = 22, Content = Glyph("\uE8C8", 10, DimBrush), ToolTip = "Copy (then Ctrl+V anywhere)" };
-            Grid.SetColumn(copy, 2);
-            row.Children.Add(copy);
-            var remove = new Button { Style = (Style)FindResource("CircleButton"), Width = 22, Height = 22, Content = Glyph("", 9, DimBrush), ToolTip = "Remove from the shelf" };
-            Grid.SetColumn(remove, 3);
-            remove.Click += (_, e) => { e.Handled = true; Forget(item); _shelf.Remove(item); SaveShelf(); RenderShelfOrRecent(); };
-            row.Children.Add(remove);
+            var (nice, tag) = item.Path != null ? NiceFileName(item.Name, DateTime.Now) : (item.Name, (string?)null);
+            Button btn = null!;
+            // copy (for Ctrl+V into anything that pastes) and remove: under the pointer
+            var copy = ClipAction("\uE8C8", Loc.T("Copy, then paste anywhere with Ctrl+V"), () => CopyShelfItem(item, btn));
+            var remove = ClipAction("\uE711", Loc.T("Remove from the shelf"), () => { Forget(item); _shelf.Remove(item); SaveShelf(); RenderShelfOrRecent(); }, DimBrush);
+            var row = ClipLine(icon, nice, item.Path == null ? "TEXT" : tag, item.Path == null ? "" : size >= 0 ? SystemMonitor.Bytes(size) : Loc.T("Folder"), copy, remove);
 
-            var btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = 36,
-                ToolTip = item.Path != null ? "Drag into any app · click to open" : "Drag into any app · click to copy" };
-            copy.Click += (_, e) => { e.Handled = true; CopyShelfItem(item, btn); };
+            btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = ClipRowHeight + 2,
+                ToolTip = item.Path != null ? Loc.T("Click to open, or drag it into any app") : Loc.T("Click to copy, or drag it into any app") };
             btn.Click += (_, _) =>
             {
                 if (_dragOut) return;

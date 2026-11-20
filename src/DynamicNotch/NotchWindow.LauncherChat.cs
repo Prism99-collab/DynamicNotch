@@ -1118,13 +1118,14 @@ public partial class NotchWindow
                     // nobody's looking (you went to another app): nothing to draw; the whole answer is drawn once at the end
                     if (!ChatOnScreen) return;
                     // a long answer is redrawn less often, and less still on battery saver: the words still flow
-                    var every = TimeSpan.FromMilliseconds(Math.Min(260, (Eco ? 120 : 50) + live.Length / 60));
+                    var every = TimeSpan.FromMilliseconds(Math.Min(160, (Eco ? 120 : 50) + live.Length / 120)); // only the last paragraph is redrawn now: it can stay quick
                     if (tick.Interval != every) tick.Interval = every;
                     dirty = false;
-                    string shown = CleanAnswer(live.ToString(), streaming: true);
+                    string raw; lock (live) raw = live.ToString();
+                    string shown = CleanAnswer(raw, streaming: true);
                     if (shown.Length == 0) { bubble.Thinking(true); return; } // only its thinking so far
                     bubble.Thinking(false);
-                    RenderMarkdown(bubble.Body, shown, streaming: true);
+                    RenderMarkdownLive(bubble.Body, shown); // only what changed is redrawn
                     FollowChat();
                 };
                 tick.Start();
@@ -1139,7 +1140,7 @@ public partial class NotchWindow
                     var roundClock = System.Diagnostics.Stopwatch.StartNew();
                     OpenRouter.ChatRequest.Value = true; // Groq gets the chat's short instructions (only the chat's)
                     turn = await OpenRouter.Stream(key, model, request, tools,
-                        piece => Dispatcher.InvokeAsync(() => { live.Append(piece); dirty = true; }),
+                        piece => { lock (live) live.Append(piece); dirty = true; }, // gathered here, drawn by the tick
                         () => Dispatcher.InvokeAsync(() => bubble.Thinking(true)),
                         cancel, temperature, effort);
                     turnLog.Append($" · AI {roundClock.Elapsed.TotalSeconds:0.0}s ({turn.Model ?? "?"}{(turn.Error != null ? ", " + turn.Error.Split(' ')[0] : "")})");
@@ -1875,7 +1876,72 @@ public partial class NotchWindow
 
     void RenderMarkdown(RichTextBox box, string md, bool streaming = false)
     {
+        _liveDocs.Remove(box);
+        RenderInto(box.Document, md, streaming);
+    }
+
+    sealed class LiveDoc { public string Prefix = ""; public int Blocks; }
+    readonly System.Runtime.CompilerServices.ConditionalWeakTable<RichTextBox, LiveDoc> _liveDocs = new();
+
+    /// <summary>
+    /// While an answer streams in: the paragraphs it has finished are drawn once and kept; only the one it's still
+    /// writing is redrawn. A long answer costs no more per update than a short one (it used to redraw everything).
+    /// </summary>
+    void RenderMarkdownLive(RichTextBox box, string md)
+    {
+        int cut = StableCut(md);
         var doc = box.Document;
+        if (!_liveDocs.TryGetValue(box, out var st) || !md.StartsWith(st.Prefix, StringComparison.Ordinal) || cut < st.Prefix.Length || st.Blocks > doc.Blocks.Count)
+        {
+            RenderInto(doc, md[..cut], streaming: true);
+            st = new LiveDoc { Prefix = md[..cut], Blocks = doc.Blocks.Count };
+            _liveDocs.AddOrUpdate(box, st);
+        }
+        else
+        {
+            TrimBlocks(doc, st.Blocks);
+            if (cut > st.Prefix.Length)
+            {
+                AppendBlocks(doc, md[st.Prefix.Length..cut]);
+                st.Prefix = md[..cut];
+                st.Blocks = doc.Blocks.Count;
+            }
+        }
+        TrimBlocks(doc, st.Blocks);
+        if (cut < md.Length) AppendBlocks(doc, md[cut..]);
+    }
+
+    void AppendBlocks(FlowDocument doc, string part)
+    {
+        var tmp = new FlowDocument();
+        RenderInto(tmp, part, streaming: true);
+        foreach (var b in tmp.Blocks.ToList()) { tmp.Blocks.Remove(b); doc.Blocks.Add(b); }
+    }
+
+    static void TrimBlocks(FlowDocument doc, int keep)
+    {
+        while (doc.Blocks.Count > keep && doc.Blocks.LastBlock is { } last) doc.Blocks.Remove(last);
+    }
+
+    /// <summary>Where the finished part ends: after the last blank line that isn't inside a code block.</summary>
+    static int StableCut(string md)
+    {
+        bool fence = false;
+        int cut = 0, start = 0;
+        while (start < md.Length)
+        {
+            int end = md.IndexOf('\n', start);
+            if (end < 0) break; // the last line is still being written
+            var line = md.AsSpan(start, end - start).Trim();
+            if (line.StartsWith("```")) fence = !fence;
+            else if (!fence && line.Length == 0) cut = end + 1;
+            start = end + 1;
+        }
+        return cut;
+    }
+
+    void RenderInto(FlowDocument doc, string md, bool streaming)
+    {
         doc.Blocks.Clear();
         doc.Foreground = Frozen(TextTone);
         var acc = ChatAccent;

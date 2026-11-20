@@ -351,7 +351,7 @@ public sealed class PreferencesWindow : Window
         new(Sec.Alerts, "", "Downloads tidy-up", "Weekly, if it's over 5 GB", () => _s.SmartDownloads, v => _s.SmartDownloads = v, "Smart"),
         new(Sec.Alerts, "", "Break reminder", "After long stretches of work", () => _s.SmartBreaks, v => _notch.PrefSetBreaks(v), "Smart"),
         new(Sec.Alerts, "", "Meeting mode", "Camera on: pause music, quiet", () => _s.MeetingMode, v => _notch.PrefSetMeeting(v), "Smart"),
-        new(Sec.Alerts, "\uE7BA", "PC strain warnings", "CPU, GPU, memory and heat watched; warns when one stays high", () => _notch.PrefStrainOn("all"), v => _notch.PrefSetStrain("all", v), "Strain"),
+        new(Sec.Alerts, "\uE7BA", "Overload warnings", "CPU, GPU, memory and heat watched; warns when one stays high", () => _notch.PrefStrainOn("all"), v => _notch.PrefSetStrain("all", v), "Strain"),
 
         new(Sec.Ai, "\uE8BD", "AI chat in the search", "“Ask AI” in the results, Shift+Enter on what you typed, Tab to go back to a chat", () => _s.AiChat, v => _s.AiChat = v, "ai"),
         new(Sec.Ai, "\uE945", "Let it act on your PC", "The notch's commands, files, the clipboard, opening apps and pages", () => _s.AiTools, v => _s.AiTools = v, "ai"),
@@ -918,10 +918,10 @@ public sealed class PreferencesWindow : Window
         Card(Rows().Where(r => r.Sec == Sec.Alerts && r.Group == "Smart"));
 
         // strain warnings ("Overload risk" in Neon): the master switch and what it watches
-        Label(Loc.T(_s.Theme == "neon" ? "Overload watch" : "PC strain warnings"));
+        Label(Loc.T("Overload warnings"));
         var strain = new List<Row>
         {
-            new(Sec.Alerts, "\uE7BA", "PC strain warnings", "A warning when something stays over its line for 20 s (never in games)",
+            new(Sec.Alerts, "\uE7BA", "Overload warnings", "A warning when something stays over its line for 20 s (never in games)",
                 () => _notch.PrefStrainOn("all"), v => _notch.PrefSetStrain("all", v)),
         };
         foreach (var (key, name, line) in _notch.PrefStrainTargets)

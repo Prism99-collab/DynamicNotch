@@ -17,12 +17,12 @@ namespace DynamicNotch.Controls;
 public sealed class NotchFace : FrameworkElement
 {
     public enum Mood { Idle, Thinking, Searching, Working, Error, Sleep, Focus, Music }
-    public enum Emote { Happy, Hello, Love, Surprised, Proud, Done, Annoyed, Tired, Wink, Dizzy, Yawn, Wave }
+    public enum Emote { Happy, Hello, Love, Surprised, Proud, Done, Annoyed, Tired, Wink, Dizzy, Yawn, Wave, Sad, Alert, Excited, Gulp, Overload }
     /// <summary>What it can wear on its head ("auto" is decided outside: by the season).</summary>
     public static readonly string[] Outfits = { "none", "beanie", "cap", "party", "crown", "santa", "witch" };
-    enum Eye { Pill, Wide, Dot, Happy, Closed, Flat, Chevron, Heart, Star, Spiral, Tired, Wink }
-    enum Mouth { None, Smile, O, BigO }
-    enum Kind { Heart, Star, Spark, Sweat, Z, Note }
+    enum Eye { Pill, Wide, Dot, Happy, Closed, Flat, Chevron, Heart, Star, Spiral, Tired, Wink, Sad }
+    enum Mouth { None, Smile, O, BigO, Frown }
+    enum Kind { Heart, Star, Spark, Sweat, Z, Note, Tear, Bang }
 
     // the box around the bun: room for a squash, a tilt and the badge
     const double BoxW = 1.62, BoxH = 1.3;
@@ -66,6 +66,16 @@ public sealed class NotchFace : FrameworkElement
     bool _neon;
     public Color Accent { get => _accent; set { if (_accent == value) return; _accent = value; _fill = null; InvalidateVisual(); } }
     public Mood Current => _mood;
+
+    Color? _wear;
+    double _wearUntil, _bounceUntil;
+    /// <summary>Wears a colour for a few seconds (an alert's own: WhatsApp green, a warning's red...), then its own again.</summary>
+    public void Tint(Color c, double secs)
+    {
+        _wear = c;
+        _wearUntil = _t + secs;
+        Kick();
+    }
     /// <summary>It feels something out loud: the feeling's name ("happy", "love", "poke", "think"...), for its voice.</summary>
     public event Action<string>? Voice;
     /// <summary>The visor look: just the eyes, glowing behind scanlines (Neon, in the notch).</summary>
@@ -173,6 +183,42 @@ public sealed class NotchFace : FrameworkElement
                 Hop(.5);
                 Emit(Kind.Spark, 3);
                 break;
+            case Emote.Sad:
+                // droopy eyes, a little frown, a tear rolling down
+                Show(Eye.Sad, Mouth.Frown, secs);
+                Anim(Sy, (.94, 300, InOut), (.94, Math.Max(100, (secs - .7) * 1000), Lin), (1, 400, InOut));
+                Anim(Oy, (.05, 300, InOut), (.05, Math.Max(100, (secs - .7) * 1000), Lin), (0, 400, InOut));
+                Emit(Kind.Tear, 1);
+                break;
+            case Emote.Alert:
+                // something needs you: a jump, eyes wide, a "!"
+                Show(Eye.Wide, Mouth.O, secs);
+                Anim(Oy, (-.32, 120, Out), (0, 380, Back));
+                Anim(Es, (1.25, 110, Out), (1, 450, InOut));
+                Emit(Kind.Bang, 1);
+                break;
+            case Emote.Excited:
+                // bouncing on the spot, beaming
+                Show(Eye.Happy, Mouth.BigO, secs);
+                _bounceUntil = _t + secs;
+                Emit(Kind.Spark, 4);
+                break;
+            case Emote.Gulp:
+                // it eats it: mouth wide, a gulp (squash), then a happy chew
+                Show(Eye.Happy, Mouth.BigO, .35);
+                Anim(Sy, (.78, 90, Out), (1.18, 140, Out), (.92, 150, InOut), (1.04, 150, InOut), (1, 200, Back));
+                Anim(Sx, (1.26, 90, Out), (.9, 140, Out), (1.06, 150, InOut), (.98, 150, InOut), (1, 200, Back));
+                _eyeUntil = _t + secs; _eye = Eye.Happy; _mouth = Mouth.BigO; _mouthUntil = _t + .35;
+                Emit(Kind.Spark, 2);
+                break;
+            case Emote.Overload:
+                // too much: spiral eyes, red, sweating, the signal tearing
+                Show(Eye.Spiral, Mouth.Frown, secs);
+                _dizzyUntil = _t + secs;
+                Tint(Color.FromRgb(0xFF, 0x2A, 0x4F), secs);
+                Emit(Kind.Sweat, 2);
+                if (_neon) _glitchUntil = _t + .5;
+                break;
             case Emote.Yawn:
                 Show(Eye.Closed, Mouth.BigO, secs);
                 Anim(Sy, (1.12, 500, InOut), (1, 600, InOut));
@@ -254,7 +300,15 @@ public sealed class NotchFace : FrameworkElement
         for (int i = 0; i < n; i++)
         {
             var b = new Bit { Kind = kind, Age = -i * .14, Life = 1.2 + Rand.NextDouble() * .5, Rot = Rand.NextDouble() * Math.PI * 2, Size = .17 + Rand.NextDouble() * .08 };
-            if (Sideways)
+            if (kind == Kind.Tear)
+            {
+                b.X = -.32; b.Y = .1; b.Vx = 0; b.Vy = .5; b.Life = 1.1; b.Size = .14;
+            }
+            else if (kind == Kind.Bang)
+            {
+                b.X = .55; b.Y = -.45; b.Vx = .12; b.Vy = -.25; b.Life = 1.2; b.Size = .28;
+            }
+            else if (Sideways)
             {
                 double side = kind == Kind.Z ? 1 : Rand.Next(2) == 0 ? -1 : 1;
                 b.X = side * .6; b.Y = (Rand.NextDouble() - .5) * .3;
@@ -332,7 +386,7 @@ public sealed class NotchFace : FrameworkElement
     /// <summary>Frames a second: asleep only its breath moves; a loop (searching) needs fewer than a hop.</summary>
     int Fps => _tw.Count > 0 || _bits.Count > 0 ? (Eco ? 30 : 60) : _mood == Mood.Sleep ? 15 : Eco ? 20 : 30;
 
-    bool Moving => _t < _waveUntil || _hatNext != null || Math.Abs(_phones - (_mood == Mood.Music ? 1 : 0)) > .01 || _mood is Mood.Searching or Mood.Working or Mood.Sleep || _mood == Mood.Music && !Eco || _t < _dizzyUntil || _t < _glitchUntil || Badge;
+    bool Moving => _t < _waveUntil || _t < _bounceUntil || _wear != null && _t < _wearUntil + .3 || _hatNext != null || Math.Abs(_phones - (_mood == Mood.Music ? 1 : 0)) > .01 || _mood is Mood.Searching or Mood.Working or Mood.Sleep || _mood == Mood.Music && !Eco || _t < _dizzyUntil || _t < _glitchUntil || Badge;
     bool Badge => _s >= 16 && _mood is Mood.Thinking or Mood.Searching or Mood.Working;
 
     bool Busy
@@ -393,7 +447,7 @@ public sealed class NotchFace : FrameworkElement
         _pitch += (tp - _pitch) * look;
 
         // what its mood does to its body: a busy little bob, the breath of sleep
-        double oy = _mood == Mood.Working ? -Math.Abs(Math.Sin(t * 7)) * .04 : _mood == Mood.Music && !Eco ? -Math.Abs(Math.Sin(t * Math.PI * Beat)) * .09 : 0;
+        double oy = _t < _bounceUntil ? -Math.Abs(Math.Sin(t * 11)) * .16 : _mood == Mood.Working ? -Math.Abs(Math.Sin(t * 7)) * .04 : _mood == Mood.Music && !Eco ? -Math.Abs(Math.Sin(t * Math.PI * Beat)) * .09 : 0;
         double sy = 1, sx = 1;
         if (_mood == Mood.Sleep) { sy = 1 + Math.Sin(t * 1.8) * .045; sx = 1 - Math.Sin(t * 1.8) * .026; }
         if (_mood == Mood.Music && !Eco) { double land = Math.Pow(1 - Math.Abs(Math.Sin(t * Math.PI * Beat)), 6); sy = 1 - .07 * land; sx = 1 + .05 * land; } // it lands on each beat
@@ -435,7 +489,7 @@ public sealed class NotchFace : FrameworkElement
     }
     double _lastZ;
 
-    Color MoodColor(Mood m) => m switch
+    Color MoodColor(Mood m) => _wear is { } w && _t < _wearUntil ? w : m switch
     {
         Mood.Thinking => Color.FromRgb(0x8B, 0x5C, 0xF6),
         Mood.Searching => Color.FromRgb(0x63, 0x66, 0xF1),
@@ -446,7 +500,8 @@ public sealed class NotchFace : FrameworkElement
         _ => _neon ? _accent : Colors.White,
     };
 
-    static double MoodTint(Mood m) => m switch
+    double MoodTint(Mood m) => _wear != null && _t < _wearUntil ? Math.Max(.6, BaseTint(m)) : BaseTint(m);
+    static double BaseTint(Mood m) => m switch
     {
         Mood.Idle => 0, Mood.Focus => .3, Mood.Music => .3, Mood.Sleep => .32, Mood.Error => .78, _ => .7,
     };
@@ -461,6 +516,17 @@ public sealed class NotchFace : FrameworkElement
     static Color Mix(Color a, Color b, double k) => Color.FromRgb((byte)(a.R + (b.R - a.R) * k), (byte)(a.G + (b.G - a.G) * k), (byte)(a.B + (b.B - a.B) * k));
     static Color A(Color c, double a) => Color.FromArgb((byte)Math.Clamp(a * 255, 0, 255), c.R, c.G, c.B);
     static T F<T>(T f) where T : Freezable { f.Freeze(); return f; }
+
+    // brushes reused, frozen (no new paint objects every frame: no garbage, no cleanup pauses while it moves)
+    static readonly Dictionary<Color, SolidColorBrush> BrushCache = new();
+    static SolidColorBrush Br(Color c)
+    {
+        if (BrushCache.TryGetValue(c, out var b)) return b;
+        if (BrushCache.Count > 512) BrushCache.Clear();
+        b = new SolidColorBrush(c);
+        b.Freeze();
+        return BrushCache[c] = b;
+    }
 
     /// <summary>The bun: a rounded square-ish oval, a touch wider at the bottom, as if it sat on something.</summary>
     static Geometry BodyGeometry(double rx, double ry)
@@ -522,14 +588,14 @@ public sealed class NotchFace : FrameworkElement
             {
                 // a signal tearing for a moment: the outline splits into magenta and cyan
                 dc.PushTransform(new TranslateTransform(-s * .06, 0));
-                dc.DrawGeometry(null, new Pen(new SolidColorBrush(A(Color.FromRgb(0xFF, 0x2B, 0xD6), .7)), 1), _body);
+                dc.DrawGeometry(null, new Pen(Br(A(Color.FromRgb(0xFF, 0x2B, 0xD6), .7)), 1), _body);
                 dc.Pop();
                 dc.PushTransform(new TranslateTransform(s * .06, 0));
-                dc.DrawGeometry(null, new Pen(new SolidColorBrush(A(Color.FromRgb(0x3D, 0xE8, 0xFF), .7)), 1), _body);
+                dc.DrawGeometry(null, new Pen(Br(A(Color.FromRgb(0x3D, 0xE8, 0xFF), .7)), 1), _body);
                 dc.Pop();
             }
-            dc.DrawGeometry(null, new Pen(new SolidColorBrush(A(rim, .28)), Math.Max(2.4, s * .2)), _body);
-            dc.DrawGeometry(_fill, new Pen(new SolidColorBrush(rim), Math.Max(1, s * .065)), _body);
+            dc.DrawGeometry(null, new Pen(Br(A(rim, .28)), Math.Max(2.4, s * .2)), _body);
+            dc.DrawGeometry(_fill, new Pen(Br(rim), Math.Max(1, s * .065)), _body);
             if (_tint > .01) dc.DrawGeometry(new LinearGradientBrush(A(moodCol, .45 * _tint), A(moodCol, 0), 90) { StartPoint = new Point(0, 1), EndPoint = new Point(0, 0) }, null, _body);
             dc.DrawGeometry(_shine, null, _body);
         }
@@ -546,14 +612,14 @@ public sealed class NotchFace : FrameworkElement
         double blush = Math.Max(_v[Blush], _tint * .35 * (_neon ? 0 : 1));
         if (blush > .01)
         {
-            var cheek = new SolidColorBrush(A(Color.FromRgb(0xFF, 0x78, 0x96), (_neon ? .6 : .5) * blush));
+            var cheek = Br(A(Color.FromRgb(0xFF, 0x78, 0x96), (_neon ? .6 : .5) * blush));
             double shift = Math.Sin(_yaw) * rx * .8;
             foreach (int side in new[] { -1, 1 })
                 dc.DrawEllipse(cheek, null, new Point(side * rx * .56 + shift, ry * .26), s * .16, s * .09);
         }
         var ink = _neon ? Mix(_accent, moodCol, Math.Min(1, _tint * 1.3)) : Color.FromRgb(0x1C, 0x17, 0x15);
-        var inkBrush = new SolidColorBrush(ink);
-        var glowPen = _neon ? new Pen(new SolidColorBrush(A(ink, .35)), Math.Max(1.6, s * .1)) { LineJoin = PenLineJoin.Round } : null;
+        var inkBrush = Br(ink);
+        var glowPen = _neon ? new Pen(Br(A(ink, .35)), Math.Max(1.6, s * .1)) { LineJoin = PenLineJoin.Round } : null;
         DrawEyes(dc, rx, ry, inkBrush, glowPen);
         DrawMouth(dc, rx, ry, ink);
         dc.Pop(); // clip
@@ -571,7 +637,7 @@ public sealed class NotchFace : FrameworkElement
         double k = _v[Hands];
         if (k < .01) return;
         double hw = _s * .15 * k, hh = _s * .125 * k;
-        var pen = _neon ? new Pen(new SolidColorBrush(_accent), Math.Max(.8, _s * .05)) : new Pen(new SolidColorBrush(A(Colors.Black, .14)), .6);
+        var pen = _neon ? new Pen(Br(_accent), Math.Max(.8, _s * .05)) : new Pen(Br(A(Colors.Black, .14)), .6);
         foreach (int side in new[] { -1, 1 })
         {
             double x = side * rx * 1.02, y = ry * .42, rot = 0;
@@ -595,17 +661,17 @@ public sealed class NotchFace : FrameworkElement
         double k = _phones, s = _s;
         dc.PushOpacity(k);
         dc.PushTransform(new TranslateTransform(0, -(1 - k) * ry * .5));
-        var cup = new SolidColorBrush(_neon ? Color.FromRgb(0xFF, 0x2B, 0xD6) : _accent);
+        var cup = Br(_neon ? Color.FromRgb(0xFF, 0x2B, 0xD6) : _accent);
         if (_hat == "none")
         {
             var band = new StreamGeometry();
             using (var c = band.Open()) { c.BeginFigure(new Point(-rx * .98, -ry * .05), false, false); c.BezierTo(new Point(-rx * 1.02, -ry * 1.55), new Point(rx * 1.02, -ry * 1.55), new Point(rx * .98, -ry * .05), true, true); }
-            dc.DrawGeometry(null, new Pen(new SolidColorBrush(_neon ? _accent : Color.FromRgb(0x2A, 0x2D, 0x34)), Math.Max(1, s * .075)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round }, band);
+            dc.DrawGeometry(null, new Pen(Br(_neon ? _accent : Color.FromRgb(0x2A, 0x2D, 0x34)), Math.Max(1, s * .075)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round }, band);
         }
         foreach (int side in new[] { -1, 1 })
         {
             var r = new Rect(side * rx * 1.0 - s * .09, -ry * .26, s * .18, s * .3);
-            dc.DrawRoundedRectangle(cup, new Pen(new SolidColorBrush(A(Colors.Black, .35)), Math.Max(.6, s * .03)), r, s * .07, s * .07);
+            dc.DrawRoundedRectangle(cup, new Pen(Br(A(Colors.Black, .35)), Math.Max(.6, s * .03)), r, s * .07, s * .07);
         }
         dc.Pop(); dc.Pop();
     }
@@ -615,7 +681,7 @@ public sealed class NotchFace : FrameworkElement
         double p = _v[Hat], s = _s;
         dc.PushOpacity(Math.Clamp(p, 0, 1));
         dc.PushTransform(new TranslateTransform(0, -(1 - p) * ry * .8)); // it drops on from above
-        var line = _neon ? new Pen(new SolidColorBrush(A(_accent, .8)), Math.Max(.7, s * .035)) : new Pen(new SolidColorBrush(A(Colors.Black, .18)), Math.Max(.5, s * .025));
+        var line = _neon ? new Pen(Br(A(_accent, .8)), Math.Max(.7, s * .035)) : new Pen(Br(A(Colors.Black, .18)), Math.Max(.5, s * .025));
         SolidColorBrush B(byte r, byte g, byte b) => new(Color.FromRgb(r, g, b));
         Geometry Poly(params Point[] pts)
         {
@@ -639,11 +705,11 @@ public sealed class NotchFace : FrameworkElement
             case "cap":
             {
                 var col = _neon ? Color.FromRgb(0x10, 0x18, 0x22) : _accent;
-                dc.DrawGeometry(new SolidColorBrush(col), line, Dome(rx * .82, -ry * .42, ry * 1.2));
+                dc.DrawGeometry(Br(col), line, Dome(rx * .82, -ry * .42, ry * 1.2));
                 dc.PushTransform(new RotateTransform(-6));
-                dc.DrawRoundedRectangle(new SolidColorBrush(Mix(col, Colors.Black, .25)), line, new Rect(rx * .1, -ry * .55, rx * 1.05, ry * .2), ry * .1, ry * .1);
+                dc.DrawRoundedRectangle(Br(Mix(col, Colors.Black, .25)), line, new Rect(rx * .1, -ry * .55, rx * 1.05, ry * .2), ry * .1, ry * .1);
                 dc.Pop();
-                dc.DrawEllipse(new SolidColorBrush(Mix(col, Colors.White, .4)), null, new Point(0, -ry * 1.3), s * .05, s * .035);
+                dc.DrawEllipse(Br(Mix(col, Colors.White, .4)), null, new Point(0, -ry * 1.3), s * .05, s * .035);
                 break;
             }
             case "party":
@@ -707,31 +773,31 @@ public sealed class NotchFace : FrameworkElement
     {
         double s = _s;
         var ink = Mix(_accent, _col, Math.Min(1, _tint * 1.3));
-        var glow = new Pen(new SolidColorBrush(A(ink, .4)), Math.Max(2, s * .17)) { LineJoin = PenLineJoin.Round };
+        var glow = new Pen(Br(A(ink, .4)), Math.Max(2, s * .17)) { LineJoin = PenLineJoin.Round };
         dc.PushTransform(new ScaleTransform(1.28, 1.28));
         if (_neon && _t < _glitchUntil)
         {
             dc.PushTransform(new TranslateTransform(-s * .09, 0));
-            DrawEyes(dc, rx, ry, new SolidColorBrush(A(Color.FromRgb(0xFF, 0x2B, 0xD6), .75)), null);
+            DrawEyes(dc, rx, ry, Br(A(Color.FromRgb(0xFF, 0x2B, 0xD6), .75)), null);
             dc.Pop();
             dc.PushTransform(new TranslateTransform(s * .09, 0));
-            DrawEyes(dc, rx, ry, new SolidColorBrush(A(Color.FromRgb(0x3D, 0xE8, 0xFF), .75)), null);
+            DrawEyes(dc, rx, ry, Br(A(Color.FromRgb(0x3D, 0xE8, 0xFF), .75)), null);
             dc.Pop();
         }
-        DrawEyes(dc, rx, ry, new SolidColorBrush(ink), glow);
+        DrawEyes(dc, rx, ry, Br(ink), glow);
         DrawMouth(dc, rx, ry, ink);
         // cheeks: two little pink dashes
         double blush = _v[Blush];
         if (blush > .02)
         {
-            var pen = new Pen(new SolidColorBrush(A(Color.FromRgb(0xFF, 0x5F, 0xA2), .9 * blush)), Math.Max(.8, s * .06)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            var pen = new Pen(Br(A(Color.FromRgb(0xFF, 0x5F, 0xA2), .9 * blush)), Math.Max(.8, s * .06)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
             double shift = Math.Sin(_yaw) * rx * .8;
             foreach (int side in new[] { -1, 1 })
                 dc.DrawLine(pen, new Point(side * rx * .62 + shift - s * .07, ry * .34), new Point(side * rx * .62 + shift + s * .05, ry * .28));
         }
         dc.Pop();
         // scanlines across it
-        var line = new SolidColorBrush(A(Colors.Black, .5));
+        var line = Br(A(Colors.Black, .5));
         for (double y = -ry * 1.3; y < ry * 1.3; y += 1.7)
             dc.DrawRectangle(line, null, new Rect(-rx * 1.4, y, rx * 2.8, .6));
     }
@@ -795,13 +861,13 @@ public sealed class NotchFace : FrameworkElement
                 break;
             }
             case Eye.Heart:
-                dc.DrawGeometry(new SolidColorBrush(Color.FromRgb(0xFF, 0x4D, 0x6D)), null, HeartGeometry(ew * 1.25));
+                dc.DrawGeometry(Br(Color.FromRgb(0xFF, 0x4D, 0x6D)), null, HeartGeometry(ew * 1.25));
                 break;
             case Eye.Star:
             {
                 var star = StarGeometry(ew * 1.05, ew * .46);
                 dc.PushTransform(new RotateTransform(_t * 90 * side));
-                dc.DrawGeometry(new SolidColorBrush(Color.FromRgb(0xFF, 0xC2, 0x33)), null, star);
+                dc.DrawGeometry(Br(Color.FromRgb(0xFF, 0xC2, 0x33)), null, star);
                 dc.Pop();
                 break;
             }
@@ -826,6 +892,14 @@ public sealed class NotchFace : FrameworkElement
                 if (side < 0) Fill(Pill(ew, Math.Max(eh * _v[Open], ew * .3)));
                 else Stroke(Curve(ew * .62, eh * .14, -eh * .62), ew * .42);
                 break;
+            case Eye.Sad:
+            {
+                // half-shut, the inner corners lifted: sad
+                dc.PushTransform(new RotateTransform(side * 18));
+                Fill(new RectangleGeometry(new Rect(-ew / 2, -eh * .05, ew, Math.Max(eh * .5 * _v[Open], ew * .3)), ew / 2, ew / 2));
+                dc.Pop();
+                break;
+            }
         }
     }
 
@@ -833,7 +907,7 @@ public sealed class NotchFace : FrameworkElement
     {
         if (_mouth == Mouth.None) return;
         double s = _s, x = Math.Sin(_yaw) * rx * .75, y = ry * .4 - _pitch * ry * .5;
-        var brush = new SolidColorBrush(ink);
+        var brush = Br(ink);
         switch (_mouth)
         {
             case Mouth.Smile:
@@ -846,14 +920,22 @@ public sealed class NotchFace : FrameworkElement
             }
             case Mouth.O: dc.DrawEllipse(brush, null, new Point(x, y + s * .03), s * .055, s * .07); break;
             case Mouth.BigO: dc.DrawEllipse(brush, null, new Point(x, y + s * .04), s * .08, s * .11); break;
+            case Mouth.Frown:
+            {
+                var g = new StreamGeometry();
+                double m = s * .08;
+                using (var c = g.Open()) { c.BeginFigure(new Point(x - m, y + m * .7), false, false); c.QuadraticBezierTo(new Point(x, y - m * .4), new Point(x + m, y + m * .7), true, true); }
+                dc.DrawGeometry(null, new Pen(brush, Math.Max(1, s * .05)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round }, g);
+                break;
+            }
         }
     }
 
     void DrawBadge(DrawingContext dc, double x, double y)
     {
         double s = _s, bw = s * .62, bh = s * .3;
-        dc.DrawRoundedRectangle(new SolidColorBrush(Colors.Black), null, new Rect(x - bw / 2 - 1.2, y - bh / 2 - 1.2, bw + 2.4, bh + 2.4), bh / 2 + 1.2, bh / 2 + 1.2);
-        dc.DrawRoundedRectangle(new SolidColorBrush(_col), null, new Rect(x - bw / 2, y - bh / 2, bw, bh), bh / 2, bh / 2);
+        dc.DrawRoundedRectangle(Br(Colors.Black), null, new Rect(x - bw / 2 - 1.2, y - bh / 2 - 1.2, bw + 2.4, bh + 2.4), bh / 2 + 1.2, bh / 2 + 1.2);
+        dc.DrawRoundedRectangle(Br(_col), null, new Rect(x - bw / 2, y - bh / 2, bw, bh), bh / 2, bh / 2);
         for (int i = 0; i < 3; i++)
         {
             double ph = ((_t * 2.4 - i * .22) % 1 + 1) % 1, r = s * .048 * (1 + .45 * Math.Max(0, Math.Sin(ph * Math.PI * 2)));
@@ -877,31 +959,46 @@ public sealed class NotchFace : FrameworkElement
             {
                 case Kind.Heart:
                     dc.PushTransform(new RotateTransform(Math.Sin(b.Age * 6) * 17));
-                    dc.DrawGeometry(new SolidColorBrush(Color.FromRgb(0xFF, 0x4D, 0x6D)), null, HeartGeometry(u));
+                    dc.DrawGeometry(Br(Color.FromRgb(0xFF, 0x4D, 0x6D)), null, HeartGeometry(u));
                     dc.Pop();
                     break;
                 case Kind.Star:
                     dc.PushTransform(new RotateTransform((b.Rot + b.Age * 2) * 57.3));
-                    dc.DrawGeometry(new SolidColorBrush(Color.FromRgb(0xFF, 0xC2, 0x33)), null, StarGeometry(u, u * .45));
+                    dc.DrawGeometry(Br(Color.FromRgb(0xFF, 0xC2, 0x33)), null, StarGeometry(u, u * .45));
                     dc.Pop();
                     break;
                 case Kind.Spark:
                     dc.PushTransform(new RotateTransform(b.Rot * 57.3));
-                    dc.DrawGeometry(new SolidColorBrush(_neon ? _accent : Colors.White), null, StarGeometry(u * .85, u * .2, 4));
+                    dc.DrawGeometry(Br(_neon ? _accent : Colors.White), null, StarGeometry(u * .85, u * .2, 4));
                     dc.Pop();
                     break;
+                case Kind.Tear:
+                {
+                    var g = new StreamGeometry();
+                    using (var c = g.Open()) { c.BeginFigure(new Point(0, -u), true, true); c.QuadraticBezierTo(new Point(u * .8, u * .2), new Point(0, u * .6), true, true); c.QuadraticBezierTo(new Point(-u * .8, u * .2), new Point(0, -u), true, true); }
+                    dc.DrawGeometry(Br(Color.FromRgb(0x6F, 0xC3, 0xFF)), null, g);
+                    break;
+                }
+                case Kind.Bang:
+                {
+                    var text = new FormattedText("!", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                        new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Black, FontStretches.Normal), u * 2.2,
+                        Br(_neon ? Color.FromRgb(0xFE, 0xE8, 0x01) : Color.FromRgb(0xFF, 0xC2, 0x33)), dip);
+                    dc.DrawText(text, new Point(-text.Width / 2, -text.Height / 2));
+                    break;
+                }
                 case Kind.Sweat:
                 {
                     var g = new StreamGeometry();
                     using (var c = g.Open()) { c.BeginFigure(new Point(0, -u), true, true); c.QuadraticBezierTo(new Point(u * .8, u * .2), new Point(0, u * .6), true, true); c.QuadraticBezierTo(new Point(-u * .8, u * .2), new Point(0, -u), true, true); }
-                    dc.DrawGeometry(new SolidColorBrush(Color.FromRgb(0x7C, 0xC7, 0xFF)), null, g);
+                    dc.DrawGeometry(Br(Color.FromRgb(0x7C, 0xC7, 0xFF)), null, g);
                     break;
                 }
                 case Kind.Z or Kind.Note:
                 {
                     var text = new FormattedText(b.Kind == Kind.Z ? "z" : "♪", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
                         new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal), u * 1.9,
-                        new SolidColorBrush(_neon ? _accent : Color.FromRgb(0xD1, 0xDB, 0xEB)), dip);
+                        Br(_neon ? _accent : Color.FromRgb(0xD1, 0xDB, 0xEB)), dip);
                     dc.DrawText(text, new Point(-text.Width / 2, -text.Height / 2));
                     break;
                 }
@@ -948,7 +1045,7 @@ public sealed class NotchFace : FrameworkElement
                 var row = new WrapPanel { Margin = new Thickness(8) };
                 foreach (var mood in Enum.GetValues<Mood>()) row.Children.Add(Tile(mood.ToString(), neon, size, f => f.SetMood(mood), 0.5));
                 foreach (var emote in Enum.GetValues<Emote>()) row.Children.Add(Tile(emote.ToString(), neon, size, f => f.Play(emote, 3), emote is Emote.Hello or Emote.Done ? 0.16 : emote == Emote.Wave ? 0.9 : 0.45));
-                foreach (var hat in Outfits.Skip(1)) row.Children.Add(Tile(hat, neon, size, f => f.SetOutfit(hat, false), 0.1));
+                foreach (var hat in Outfits.Skip(1).Take(0)) row.Children.Add(Tile(hat, neon, size, f => f.SetOutfit(hat, false), 0.1));
                 row.Children.Add(Tile("music+hat", neon, size, f => { f.SetOutfit("crown", false); f.SetMood(Mood.Music); }, 0.8));
                 if (neon) foreach (var v in new[] { "visor", "visor-love", "visor-music", "visor-sleep" })
                     row.Children.Add(Tile(v, neon, size, f => { f.Visor = true; if (v == "visor-love") f.Play(Emote.Love, 3); if (v == "visor-music") f.SetMood(Mood.Music); if (v == "visor-sleep") f.SetMood(Mood.Sleep); }, 0.5));
@@ -970,7 +1067,7 @@ public sealed class NotchFace : FrameworkElement
             set(face);
             for (double t = 0; t < at; t += 1 / 60.0) face.Step(1 / 60.0);
             var box = new StackPanel { Width = Math.Max(64, size * 2.2), Margin = new Thickness(2, 4, 2, 4) };
-            box.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(0x05, 0x05, 0x06)), Padding = new Thickness(4), Child = face, CornerRadius = new CornerRadius(6) });
+            box.Children.Add(new Border { Background = Br(Color.FromRgb(0x05, 0x05, 0x06)), Padding = new Thickness(4), Child = face, CornerRadius = new CornerRadius(6) });
             box.Children.Add(new TextBlock { Text = name, Foreground = Brushes.Gray, FontSize = 9, HorizontalAlignment = HorizontalAlignment.Center });
             return box;
         }

@@ -142,6 +142,7 @@ public partial class NotchWindow : Window
         Safe(nameof(WireCompanion), WireCompanion);
         Safe(nameof(WireFace), WireFace);
         Safe(nameof(WireHeader), WireHeader);
+        Safe(nameof(StyleArtDisc), StyleArtDisc); // the cover is a record in every theme (NotchWindow.Disc)
         Safe(nameof(WireLauncher), WireLauncher);
         Safe(nameof(ApplyCustomColors), ApplyCustomColors); // your colours from the Colors page
         Safe(nameof(WireColors), WireColors);

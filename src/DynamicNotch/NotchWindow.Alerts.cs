@@ -364,6 +364,7 @@ public partial class NotchWindow
         // the number or count on the side wears the pop-up's colour
         OsdRight.Foreground = _osdAccent is { } ac && !r.Level.HasValue ? Frozen(Lighten(ac, 0.25)) : Frozen(Color.FromArgb(0xD0, 0xFF, 0xFF, 0xFF));
 
+        FaceInOsd(r, sameKind); // Pixo's face rides along, feeling it (NotchWindow.FaceOsd)
         _osdTimer.Stop();
         _osdTimer.Interval = TimeSpan.FromSeconds(r.Seconds);
         if (!_osdHover) _osdTimer.Start();
@@ -467,7 +468,7 @@ public partial class NotchWindow
         if (!_alertsReady) return;
         if (_focus.IsOn)
         {
-            ShowOsd("focus", "", null, "Focus on", "Notifications held until you're done · click to end", null,
+            ShowOsd("focus", "", null, "Focus mode on", "Notifications wait until you're done · Click to end", null,
                 glyphBrush: FocusPurple, seconds: 3, force: true, onClick: () => _focus.Set(false));
             return;
         }

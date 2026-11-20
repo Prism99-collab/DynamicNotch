@@ -344,7 +344,7 @@ public partial class NotchWindow
         {
             // one Windows prompt: the account joins "Performance Log Users" for good, and a helper reads the frames
             // right now for this session (no sign-out, no restart). Wait for it off the UI thread.
-            ShowOsd("fps", "\uE7FC", null, Loc.T("Turning FPS on"), Loc.T("Windows asks for your OK once"), null, glyphBrush: Green, seconds: 3, force: true);
+            ShowOsd("fps", "\uE7FC", null, Loc.T("Turning FPS on"), Loc.T("Windows will ask for permission once"), null, glyphBrush: Green, seconds: 3, force: true);
             bool ok = await Task.Run(() => _fps.LaunchHelper(join: true));
             if (!ok)
             {
@@ -357,7 +357,7 @@ public partial class NotchWindow
         }
         _settings.GameStats = true;
         _settings.Save();
-        ShowOsd("fps", "\uE7FC", null, Loc.T("FPS in games is on"), Loc.T("It shows as soon as a game is in front"), null, glyphBrush: Green, seconds: 3, force: true);
+        ShowOsd("fps", "\uE7FC", null, Loc.T("FPS in games is on"), Loc.T("It appears as soon as a game is in front"), null, glyphBrush: Green, seconds: 3, force: true);
         CheckForeground(); // a game already in front gets its pill now
         RefreshBase();
         SyncSettingsPage();

@@ -243,7 +243,7 @@ public partial class NotchWindow
         Add("Charge reminder", "When ~45 min are left", () => _settings.SmartChargeReminder, v => _settings.SmartChargeReminder = v);
         Add("Downloads tidy-up", "Weekly, if it's over 5 GB", () => _settings.SmartDownloads, v => _settings.SmartDownloads = v);
         Add("Break reminder", "After long stretches of work", () => _settings.SmartBreaks, v => { _settings.SmartBreaks = v; _activeSince = null; });
-        Add("PC strain warnings", "CPU, GPU, memory, heat · Preferences", () => _settings.StrainWarnings, v => PrefSetStrain("all", v));
+        Add("Overload warnings", "CPU, GPU, memory, heat · Preferences", () => _settings.StrainWarnings, v => PrefSetStrain("all", v));
         Add("Meeting mode", "Camera on: pause music, quiet", () => _settings.MeetingMode, v =>
         {
             _settings.MeetingMode = v;
@@ -265,7 +265,8 @@ public partial class NotchWindow
             text.Children.Add(Localized(new TextBlock { FontSize = 12, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis }, title));
             text.Children.Add(Localized(new TextBlock { FontSize = 10, Foreground = DimBrush, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 1, 0, 0) }, hint));
             cell.Children.Add(text);
-            var sw = new ToggleButton { Style = (Style)FindResource("Switch"), IsChecked = get(), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            var sw = new ToggleButton { Style = (Style)FindResource("Switch"), IsChecked = get(), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, LayoutTransform = new ScaleTransform(0.8, 0.8) };
+            RegisterSetting(title, hint, 2, get, set); // findable from the Settings ask box
             sw.Click += (_, _) => { set(sw.IsChecked == true); _settings.Save(); };
             cell.Children.Add(sw);
             _smartSwitches.Add((sw, get));

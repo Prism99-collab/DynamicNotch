@@ -405,7 +405,7 @@
                                                     <StackPanel x:Name="CallVoice" Orientation="Horizontal" Height="14" Margin="0,8,0,0" />
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                                                    <Button x:Name="CallMuteBtn" Style="{StaticResource CircleButton}" Width="42" Height="42" ToolTip="Mute / unmute your microphone">
+                                                    <Button x:Name="CallMuteBtn" Style="{StaticResource CircleButton}" Width="42" Height="42" ToolTip="Mute or unmute your microphone">
                                                         <Grid>
                                                             <Ellipse x:Name="CallMuteBg" Fill="#26262A" />
                                                             <TextBlock x:Name="CallMuteGlyph" Text="&#xE720;" FontFamily="{StaticResource IconFont}" FontSize="16"
@@ -714,7 +714,7 @@
 
                                                     <!-- the ring: click to start / pause, scroll to change the minutes -->
                                                     <Grid x:Name="TimerFace" Grid.Row="1" Width="98" Height="98" Background="Transparent" Cursor="Hand" Margin="0,3,0,3"
-                                                          ToolTip="Click: start / pause · scroll: minutes">
+                                                          ToolTip="Click to start or pause · Scroll to set the minutes">
                                                         <c:RingGauge x:Name="TimerRing" RingBrush="#FF9F0A" />
                                                         <StackPanel VerticalAlignment="Center">
                                                             <TextBlock x:Name="TimerText" Text="25:00" FontSize="25" FontWeight="Light" HorizontalAlignment="Center"
@@ -802,7 +802,7 @@
                                                 </Grid.RowDefinitions>
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                     <Button x:Name="ShelfTab" Style="{StaticResource Capsule}" Content="Shelf" Height="22" Padding="10,0" FontSize="10.5" Margin="0,0,3,0"
-                                                            ToolTip="Your shelf · drag files out into any app" />
+                                                            ToolTip="Your shelf: drag files out into any app" />
                                                     <Button x:Name="RecentTab" Style="{StaticResource Capsule}" Content="Recent" Height="22" Padding="10,0" FontSize="10.5" />
                                                 </StackPanel>
                                                 <Button x:Name="OpenDownloads" Style="{StaticResource CircleButton}" Width="24" Height="24" HorizontalAlignment="Right" ToolTip="Open Downloads">

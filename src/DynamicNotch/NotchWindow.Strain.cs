@@ -90,7 +90,7 @@ public partial class NotchWindow
         void TaskManager() { try { Process.Start(new ProcessStartInfo("taskmgr.exe") { UseShellExecute = true }); } catch { } }
         if (_cyber)
         {
-            ShowOsd("strain", "", null, Loc.T("SYSTEM OVERLOAD"), reading, null,
+            ShowOsd("strain", "", null, Loc.T("OVERLOAD RISK"), reading, null,
                 glyphBrush: Frozen(CyRed), seconds: 5, force: true, prio: Prio.High, motion: Motion.Shake, onClick: TaskManager);
             // chrome overload: the notch glitches red
             CyberGlitch(strong: true, tint: CyRed);

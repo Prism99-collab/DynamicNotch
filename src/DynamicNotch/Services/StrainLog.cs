@@ -199,7 +199,7 @@ public static class StrainLog
     public static string WriteReport()
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Pixo · strain log (Overload risk)");
+        sb.AppendLine("Pixo · strain log (overload risk)");
         sb.AppendLine($"{Events.Count} warning(s), newest first · {DateTime.Now:yyyy-MM-dd HH:mm}");
         sb.AppendLine(new string('═', 64));
         foreach (var e in Events)

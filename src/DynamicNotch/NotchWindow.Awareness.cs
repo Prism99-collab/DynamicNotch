@@ -47,7 +47,7 @@ public partial class NotchWindow
         Services.AppLog.Write("first start: welcome");
         After(900, () =>
         {
-            ShowOsd("welcome", "\uE7E8", null, "Pixo is on", "Mouse to the top edge, or Win+Alt+N", null,
+            ShowOsd("welcome", "\uE7E8", null, "Pixo is ready", "Hover the top edge or press Win+Alt+N", null,
                 glyphBrush: Blue, seconds: 6, force: true, motion: Motion.Pulse, onClick: () => Expand(byHotkey: true));
         });
     }

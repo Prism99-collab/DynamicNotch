@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.1.0] — 2026-11-20
+
+Pixo reacts to everything now, and it's quicker when you push it.
+
+### Added
+- The face shows up in every alert, in the alert's colour, with a feeling that fits: a wink when you copy, a hop when a
+  download finishes, a tear when one fails, hearts on the charger, bouncing for an incoming call.
+- New feelings: sad, alert, excited, gulp and overload.
+- Settings has an "Ask Pixo" box: type to find any setting, or ask how to do something and get a one-line answer.
+- The music cover is a spinning record in every theme, with a tonearm that drops on when you press play.
+
+### Changed
+- Settings, Clipboard & Files and the Overload log are more compact and easier to read.
+- Long AI answers stay smooth while they're being written.
+- Clearer wording across the app.
+
 ## [3.0.0] — 2026-11-20
 
 Say hi to Pixo. New name, new logo, and a little face that lives in your notch.

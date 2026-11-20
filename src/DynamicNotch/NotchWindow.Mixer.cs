@@ -103,7 +103,7 @@ public partial class NotchWindow
         {
             Width = 22, Height = 22, CornerRadius = new CornerRadius(6), Background = (Brush)FindResource("Tile"),
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand,
-            ToolTip = "Mute / unmute",
+            ToolTip = "Mute or unmute",
         };
         var glyph = Glyph(app.IsSystem ? "" : "", 11, DimBrush);
         icon.Child = glyph;

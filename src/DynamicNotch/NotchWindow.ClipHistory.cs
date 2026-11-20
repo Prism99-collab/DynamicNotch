@@ -6,6 +6,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
+using DynamicNotch.Services;
+
 namespace DynamicNotch;
 
 /// <summary>
@@ -126,6 +128,7 @@ public partial class NotchWindow
         bool pinned = same?.Pinned ?? false;
         if (same != null) _clips.Remove(same);
         _clips.Insert(0, new ClipEntry { Text = text, At = DateTime.Now, Pinned = pinned });
+        _clipFresh = _clips[0]; _clipFreshAt = DateTime.UtcNow;
         TrimClips();
         ClipsChanged();
     }
@@ -213,57 +216,62 @@ public partial class NotchWindow
         RenderClipboard();
     }
 
+    ClipEntry? _clipFresh;
+    DateTime _clipFreshAt, _clipCascadeAt;
+
     void RenderClipboard()
     {
         ClipList.Children.Clear();
-        ClipEmpty.Visibility = _clips.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ClipEmpty.Visibility = Visibility.Collapsed;
+        if (_clips.Count == 0)
+        {
+            ClipList.Children.Add(ClipEmptyState(Loc.T("Nothing copied yet"), Loc.T("Copy text or a picture and it appears here.")));
+            return;
+        }
         // pinned first (in the order they were pinned), then the rest, newest first
         foreach (var c in _clips.Where(c => c.Pinned).Concat(_clips.Where(c => !c.Pinned)))
-            ClipList.Children.Add(ClipRow(c));
+        {
+            var row = ClipRow(c);
+            ClipList.Children.Add(row);
+            if (ReferenceEquals(c, _clipFresh) && (DateTime.UtcNow - _clipFreshAt).TotalSeconds < 3) { _clipFresh = null; ClipGlow(row); }
+        }
+        // opening the page: the rows arrive in a quick cascade (not on every small change after)
+        if ((DateTime.UtcNow - _clipCascadeAt).TotalSeconds > 4) ClipCascade(ClipList);
+        _clipCascadeAt = DateTime.UtcNow;
     }
 
     Button ClipRow(ClipEntry c)
     {
-        var row = new Grid();
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(c.Image != null ? 46 : 22) });
-        row.ColumnDefinitions.Add(new ColumnDefinition());
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
-
         FrameworkElement lead;
         if (c.Image != null && LoadThumb(c.Image) is { } thumb)
-            lead = new Border { Width = 40, Height = 26, CornerRadius = new CornerRadius(4), Background = new ImageBrush(thumb) { Stretch = Stretch.UniformToFill }, HorizontalAlignment = HorizontalAlignment.Left };
+            lead = new Border { Width = 30, Height = 22, CornerRadius = new CornerRadius(_cyber ? 0 : 5), Background = new ImageBrush(thumb) { Stretch = Stretch.UniformToFill } };
         else
-            lead = Glyph(c.Text != null && LooksLikeLink(c.Text) ? "" : "", 11, DimBrush);
-        row.Children.Add(lead);
+            lead = new Border
+            {
+                Width = 22, Height = 22, CornerRadius = new CornerRadius(_cyber ? 0 : 6), Background = (Brush)FindResource("Tile"),
+                Child = Glyph(c.Text != null && LooksLikeLink(c.Text.Trim()) ? "\uE71B" : "\uE8C8", 10, DimBrush),
+            };
+        bool link = c.Text != null && LooksLikeLink(c.Text.Trim());
+        string title = c.Text != null ? NiceClipText(c.Text) : Loc.T("Picture");
 
-        var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        string line = c.Text != null ? string.Join(" ", c.Text.Split(new[] { '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries)) : "Picture";
-        words.Children.Add(new TextBlock { Text = line, FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis });
-        words.Children.Add(new TextBlock { Text = Ago(c.At), FontSize = 9.5, Foreground = DimBrush });
-        Grid.SetColumn(words, 1);
-        row.Children.Add(words);
-
-        // the pin: always shown on pinned items, faint on the rest
-        var pin = new Button
+        var pin = ClipAction(c.Pinned ? "\uE77A" : "\uE718", c.Pinned ? Loc.T("Unpin") : Loc.T("Pin to keep it at the top"), () =>
         {
-            Style = (Style)FindResource("CircleButton"), Width = 22, Height = 22, VerticalAlignment = VerticalAlignment.Center,
-            Content = Glyph(c.Pinned ? "" : "", 10, c.Pinned ? Brushes.White : DimBrush),
-            Opacity = c.Pinned ? 1 : 0.55, ToolTip = c.Pinned ? "Unpin" : "Pin: keep it at the top",
-        };
-        pin.Click += (_, e) =>
-        {
-            e.Handled = true;
             c.Pinned = !c.Pinned;
             ClipsChanged();
             RenderClipboard();
-        };
-        Grid.SetColumn(pin, 2);
-        row.Children.Add(pin);
+        });
+        var remove = ClipAction("\uE711", Loc.T("Remove"), () =>
+        {
+            _clips.Remove(c);
+            ClipsChanged();
+            RenderClipboard();
+        }, DimBrush);
+        var row = ClipLine(lead, title, link ? "LINK" : null, c.Pinned ? Loc.T("Pinned") : ShortAgo(c.At), pin, remove);
 
         var btn = new Button
         {
-            Style = (Style)FindResource("RowButton"), Content = row, Height = c.Image != null ? 38 : 36,
-            ToolTip = c.Text != null ? (c.Text.Length > 300 ? c.Text[..300] + "…" : c.Text) + "\nClick to copy · right-click to remove" : "Click to copy · right-click to remove",
+            Style = (Style)FindResource("RowButton"), Content = row, Height = ClipRowHeight + 2,
+            ToolTip = (c.Text != null ? (c.Text.Length > 300 ? c.Text[..300] + "…" : c.Text) + "\n\n" : "") + Loc.T("Click to copy it again"),
         };
         btn.Click += (_, _) =>
         {
@@ -275,8 +283,8 @@ public partial class NotchWindow
             }
             catch { }
             // copied again: it moves to the top (pinned ones keep their place)
-            if (!c.Pinned) { c.At = DateTime.Now; _clips.Remove(c); _clips.Insert(0, c); ClipsChanged(); RenderClipboard(); }
-            else FlashRow(btn);
+            if (!c.Pinned) { c.At = DateTime.Now; _clips.Remove(c); _clips.Insert(0, c); _clipFresh = c; _clipFreshAt = DateTime.UtcNow; ClipsChanged(); RenderClipboard(); }
+            else ClipGlow(btn);
         };
         btn.MouseRightButtonUp += (_, e) =>
         {

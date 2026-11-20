@@ -99,7 +99,7 @@ public partial class NotchWindow
             var b = new TextBlock { Text = _cyber ? label.ToUpperInvariant() : label, FontSize = 9.5, Foreground = DimBrush, Cursor = Cursors.Hand, Margin = new Thickness(10, 0, 0, 0), FontFamily = _cyber ? CyFont : UiText };
             b.MouseEnter += (_, _) => b.Foreground = Frozen(ChatAccent);
             b.MouseLeave += (_, _) => b.Foreground = DimBrush;
-            b.MouseLeftButtonUp += (_, e) => { e.Handled = true; try { act(); } catch { Toast("Couldn't do that"); } _launchBox?.Focus(); };
+            b.MouseLeftButtonUp += (_, e) => { e.Handled = true; try { act(); } catch { Toast("That didn't work. Try again"); } _launchBox?.Focus(); };
             row.Children.Add(b);
         }
         return row;
@@ -227,7 +227,7 @@ public partial class NotchWindow
             chip.MouseEnter += (_, _) => chip.BorderBrush = Frozen(acc);
             chip.MouseLeave += (_, _) => chip.BorderBrush = Frozen(A(acc, 0x50));
             chip.MouseLeftButtonDown += (_, e) => e.Handled = true;
-            chip.MouseLeftButtonUp += (_, e) => { e.Handled = true; try { act(); } catch { Toast("Couldn't do that"); } _launchBox?.Focus(); };
+            chip.MouseLeftButtonUp += (_, e) => { e.Handled = true; try { act(); } catch { Toast("That didn't work. Try again"); } _launchBox?.Focus(); };
             row.Children.Add(chip);
         }
         bubble.Extras.Children.Add(row);
