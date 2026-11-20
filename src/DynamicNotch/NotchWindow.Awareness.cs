@@ -28,7 +28,7 @@ public partial class NotchWindow
     {
         "explorer", "ShellExperienceHost", "StartMenuExperienceHost", "SearchHost", "SearchApp", "LockApp", "TextInputHost",
         "ApplicationFrameHost", "dllhost", "rundll32", "consent", "OpenWith", "PickerHost", "ShellHost", "SystemSettingsBroker",
-        "DynamicNotch", "conhost", "smartscreen", "WerFault", "CredentialUIBroker", "UserOOBEBroker",
+        "Pixo", "Pixo", "DynamicNotch", "conhost", "smartscreen", "WerFault", "CredentialUIBroker", "UserOOBEBroker",
     };
 
     /// <summary>
@@ -47,7 +47,7 @@ public partial class NotchWindow
         Services.AppLog.Write("first start: welcome");
         After(900, () =>
         {
-            ShowOsd("welcome", "\uE7E8", null, "Dynamic Notch is on", "Mouse to the top edge, or Win+Alt+N", null,
+            ShowOsd("welcome", "\uE7E8", null, "Pixo is on", "Mouse to the top edge, or Win+Alt+N", null,
                 glyphBrush: Blue, seconds: 6, force: true, motion: Motion.Pulse, onClick: () => Expand(byHotkey: true));
         });
     }

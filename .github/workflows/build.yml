@@ -35,7 +35,7 @@ jobs:
         with:
           name: DynamicNotch-installers
           path: |
-            artifacts/DynamicNotch-Setup-*.exe
+            artifacts/Pixo-Setup-*.exe
             artifacts/SHA256SUMS.txt
 
       - name: Publish release
@@ -45,7 +45,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = $env:GITHUB_REF_NAME
-          $files = @(Get-ChildItem artifacts -File -Filter "DynamicNotch-Setup-*.exe" | ForEach-Object FullName) + "artifacts/SHA256SUMS.txt"
+          $files = @(Get-ChildItem artifacts -File -Filter "Pixo-Setup-*.exe" | ForEach-Object FullName) + "artifacts/SHA256SUMS.txt"
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) { Write-Host "Release $tag already exists; keeping its files."; exit 0 }
-          gh release create $tag @files --title "Dynamic Notch $($tag.TrimStart('v'))" --generate-notes
+          gh release create $tag @files --title "Pixo $($tag.TrimStart('v'))" --generate-notes

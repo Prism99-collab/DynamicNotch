@@ -31,7 +31,7 @@ public sealed class CompanionHost : Window
         ResizeMode = ResizeMode.NoResize;
         Focusable = false;
         IsHitTestVisible = false;
-        Title = "Dynamic Notch companion";
+        Title = "Pixo companion";
         Width = HostWidth;
         Height = HostHeight;
         WindowStartupLocation = WindowStartupLocation.Manual;

@@ -12,6 +12,9 @@ namespace DynamicNotch;
 ///  • Crystal: frost glitter twinkling, a band of light sweeping across the glass every few seconds, rainbow glints.
 ///  • Original: barely there: a few motes of light floating up, so the classic look stays clean.
 /// Built from a few cached sheets the graphics chip slides and fades (Controls/Ambient): smooth, and nearly free.
+///  • Neon: a different one on each page, over its data rain (no pictures): city lights drifting on Home, data
+///    packets rising on Work, signal rings on Calls, sparks on System, a crosshair grid with a scan on Tools,
+///    fragments on Clipboard &amp; Files, colour motes on Colors, slow cells on Settings. Changing page cross-fades them.
 /// Only while the notch is open, never in power-saving mode, hidden or off screen.
 /// </summary>
 public partial class NotchWindow
@@ -24,7 +27,9 @@ public partial class NotchWindow
         if (_ambients.TryGetValue(key, out var a)) return a;
         a = key switch
         {
-            "abyss" => AbyssAmbient(), "liquid" => LiquidAmbient(), "crystal" => CrystalAmbient(), "original" => OriginalAmbient(), _ => null,
+            "abyss" => AbyssAmbient(), "liquid" => LiquidAmbient(), "crystal" => CrystalAmbient(), "original" => OriginalAmbient(),
+            _ when key.StartsWith("neon") && int.TryParse(key[4..], out int page) => NeonAmbient(page),
+            _ => null,
         };
         if (a == null) return null;
         a.Visibility = Visibility.Collapsed;
@@ -37,15 +42,28 @@ public partial class NotchWindow
     }
 
     /// <summary>The current theme's background runs while the notch is open; every other one rests.</summary>
+    string? _ambientWant;
+
     void UpdateAmbient()
     {
         if (!_ambientWired) { _ambientWired = true; _power.Changed += UpdateAmbient; }
         string key = ThemeKey;
-        bool on = key != "neon" && _mode == Mode.Expanded && !_launcherOpen && !Eco && !_offScreen && !_hidden && RainDev != "off"; // (=off: for measuring)
+        if (key == "neon") key = "neon" + _page; // Neon: each page its own
+        bool on = _mode == Mode.Expanded && !_launcherOpen && !Eco && !_offScreen && !_hidden && RainDev != "off"; // (=off: for measuring)
+        _ambientWant = on ? key : null;
         foreach (var (k, a) in _ambients)
-            if (k != key || !on) { a.Stop(); a.Visibility = Visibility.Collapsed; }
+        {
+            if (k == _ambientWant || a.Visibility != Visibility.Visible) continue;
+            if (!on) { a.BeginAnimation(OpacityProperty, null); a.Stop(); a.Visibility = Visibility.Collapsed; continue; }
+            // another page: the old one fades out as the new one fades in
+            var gone = new System.Windows.Media.Animation.DoubleAnimation(0, TimeSpan.FromMilliseconds(260));
+            string mineKey = k;
+            gone.Completed += (_, _) => { if (_ambientWant != mineKey) { a.Stop(); a.Visibility = Visibility.Collapsed; } };
+            a.BeginAnimation(OpacityProperty, gone);
+        }
         if (!on || AmbientFor(key) is not { } mine) return;
-        mine.Visibility = Visibility.Visible;
+        if (mine.Visibility != Visibility.Visible) { mine.Opacity = 0; mine.Visibility = Visibility.Visible; }
+        mine.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(1, TimeSpan.FromMilliseconds(340)));
         mine.Start();
     }
 
@@ -110,6 +128,63 @@ public partial class NotchWindow
             var c = prism[r.Next(prism.Length)];
             return (Frozen(new RadialGradientBrush(Colors.White, Color.FromArgb(0xB0, c.R, c.G, c.B))), 8 + r.NextDouble() * 5);
         }, everySeconds: 3.5);
+        return a;
+    }
+
+    /// <summary>Neon, one look per page (over the data rain, so a touch quieter than the glass themes' backgrounds).</summary>
+    Ambient NeonAmbient(int page)
+    {
+        var a = new Ambient(ExpandedSize.Width, ExpandedSize.Height);
+        Color cyan = CyCyan, yellow = CyYellow, magenta = C(0xFF, 0x2B, 0xD6), teal = C(0x2F, 0xE0, 0xC6), red = C(0xFF, 0x2A, 0x4F), violet = C(0x9D, 0x5C, 0xFF);
+        Color[] neon = { cyan, yellow, magenta, teal, violet };
+        Brush FlareOf(Color c) => Frozen(new RadialGradientBrush(Colors.White, Color.FromArgb(0xA0, c.R, c.G, c.B)));
+        switch (page)
+        {
+            case 0: // Home: city lights out of focus, drifting by, and tiny lights twinkling far away
+                a.AddSheet(r => Ambient.Glow(26 + r.NextDouble() * 34, r.Next(3) switch { 0 => cyan, 1 => magenta, _ => yellow }),
+                    count: 7, speed: 0, sway: 30, swaySeconds: 12, opacity: 0.2, pulseLow: 0.08, pulseSeconds: 5);
+                a.AddSheet(r => Ambient.Speck(0.9 + r.NextDouble(), r.Next(4) == 0 ? yellow : cyan), count: 26, speed: 0, opacity: 0.7, pulseLow: 0.15, pulseSeconds: 2.4);
+                a.AddFlares(r => (FlareOf(magenta), 8 + r.NextDouble() * 5), everySeconds: 3.4);
+                break;
+            case 7: // Work: data packets rising, two depths
+                a.AddSheet(r => Ambient.Bit(1.6 + r.NextDouble() * 1.4, r.Next(3) == 0 ? yellow : cyan), count: 24, speed: -9, sway: 3, swaySeconds: 6, opacity: 0.5, pulseLow: 0.25, pulseSeconds: 2);
+                a.AddSheet(r => Ambient.Bit(3.2 + r.NextDouble() * 1.6, r.Next(2) == 0 ? yellow : cyan), count: 8, speed: -17, opacity: 0.6);
+                a.AddFlares(r => (FlareOf(yellow), 7 + r.NextDouble() * 4), everySeconds: 4);
+                break;
+            case 6: // Calls: signal rings rising like a voice going out
+                a.AddSheet(r => Ambient.Ring(9 + r.NextDouble() * 18, r.Next(2) == 0 ? magenta : cyan), count: 8, speed: -7, sway: 9, swaySeconds: 7, opacity: 0.32, pulseLow: 0.1, pulseSeconds: 2.2);
+                a.AddSheet(r => Ambient.Glow(2.5 + r.NextDouble() * 2, magenta), count: 12, speed: -12, sway: 5, swaySeconds: 5, opacity: 0.55);
+                break;
+            case 1: // System: sparks streaking up, hotter red and yellow, over a faint red haze
+                a.AddSheet(r => Ambient.Glow(60 + r.NextDouble() * 40, red), count: 2, speed: 0, sway: 20, swaySeconds: 10, opacity: 0.12, pulseLow: 0.04, pulseSeconds: 3);
+                a.AddSheet(r => Ambient.Streak(1.1, 7 + r.NextDouble() * 9, r.Next(3) == 0 ? red : yellow), count: 18, speed: -42, opacity: 0.5);
+                a.AddSheet(r => Ambient.Speck(1 + r.NextDouble(), yellow), count: 14, speed: -20, sway: 4, swaySeconds: 3, opacity: 0.6);
+                break;
+            case 2: // Tools: a crosshair grid breathing in two waves, a scan crossing it now and then
+                a.AddSheet(r => Ambient.Cross(4 + r.NextDouble() * 2, teal), count: 22, speed: 0, opacity: 0.5, pulseLow: 0.1, pulseSeconds: 2.6);
+                a.AddSheet(r => Ambient.Cross(3 + r.NextDouble() * 2, cyan), count: 18, speed: 0, opacity: 0.45, pulseLow: 0.08, pulseSeconds: 3.3, pulseDelay: 1.2);
+                var band = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 0.5) };
+                band.GradientStops.Add(new GradientStop(Color.FromArgb(0x00, teal.R, teal.G, teal.B), 0));
+                band.GradientStops.Add(new GradientStop(Color.FromArgb(0x2C, teal.R, teal.G, teal.B), 0.5));
+                band.GradientStops.Add(new GradientStop(Color.FromArgb(0x00, teal.R, teal.G, teal.B), 1));
+                band.Freeze();
+                a.AddSweep(band, bandWidth: 46, angle: 0, crossSeconds: 2.2, everySeconds: 6);
+                break;
+            case 3: // Clipboard & Files: fragments drifting up, turning to cells and bits
+                a.AddSheet(r => r.Next(3) == 0 ? Ambient.Hex(6 + r.NextDouble() * 5, cyan) : Ambient.Bit(1.8 + r.NextDouble() * 1.5, teal), count: 18, speed: -8, sway: 10, swaySeconds: 8, opacity: 0.5, pulseLow: 0.25, pulseSeconds: 3);
+                a.AddSheet(r => Ambient.Speck(1 + r.NextDouble(), cyan), count: 20, speed: 0, opacity: 0.6, pulseLow: 0.1, pulseSeconds: 2.8);
+                a.AddFlares(r => (FlareOf(cyan), 7 + r.NextDouble() * 4), everySeconds: 3.6);
+                break;
+            case 4: // Colors: motes of every neon colour rising
+                a.AddSheet(r => Ambient.Glow(3 + r.NextDouble() * 4, neon[r.Next(neon.Length)]), count: 20, speed: -10, sway: 8, swaySeconds: 7, opacity: 0.75, pulseLow: 0.4, pulseSeconds: 3);
+                a.AddSheet(r => Ambient.Glow(30 + r.NextDouble() * 30, neon[r.Next(neon.Length)]), count: 4, speed: 0, sway: 24, swaySeconds: 11, opacity: 0.14, pulseLow: 0.05, pulseSeconds: 6);
+                a.AddFlares(r => (FlareOf(neon[r.Next(neon.Length)]), 8 + r.NextDouble() * 5), everySeconds: 2.8);
+                break;
+            default: // Settings: slow cells hanging in the dark, breathing
+                a.AddSheet(r => Ambient.Hex(11 + r.NextDouble() * 12, yellow, 0.9), count: 7, speed: -3, sway: 6, swaySeconds: 12, opacity: 0.26, pulseLow: 0.08, pulseSeconds: 4);
+                a.AddSheet(r => Ambient.Speck(1 + r.NextDouble(), yellow), count: 22, speed: 0, opacity: 0.55, pulseLow: 0.1, pulseSeconds: 2.6);
+                break;
+        }
         return a;
     }
 

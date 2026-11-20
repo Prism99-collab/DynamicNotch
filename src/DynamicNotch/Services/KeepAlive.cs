@@ -22,7 +22,7 @@ public static class KeepAlive
     public const string AutoArg = "--auto";
     public const string RestartArg = "--restarted";
     public const string UninstallArg = "--uninstall";
-    const string TaskName = "Dynamic Notch";
+    const string TaskName = "Pixo";
 
     static string StopFlag => Path.Combine(Settings.Folder, "stopped.flag");
 
@@ -76,7 +76,7 @@ public static class KeepAlive
                 string xml = TaskXml(exe, logon, guard);
                 // already right (and switched on: an interrupted upgrade may have left it disabled)
                 if (CurrentTaskXml() is { } existing && !existing.Contains("<Enabled>false</Enabled>") && Normalize(existing) == Normalize(xml)) return;
-                string path = Path.Combine(Path.GetTempPath(), $"DynamicNotch-task-{Environment.ProcessId}.xml");
+                string path = Path.Combine(Path.GetTempPath(), $"Pixo-task-{Environment.ProcessId}.xml");
                 File.WriteAllText(path, xml, Encoding.Unicode);
                 RunSchtasks($"/Create /TN \"{TaskName}\" /XML \"{path}\" /F");
                 try { File.Delete(path); } catch { }
@@ -97,6 +97,7 @@ public static class KeepAlive
     static void RemoveLegacyEntries()
     {
         RunSchtasks("/Delete /TN \"DynamicNotch Guardian\" /F", quiet: true);
+        RunSchtasks("/Delete /TN \"Dynamic Notch\" /F", quiet: true); // its name before Pixo
         try
         {
             using var run = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
@@ -178,8 +179,8 @@ public static class KeepAlive
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Author>Dynamic Notch</Author>
-    <Description>Starts Dynamic Notch when you sign in and brings it back after lock, sleep or an unexpected exit. Choose Exit in its tray menu to keep it off; change this in the notch's Settings page.</Description>
+    <Author>Prism</Author>
+    <Description>Starts Pixo when you sign in and brings it back after lock, sleep or an unexpected exit. Choose Exit in its tray menu to keep it off; change this in the notch's Settings page.</Description>
   </RegistrationInfo>
   <Triggers>{triggers}</Triggers>
   <Principals>

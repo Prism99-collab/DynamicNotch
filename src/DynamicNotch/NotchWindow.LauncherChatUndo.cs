@@ -220,7 +220,7 @@ public partial class NotchWindow
 
     string SavePictures(List<byte[]> images, string madeWith)
     {
-        string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Dynamic Notch");
+        string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Pixo");
         Directory.CreateDirectory(folder);
         var saved = new List<string>();
         foreach (var bytes in images)

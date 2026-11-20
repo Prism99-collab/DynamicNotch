@@ -6,7 +6,7 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 & (Join-Path $PSScriptRoot "build.ps1")
-$setup = Get-ChildItem (Join-Path $root "artifacts") -Filter "DynamicNotch-Setup-*.exe" | Select-Object -First 1
+$setup = Get-ChildItem (Join-Path $root "artifacts") -Filter "Pixo-Setup-*.exe" | Select-Object -First 1
 Write-Host "Installing $($setup.Name) silently..."
 Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
-Write-Host "Installed. Dynamic Notch starts at the next sign-in, or open it from the Start menu now."
+Write-Host "Installed. Pixo starts at the next sign-in, or open it from the Start menu now."

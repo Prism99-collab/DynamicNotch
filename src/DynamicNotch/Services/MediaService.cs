@@ -66,7 +66,7 @@ public sealed class MediaService
         internal Player(WebTab tab, int id) { Web = tab; Id = id; AppId = tab.Browser; }
         /// <summary>Windows' media session (an app, or the one tab a browser tells Windows about)...</summary>
         internal readonly GlobalSystemMediaTransportControlsSession? Session;
-        /// <summary>...or a browser tab the "Dynamic Notch Media" extension reports.</summary>
+        /// <summary>...or a browser tab the "Pixo Media" extension reports.</summary>
         internal WebTab? Web;
         internal string? ArtUrl;
         internal byte[]? ArtBytes;

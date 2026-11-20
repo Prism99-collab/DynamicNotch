@@ -1,9 +1,9 @@
-; Dynamic Notch — Windows installer (Inno Setup 6)
+; Pixo — Windows installer (Inno Setup 6)
 ; Built by scripts\build.ps1, which passes the version and the folder holding the published exes.
-; Per-user install: no administrator prompt, installs to %LOCALAPPDATA%\Programs\Dynamic Notch.
+; Per-user install: no administrator prompt, installs to %LOCALAPPDATA%\Programs\Pixo.
 
 #ifndef AppVersion
-  #define AppVersion "2.13.1"
+  #define AppVersion "3.0.0"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish"
@@ -16,10 +16,10 @@
   #define Arch "x64"
 #endif
 
-#define AppName "Dynamic Notch"
-#define AppExe "DynamicNotch.exe"
-#define AppPublisher "Prism99-collab"
-#define AppUrl "https://github.com/Prism99-collab/DynamicNotch"
+#define AppName "Pixo"
+#define AppExe "Pixo.exe"
+#define AppPublisher "Prism"
+#define AppUrl "https://github.com/Prism99-collab/Pixo"
 
 [Setup]
 ; Never change AppId: it is how Windows recognises upgrades of the same app.
@@ -39,6 +39,9 @@ VersionInfoDescription={#AppName} Setup
 PrivilegesRequired=lowest
 DefaultDirName={autopf}\{#AppName}
 DisableProgramGroupPage=yes
+; it moves to its new folder (Pixo) on upgrade; the old one is cleared below
+UsePreviousAppDir=no
+AppCopyright=Copyright (c) 2026 Prism
 DisableDirPage=auto
 DisableReadyPage=no
 
@@ -53,7 +56,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.19041
 
 OutputDir={#OutputDir}
-OutputBaseFilename=DynamicNotch-Setup-{#AppVersion}-{#Arch}
+OutputBaseFilename=Pixo-Setup-{#AppVersion}-{#Arch}
 SetupIconFile=..\src\DynamicNotch\Assets\app.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
@@ -68,7 +71,7 @@ SolidCompression=yes
 
 ; close a running copy before replacing it (upgrades), and don't ask to restart Windows
 CloseApplications=force
-CloseApplicationsFilter={#AppExe}
+CloseApplicationsFilter={#AppExe},DynamicNotch.exe
 RestartApplications=no
 RestartIfNeededByRun=no
 
@@ -87,6 +90,12 @@ Source: "..\THIRD-PARTY-NOTICES.md"; DestDir: "{app}"; DestName: "THIRD-PARTY-NO
 Source: "..\TRADEMARKS.md"; DestDir: "{app}"; DestName: "TRADEMARKS.txt"; Flags: ignoreversion
 Source: "..\PRIVACY.md"; DestDir: "{app}"; DestName: "PRIVACY.txt"; Flags: ignoreversion
 
+[InstallDelete]
+; the name before Pixo: its folder, shortcuts and sign-in entries go
+Type: filesandordirs; Name: "{autopf}\Dynamic Notch"
+Type: files; Name: "{autoprograms}\Dynamic Notch.lnk"
+Type: files; Name: "{autodesktop}\Dynamic Notch.lnk"
+
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; Comment: "Open {#AppName}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Comment: "Open {#AppName}"; Tasks: desktopicon
@@ -100,6 +109,7 @@ Filename: "{app}\{#AppExe}"; Parameters: "--uninstall"; Flags: runhidden waitunt
 
 [UninstallDelete]
 ; settings and logs
+Type: filesandordirs; Name: "{userappdata}\Pixo"
 Type: filesandordirs; Name: "{userappdata}\DynamicNotch"
 
 [Code]
@@ -109,6 +119,7 @@ var
 begin
   { make sure no copy of the notch keeps the exe locked while files are replaced }
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM {#AppExe}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM DynamicNotch.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
 procedure SetStartupTask(Enable: Boolean);
@@ -118,7 +129,8 @@ var
 begin
   { the app's own sign-in / keep-alive task (it may not exist yet: then this does nothing) }
   if Enable then Switch := '/ENABLE' else Switch := '/DISABLE';
-  Exec(ExpandConstant('{sys}\schtasks.exe'), '/Change /TN "Dynamic Notch" ' + Switch, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\schtasks.exe'), '/Change /TN "Pixo" ' + Switch, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  if not Enable then Exec(ExpandConstant('{sys}\schtasks.exe'), '/Change /TN "Dynamic Notch" /DISABLE', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;

@@ -8,7 +8,6 @@ namespace DynamicNotch;
 
 /// <summary>
 /// The welcome page's greeting, alive:
-///  • a status line on top: a pulsing dot, "ONLINE", and which AI is listening;
 ///  • the greeting itself decodes in, its letters scrambling through symbols before they settle, left to right;
 ///    in Neon it has a cyan and magenta ghost that splits apart while it decodes and glitches once in a while after,
 ///    and a block cursor that blinks after it; in the other themes a light sweeps across the words now and then;
@@ -22,7 +21,7 @@ public partial class NotchWindow
         var acc = ChatAccent;
         int hour = DateTime.Now.Hour;
         string hello = hour < 5 ? "Up late?" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-        string target = _cyber ? $"{hello.ToUpperInvariant().TrimEnd('?')} // READY" : hello;
+        string target = _cyber ? hello.ToUpperInvariant().TrimEnd('?') : hello;
         string sub = _settings.AiTools ? "Ask anything, or tell me what to do on your PC." : "Ask me anything.";
         var font = _cyber ? CyFont : UiText;
         double size = _cyber ? 17 : 20;
@@ -45,7 +44,7 @@ public partial class NotchWindow
             Child = status, HorizontalAlignment = HorizontalAlignment.Center, Padding = new Thickness(9, 2, 10, 3), Margin = new Thickness(0, 0, 0, 7),
             CornerRadius = new CornerRadius(_cyber ? 0 : 9), Background = Frozen(A(acc, 0x14)), BorderBrush = Frozen(A(acc, 0x40)), BorderThickness = new Thickness(1),
         };
-        root.Children.Add(statusPlate);
+        // (no status line: the face says it all)
 
         // ── the greeting: the words, with two coloured ghosts behind in Neon
         TextBlock Layer(Brush brush) => new() { Text = target, FontSize = size, FontWeight = FontWeights.Bold, FontFamily = font, Foreground = brush, HorizontalAlignment = HorizontalAlignment.Center };
@@ -83,7 +82,7 @@ public partial class NotchWindow
 
         // ── it comes alive
         var rnd = new Random();
-        const string noise = "▓▒░<>/\\\\|#%&@$01{}[]=+*";
+        const string noise = "▓▒░<>#%&@$01{}[]=+*";
         void SetAll(string t) { main.Text = t; if (ghostA != null) ghostA.Text = t; if (ghostB != null) ghostB.Text = t; }
         int frame = 0, frames = Math.Max(14, target.Length + 6);
         under.Text = "";

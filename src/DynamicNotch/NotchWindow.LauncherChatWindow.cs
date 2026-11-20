@@ -224,7 +224,7 @@ sealed class ChatPopWindow : Window
 
     public ChatPopWindow(NotchWindow owner, FrameworkElement content, Color accent, bool neon, string bounds, bool topmost)
     {
-        Title = "AI chat · Dynamic Notch";
+        Title = "AI chat · Pixo";
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.CanResize;
         ShowInTaskbar = true;

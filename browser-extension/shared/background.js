@@ -1,5 +1,5 @@
-// Dynamic Notch Media — the browser's side of the link. It gathers what every tab plays (from content.js) and
-// hands the list to Dynamic Notch on this PC (ws://127.0.0.1, nothing goes online), and passes the notch's buttons
+// Pixo Media — the browser's side of the link. It gathers what every tab plays (from content.js) and
+// hands the list to Pixo on this PC (ws://127.0.0.1, nothing goes online), and passes the notch's buttons
 // back to the right tab. When the notch isn't running it simply waits and tries again now and then.
 const api = globalThis.browser ?? globalThis.chrome;
 const LINK = 'ws://127.0.0.1:47853/dynamic-notch';

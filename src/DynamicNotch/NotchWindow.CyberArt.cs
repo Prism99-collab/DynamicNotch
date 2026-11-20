@@ -33,6 +33,7 @@ public partial class NotchWindow
 
     void CyberArt(bool on)
     {
+        on = false; // the page pictures are gone: each page has its own moving particles now (NotchWindow.Ambient)
         try
         {
             if (!on)
@@ -68,6 +69,7 @@ public partial class NotchWindow
     /// <summary>The current page's picture: a soft cross-fade from the last one.</summary>
     void CyberArtShow()
     {
+        UpdateAmbient(); // the page's own particles
         if (_artHost == null || !_cyber) return;
         var brush = _page < _art.Length ? _art[_page] : null;
         if (ReferenceEquals(_artFront.Background, brush) && _artFront.Opacity > 0) return;

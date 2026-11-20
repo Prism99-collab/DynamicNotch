@@ -185,7 +185,7 @@ public partial class NotchWindow
         }
         if (c is { } k && _mode is Mode.Osd or Mode.Drop or Mode.Media or Mode.Activity && !_hidden)
         {
-            var size = _mode switch { Mode.Drop => DropSize, Mode.Osd => _osdSize, Mode.Media => MediaSize, _ => ActivitySize };
+            var size = _mode switch { Mode.Drop => DropSize, Mode.Osd => _osdSize, Mode.Media => new Size(_sw.Target, _sh.Target), _ => ActivitySize };
             Aura.Width = size.Width + (_auraLive ? 70 : 90);
             Aura.Height = size.Height + (_auraLive ? 30 : 44);
             if (k != _auraFor)
@@ -361,9 +361,14 @@ public partial class NotchWindow
     /// <summary>Shows, updates or hides the little second island next to the main pill.</summary>
     void UpdateSecond()
     {
-        var second = _mode is Mode.Media or Mode.Activity && !_hidden ? SecondActivity : LiveActivity.None;
-        if (second != LiveActivity.None) { FillSecond(second); SizeSecond(); }
-        int more = second != LiveActivity.None ? Activities().Count - 2 : 0;
+        var raw = _mode is Mode.Media or Mode.Activity && !_hidden ? SecondActivity : LiveActivity.None;
+        if (raw != LiveActivity.None && raw != _secondRaw) Bud(); // a new one: it slides out to show itself
+        _secondRaw = raw;
+        if (raw != LiveActivity.None) { FillSecond(raw); SizeSecond(); }
+        int more = raw != LiveActivity.None ? Activities().Count - 2 : 0;
+        // tucked: only a light in the notch's edge says it's there
+        var second = IslandsOut ? raw : LiveActivity.None;
+        TuckLeft(raw != LiveActivity.None && second == LiveActivity.None);
         SecondMore.Text = more > 0 ? $"+{more}" : "";
         SecondMore.Visibility = more > 0 ? Visibility.Visible : Visibility.Collapsed;
 
@@ -494,30 +499,26 @@ public partial class NotchWindow
                 rim = ((SolidColorBrush)Blue).Color;
                 break;
             case LiveActivity.Call when _call is { } call:
-                // the calling app's icon and the call's running time, green (red when muted)
-                SecondArt.Background = call.Icon != null ? IconBrush(call.Icon) : null;
-                SecondArt.CornerRadius = new CornerRadius(5);
-                SecondArt.Visibility = call.Icon != null ? Visibility.Visible : Visibility.Collapsed;
-                SecondGlyph.Visibility = call.Icon != null ? Visibility.Collapsed : Visibility.Visible;
+                // a phone and the call's running time, green (red when muted)
                 SecondGlyph.Text = "\uE717";
                 SecondGlyph.Foreground = SecondText.Foreground = CallBrush;
                 SecondText.Text = FormatTimer(DateTime.UtcNow - call.Started);
                 rim = ((SolidColorBrush)CallBrush).Color;
                 break;
-            default: // music: the album cover as a tiny round disc
-                SecondArt.CornerRadius = new CornerRadius(9);
-                SecondArt.Background = ArtBrush(_media.Art) ?? (Brush)new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2E));
-                SecondArt.Visibility = Visibility.Visible;
-                SecondGlyph.Visibility = Visibility.Collapsed;
+            default: // music: a note in the song's colour (no picture: it stays clean beside the notch)
+                rim = _media.Accent;
+                SecondGlyph.Text = "\uE8D6";
+                SecondGlyph.Foreground = new SolidColorBrush(Lighten(rim, 0.25));
                 SecondText.Text = "";
                 SecondText.Margin = new Thickness(0);
-                rim = _media.Accent;
+                _secondColor = rim;
                 IslandRim(SecondRim, rim);
                 IslandAura(SecondAura, rim);
                 SecondProgress(null);
                 return;
         }
         SecondText.Margin = new Thickness(6, 0, 0, 0);
+        _secondColor = rim;
         IslandRim(SecondRim, rim);
         IslandAura(SecondAura, rim);
         if (a != LiveActivity.Download) SecondProgress(null);

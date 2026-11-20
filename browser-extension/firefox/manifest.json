@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Dynamic Notch Media",
+  "name": "Pixo Media",
   "version": "1.1.0",
-  "description": "Shows every tab that plays (videos, music, streams) in Dynamic Notch, with play, pause, next and previous, and lets the notch's AI read the page you ask it about. Stays on this PC.",
+  "description": "Shows every tab that plays (videos, music, streams) in Pixo, with play, pause, next and previous, and lets the notch's AI read the page you ask it about. Stays on this PC.",
   "icons": { "128": "icon128.png" },
   "permissions": ["alarms"],
   "background": { "scripts": ["background.js"] },

@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.0.0] — 2026-11-20
+
+Say hi to Pixo. New name, new logo, and a little face that lives in your notch.
+
+### Added
+- A face in the notch. It blinks, looks at your pointer, dozes off when you're away and says hello when you're back.
+  It reacts to what happens: hearts when you plug in the charger, a hop when something's done, a frown when the
+  volume is maxed. Click it to poke it, right-click to change its hat.
+- It has a voice: tiny sounds that match how it feels. Switch them off in Preferences, "Face sounds".
+- With music on, the face dances along in the music pill, headphones on.
+- The AI page has the face too. It waves, follows your pointer, and watches you type.
+- Neon: each page has its own moving particles, and in the notch the face becomes a glowing visor.
+
+### Changed
+- The notch tucks in small when you haven't touched it for a few seconds, and grows back when you come near.
+- The side pills tuck into the notch as a small light, and slide out when something starts or when you reach for it.
+- Animations look the same on every PC, laptops on battery included. Only Windows' battery saver makes them lighter.
+- The buttons at the top of the open notch fold away on pages where they'd crowd the title.
+
 ## [2.13.1] — 2026-11-19
 
 The AI does what you meant, and doesn't keep you waiting.

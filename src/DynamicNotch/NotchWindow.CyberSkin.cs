@@ -97,8 +97,8 @@ public partial class NotchWindow
         _skinWindow = this;
         try
         {
-            _cyStyles = new ResourceDictionary { Source = new Uri("/DynamicNotch;component/Cyber.xaml", UriKind.Relative) };
-            _cyStyles.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/DynamicNotch;component/Glass.xaml", UriKind.Relative) });
+            _cyStyles = new ResourceDictionary { Source = new Uri("/Pixo;component/Cyber.xaml", UriKind.Relative) };
+            _cyStyles.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/Pixo;component/Glass.xaml", UriKind.Relative) });
         }
         catch (Exception ex) { Services.AppLog.Write("cyber styles: " + ex.Message); }
         // every element as it appears (rows, chips, art built later) gets the skin while it's on

@@ -65,7 +65,7 @@ public static class BrowserDownloads
 
     static void Read(string history, Dictionary<string, Info> into)
     {
-        string tmp = Path.Combine(Path.GetTempPath(), "DynamicNotch");
+        string tmp = Path.Combine(Path.GetTempPath(), "Pixo");
         Directory.CreateDirectory(tmp);
         string copy = Path.Combine(tmp, "history-" + Environment.CurrentManagedThreadId + ".db");
         try

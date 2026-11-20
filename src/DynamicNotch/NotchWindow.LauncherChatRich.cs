@@ -57,13 +57,13 @@ public partial class NotchWindow
             ("Save", () =>
             {
                 if (Snapshot(frame) is not { } png) return;
-                string folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Dynamic Notch");
+                string folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Pixo");
                 System.IO.Directory.CreateDirectory(folder);
                 string file = System.IO.Path.Combine(folder, $"Chart {DateTime.Now:yyyy-MM-dd HHmmss}.png");
                 var enc = new PngBitmapEncoder();
                 enc.Frames.Add(BitmapFrame.Create(png));
                 using (var fs = System.IO.File.Create(file)) enc.Save(fs);
-                Toast("Saved in Pictures\\Dynamic Notch");
+                Toast("Saved in Pictures\\Pixo");
                 OpenLink(file);
             })));
         return new BlockUIContainer(stack) { Margin = new Thickness(0, 3, 0, 7) };
@@ -117,11 +117,11 @@ public partial class NotchWindow
             ("Copy", () => CopyText(string.Join("\r\n", cells.Select(c => string.Join("\t", c))), "Table copied: paste it in Excel or Sheets")),
             ("Excel", () =>
             {
-                string folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Dynamic Notch");
+                string folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Pixo");
                 System.IO.Directory.CreateDirectory(folder);
                 string file = System.IO.Path.Combine(folder, $"Table {DateTime.Now:yyyy-MM-dd HHmmss}.xlsx");
                 DocWriter.Write(file, string.Join("\n", rows.Select(Clean)));
-                Toast("Saved in Documents\\Dynamic Notch");
+                Toast("Saved in Documents\\Pixo");
                 OpenLink(file);
             }));
         buttons.Margin = new Thickness(0, -6, 2, 0);

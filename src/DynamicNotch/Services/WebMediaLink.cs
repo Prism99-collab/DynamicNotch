@@ -12,7 +12,7 @@ namespace DynamicNotch.Services;
 /// <summary>The page in front in a browser, as the extension reads it when the AI asks.</summary>
 public sealed record WebPage(string Url, string Title, string Text, string Selected);
 
-/// <summary>One browser tab that plays, as the "Dynamic Notch Media" extension reports it.</summary>
+/// <summary>One browser tab that plays, as the "Pixo Media" extension reports it.</summary>
 public sealed record WebTab(string Key, int Link, int TabId, string Browser, string Title, string Artist, string Site,
     string? Art, string? Icon, bool Playing, double Pos, double Dur, bool CanNext, bool CanPrev, DateTime At);
 

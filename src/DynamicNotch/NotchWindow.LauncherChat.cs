@@ -425,48 +425,8 @@ public partial class NotchWindow
         var acc = ChatAccent;
         var box = new StackPanel { Margin = new Thickness(0, 14, 0, 0), Tag = "welcome", HorizontalAlignment = HorizontalAlignment.Stretch };
 
-        // the mark, with rings that ripple out from it
-        var stage = new Grid { Width = 120, Height = 96, HorizontalAlignment = HorizontalAlignment.Center };
-        var ripples = new List<System.Windows.Shapes.Ellipse>();
-        for (int r = 0; r < 2; r++)
-        {
-            var ring = new System.Windows.Shapes.Ellipse
-            {
-                Width = 64, Height = 64, StrokeThickness = 1.2, Opacity = 0, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-                Stroke = Frozen(new LinearGradientBrush(A(acc, 0xC0), A(AiSecond, 0x80), 45)), RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1),
-            };
-            if (_cyber) ring.StrokeDashArray = new DoubleCollection { 2, 3 };
-            ripples.Add(ring);
-            stage.Children.Add(ring);
-        }
-        var orb = new Controls.AiOrb(58, acc, AiSecond, _cyber) { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        stage.Children.Add(orb);
-        box.Children.Add(stage);
-        stage.Loaded += (_, _) =>
-        {
-            orb.Start();
-            if (Eco) return;
-            for (int r = 0; r < ripples.Count; r++)
-            {
-                var begin = TimeSpan.FromSeconds(r * 1.6);
-                var scale = new DoubleAnimation(0.9, 1.75, TimeSpan.FromSeconds(3.2)) { BeginTime = begin, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
-                var fade = new DoubleAnimationUsingKeyFrames { BeginTime = begin, RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromSeconds(3.2) };
-                fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-                fade.KeyFrames.Add(new LinearDoubleKeyFrame(0.7, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0.4))));
-                fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(3.2))));
-                Timeline.SetDesiredFrameRate(scale, 30);
-                Timeline.SetDesiredFrameRate(fade, 30);
-                var st = (ScaleTransform)ripples[r].RenderTransform;
-                st.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
-                st.BeginAnimation(ScaleTransform.ScaleYProperty, scale);
-                ripples[r].BeginAnimation(OpacityProperty, fade);
-            }
-        };
-        stage.Unloaded += (_, _) =>
-        {
-            orb.Stop();
-            foreach (var r in ripples) { r.BeginAnimation(OpacityProperty, null); ((ScaleTransform)r.RenderTransform).BeginAnimation(ScaleTransform.ScaleXProperty, null); ((ScaleTransform)r.RenderTransform).BeginAnimation(ScaleTransform.ScaleYProperty, null); }
-        };
+        // the AI's face (NotchWindow.LauncherChatFace)
+        box.Children.Add(WelcomeFace(acc));
 
         // the greeting (NotchWindow.LauncherChatGreeting)
         box.Children.Add(Greeting());
@@ -1396,7 +1356,7 @@ public partial class NotchWindow
             _ => "Style: ultra brief, like a sharp expert in a hurry. The answer first, in as few words as stay clear. Fragments are fine. No greeting, no restating the question, no filler, no apologies, no 'let me know if...', no closing question. A short list beats a paragraph; one line beats a list. Only go longer when asked, or when the task is to write something (then write it in full, nothing around it).",
         };
         var sb = new StringBuilder();
-        sb.AppendLine("You are the AI of Dynamic Notch: a panel at the top of the user's Windows screen that shows music, calls, alerts, timers, reminders, focus sessions, system stats, the clipboard and files, and has a search. You are its brain: you answer, and you act on the PC for the user.");
+        sb.AppendLine("You are the AI of Pixo: a panel at the top of the user's Windows screen that shows music, calls, alerts, timers, reminders, focus sessions, system stats, the clipboard and files, and has a search. You are its brain: you answer, and you act on the PC for the user.");
         sb.AppendLine($"Now: {now:dddd d MMMM yyyy, HH:mm}. User's folders: Documents {Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)}, Downloads {System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")}. Notch theme: {Skin.Key}{(_media.Title.Length > 0 ? $". Playing: {_media.Title}" : "")}.");
         sb.AppendLine(style);
         sb.AppendLine("How your answer is shown: a narrow dark panel. **bold** is drawn in the theme's highlight colour, so bold only the 1-3 words that matter. Lists and short paragraphs. Fenced code blocks get a copy button. Links: [text](url). Full file paths (C:\\...) become clickable, so write them in full. Use a markdown table (header row, |---| line) whenever you compare things or list items with values: it's drawn as a real table, so keep cells short. No emojis. A picture can be shown with ![what](https://url) on its own line; YouTube links get a video card. The user may attach pictures or their screen: describe and use what you see. The user may talk instead of typing (their words are dictated, so forgive small mistakes); when they did, your answer may be read aloud: keep it natural to hear. Answer in the user's language.");
@@ -1598,11 +1558,18 @@ public partial class NotchWindow
     {
         var acc = ChatAccent;
         var body = MessageBox();
-        // three dots that breathe while it thinks
-        var dots = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 5, 0, 3), Visibility = Visibility.Collapsed };
-        for (int i = 0; i < 3; i++)
-            dots.Children.Add(new Ellipse { Width = 5, Height = 5, Margin = new Thickness(0, 0, 4, 0), Fill = Frozen(acc), Opacity = 0.3 });
-        var label = new TextBlock { Text = _cyber ? "PROCESSING" : "Thinking", FontFamily = _cyber ? CyFont : UiText, FontSize = _cyber ? 9.5 : 10.5, Foreground = Frozen(A(acc, 0xB0)), Margin = new Thickness(4, -2, 0, 0) };
+        // its little face while it works: thinking (eyes up), searching (eyes scanning), busy (a bob)
+        var dots = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(-4, 2, 0, 1), Visibility = Visibility.Collapsed };
+        var face = new Controls.NotchFace(14) { Neon = _cyber, Accent = acc, Eco = Eco, VerticalAlignment = VerticalAlignment.Center };
+        face.SetMood(Controls.NotchFace.Mood.Thinking);
+        face.SetOutfit(FaceOutfitNow(), animate: false);
+        dots.Children.Add(face);
+        static Controls.NotchFace.Mood MoodFor(string w) =>
+            System.Text.RegularExpressions.Regex.IsMatch(w, "search|read|fetch|getting|headline|source", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? Controls.NotchFace.Mood.Searching
+            : System.Text.RegularExpressions.Regex.IsMatch(w, "busy|trying again", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? Controls.NotchFace.Mood.Error
+            : System.Text.RegularExpressions.Regex.IsMatch(w, "running|opening|doing|checking|sync|writing", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? Controls.NotchFace.Mood.Working
+            : Controls.NotchFace.Mood.Thinking;
+        var label = new TextBlock { Text = _cyber ? "PROCESSING" : "Thinking", FontFamily = _cyber ? CyFont : UiText, FontSize = _cyber ? 9.5 : 10.5, Foreground = Frozen(A(acc, 0xB0)), Margin = new Thickness(1, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         dots.Children.Add(label);
         TextBlock? caret = null; // Neon: a block cursor blinking after what it's doing
         if (_cyber && !Eco) { caret = new TextBlock { Text = "\u258C", FontSize = 9, Foreground = Frozen(acc), Margin = new Thickness(3, -2, 0, 0), VerticalAlignment = VerticalAlignment.Center }; dots.Children.Add(caret); }
@@ -1658,6 +1625,7 @@ public partial class NotchWindow
         string asked = _chatLastUser; // the question this answers (for 👎)
         bubble.Finished = () =>
         {
+            Services.FaceSound.Say("done", _cyber); // "ta-daa": it's done
             if (Eco) return;
             if (_cyber)
             {
@@ -1683,7 +1651,7 @@ public partial class NotchWindow
             ("\uE8C8", "Copy", () => CopyText(Plain(), "Copied")),
             ("\uE72C", "Retry", Retry),
             ("\uE8E0", "Bad answer (kept for the AI's checks)", () => BadAnswer(asked, Plain()))));
-        bubble.OnWord = w => { word = w; label.Text = w; };
+        bubble.OnWord = w => { word = w; label.Text = w; face.SetMood(MoodFor(w)); };
         bubble.OnThinking = on =>
         {
             var v = on ? Visibility.Visible : Visibility.Collapsed;
@@ -1701,14 +1669,6 @@ public partial class NotchWindow
                     blink.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(450))));
                     caret.BeginAnimation(OpacityProperty, blink);
                 }
-            }
-            for (int i = 0; i < 3; i++)
-            {
-                var e = (Ellipse)dots.Children[i];
-                if (!on || Eco) { e.BeginAnimation(OpacityProperty, null); continue; }
-                var a = new DoubleAnimation(0.25, 1, TimeSpan.FromMilliseconds(420)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, BeginTime = TimeSpan.FromMilliseconds(140 * i), EasingFunction = new SineEase() };
-                Timeline.SetDesiredFrameRate(a, 30);
-                e.BeginAnimation(OpacityProperty, a);
             }
         };
         _chatStack!.Children.Add(root);

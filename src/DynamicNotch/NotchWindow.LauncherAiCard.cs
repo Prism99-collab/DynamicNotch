@@ -39,8 +39,10 @@ public partial class NotchWindow
         row.ColumnDefinitions.Add(new ColumnDefinition());
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var orb = new AiOrb(24, acc, second, _cyber) { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        _startOrb = orb;
+        // the AI's face: the same little face that lives in the notch, smiling when you come to it
+        var orb = new NotchFace(19) { Neon = _cyber, Accent = acc, Eco = Eco, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        orb.SetOutfit(FaceOutfitNow(), animate: false);
+        if (!connected) orb.SetMood(NotchFace.Mood.Sleep);
         row.Children.Add(orb);
 
         var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 8, 0) };
@@ -92,16 +94,14 @@ public partial class NotchWindow
         {
             lift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-1.5, TimeSpan.FromMilliseconds(140)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
             card.Background = new LinearGradientBrush(A(acc, 0x3A), A(second, 0x2A), new Point(0, 0.5), new Point(1, 0.5));
-            orb.Busy(true);
+            if (connected) orb.Play(NotchFace.Emote.Happy, 1.4);
         };
         card.MouseLeave += (_, _) =>
         {
             lift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(200)));
             card.Background = wash;
-            orb.Busy(false);
         };
         card.MouseLeftButtonUp += (_, _) => EnterChat(null, resume: true);
-        if (!Eco) orb.Start();
         return card;
     }
 

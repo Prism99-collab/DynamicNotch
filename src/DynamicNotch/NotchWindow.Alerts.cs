@@ -838,7 +838,11 @@ public partial class NotchWindow
 
     void UpdatePrivacyBubble()
     {
-        bool show = (_privacy.MicInUse || _privacy.CamInUse) && _mode is not (Mode.Expanded or Mode.Game) && !_hidden;
+        bool raw = (_privacy.MicInUse || _privacy.CamInUse) && _mode is not (Mode.Expanded or Mode.Game) && !_hidden;
+        if (raw && !_privacyRaw) Bud(); // the mic or camera just came on: it shows itself
+        _privacyRaw = raw;
+        bool show = raw && IslandsOut;
+        TuckRight(raw && !show); // tucked: a light in the notch's edge, orange (mic) or green (camera)
         // the same height as what it sits beside: smaller next to the slim bar over a window
         double h = _mode == Mode.Slim ? 18 : 22; // a bead beside the notch, always clearly smaller than it
         if (PrivacyBubble.Height != h) { PrivacyBubble.Height = h; PrivacyBubble.CornerRadius = PrivacyRim.CornerRadius = new CornerRadius(0, 0, h / 2, h / 2); }

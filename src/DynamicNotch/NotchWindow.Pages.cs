@@ -144,6 +144,7 @@ public partial class NotchWindow
         if (changed && _page == WorkPage) EndWorkTyping(giveBack: true);
         if (changed && _page == CallsPage && _call != null) _leftCallsPage = true; // you moved on: the next opening stays where you are
         _page = page;
+        HeaderPage(); // the quick buttons fold or open, the page's name refits
         _pageX.Configure(SpringStyle.Page);
         _pageX.Active = true;
         if (instant) { _pageX.Snap(-PagePos(page) * PageWidth); PagesShift.X = _pageX.Value; }
@@ -699,6 +700,10 @@ public partial class NotchWindow
         Add("Always keep running", () => _settings.KeepRunning, v => { _settings.KeepRunning = v; KeepAlive.Sync(_settings); });
         Add("Start with Windows", () => _settings.StartWithWindows, v => { _settings.StartWithWindows = v; KeepAlive.Sync(_settings); });
         Add("Companion", () => _settings.Companion, v => _settings.Companion = v);
+        Add("Face in the notch", () => _settings.NotchFace, v => { _settings.NotchFace = v; RefreshBase(); });
+        Add("Compact when resting", () => _settings.CompactWhenResting, v => { _settings.CompactWhenResting = v; FaceWake(); });
+        Add("Face sounds", () => _settings.FaceSounds, v => _settings.FaceSounds = v);
+        Add("Tuck pills into the notch", () => _settings.TuckPills, v => { _settings.TuckPills = v; RefreshIslands(); });
         BuildSettingsTabs(); // Smart is the third tab (its switches are built with the Smart page code)
 
         void Add(string label, Func<bool> get, Action<bool> set)

@@ -225,5 +225,36 @@ public sealed class Ambient : Grid
         }) { GradientOrigin = new Point(0.35, 0.3) }),
     };
 
+    /// <summary>A small square bit (a data packet).</summary>
+    public static FrameworkElement Bit(double size, Color c) => new Rectangle { Width = size, Height = size, Fill = Frozen(new SolidColorBrush(c)) };
+
+    /// <summary>A thin streak, bright at its head (top) and fading out down its tail: a spark rising.</summary>
+    public static FrameworkElement Streak(double width, double length, Color c) => new Rectangle
+    {
+        Width = width, Height = length, RadiusX = width / 2, RadiusY = width / 2,
+        Fill = Frozen(new LinearGradientBrush(Color.FromArgb(0xFF, c.R, c.G, c.B), Color.FromArgb(0x00, c.R, c.G, c.B), 90)),
+    };
+
+    /// <summary>A thin ring (a signal, a ripple).</summary>
+    public static FrameworkElement Ring(double size, Color c, double thickness = 1) => new Ellipse
+    {
+        Width = size, Height = size, StrokeThickness = thickness, Stroke = Frozen(new SolidColorBrush(c)),
+    };
+
+    /// <summary>A small + mark (a crosshair on a grid).</summary>
+    public static FrameworkElement Cross(double size, Color c) => new Path
+    {
+        Data = CrossShape, Width = size, Height = size, Stretch = Stretch.Fill, StrokeThickness = 1, Stroke = Frozen(new SolidColorBrush(c)),
+    };
+
+    /// <summary>A hexagon outline (a cell, a nut).</summary>
+    public static FrameworkElement Hex(double size, Color c, double thickness = 1) => new Path
+    {
+        Data = HexShape, Width = size, Height = size * 0.87, Stretch = Stretch.Fill, StrokeThickness = thickness, Stroke = Frozen(new SolidColorBrush(c)),
+    };
+
+    static readonly Geometry CrossShape = Freeze(Geometry.Parse("M5,0 L5,10 M0,5 L10,5"));
+    static readonly Geometry HexShape = Freeze(Geometry.Parse("M2.5,0 L7.5,0 L10,4.33 L7.5,8.66 L2.5,8.66 L0,4.33 Z"));
+
     static Brush Frozen(Brush b) { b.Freeze(); return b; }
 }

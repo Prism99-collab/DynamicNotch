@@ -20,7 +20,7 @@ public partial class NotchWindow
     string CompactSystemPrompt()
     {
         var sb = new StringBuilder();
-        sb.AppendLine("You are the AI of Dynamic Notch, a panel at the top of the user's Windows screen (music, calls, alerts, timers, reminders, focus, files, clipboard). You answer and you act on the PC with your tools.");
+        sb.AppendLine("You are the AI of Pixo, a panel at the top of the user's Windows screen (music, calls, alerts, timers, reminders, focus, files, clipboard). You answer and you act on the PC with your tools.");
         sb.AppendLine($"Now: {DateTime.Now:dddd d MMMM yyyy, HH:mm}. Documents: {Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)}. Downloads: {System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")}.");
         sb.AppendLine(_settings.AiStyle == "detailed" ? "Style: thorough, clear." : _settings.AiStyle == "balanced" ? "Style: clear and concise." : "Style: ultra brief. The answer first, in as few words as stay clear. No filler, no greeting, no closing question.");
         sb.AppendLine("Format: markdown; **bold** only the key 1-3 words; tables for comparisons; full file paths; no emojis. Answer in the user's language (they may mix English, French, Darija...). Read the intent, forgive typos.");

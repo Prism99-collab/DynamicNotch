@@ -198,7 +198,7 @@ public sealed class FrameCounter : IDisposable
 }
 
 /// <summary>
-/// The helper itself: "DynamicNotch.exe --fps-helper &lt;block&gt; [--join &lt;account&gt;]", started elevated by
+/// The helper itself: "Pixo.exe --fps-helper &lt;block&gt; [--join &lt;account&gt;]", started elevated by
 /// <see cref="FrameCounter.LaunchHelper"/>. No window, no tray icon. It counts the frames of whatever the notch
 /// points it at, writes them into the shared block, and quits when told to or when the notch has been gone for 30
 /// minutes.
@@ -270,7 +270,7 @@ public static class FpsHelper
     {
         try
         {
-            foreach (var p in Process.GetProcessesByName("DynamicNotch"))
+            foreach (var p in Process.GetProcessesByName("Pixo").Concat(Process.GetProcessesByName("DynamicNotch")))
                 using (p) if (p.Id != Environment.ProcessId) return true;
         }
         catch { return true; }

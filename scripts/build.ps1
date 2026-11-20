@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
-  Builds Dynamic Notch and its installers.
+  Builds Pixo and its installers.
 
 .DESCRIPTION
-  1. Publishes a self-contained, single-file DynamicNotch.exe for win-x64 and win-arm64
+  1. Publishes a self-contained, single-file Pixo.exe for win-x64 and win-arm64
      (no .NET installation needed on the target PC).
   2. Compiles installer\DynamicNotch.iss with Inno Setup into
-     artifacts\DynamicNotch-Setup-<version>-x64.exe and ...-arm64.exe.
+     artifacts\Pixo-Setup-<version>-x64.exe and ...-arm64.exe.
   3. Writes SHA-256 checksums to artifacts\SHA256SUMS.txt.
 
 .EXAMPLE
@@ -31,7 +31,7 @@ $iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFile
   Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $iscc) { throw "Inno Setup 6 is required: winget install JRSoftware.InnoSetup" }
 
-Write-Host "Building Dynamic Notch $Version" -ForegroundColor Cyan
+Write-Host "Building Pixo $Version" -ForegroundColor Cyan
 if (Test-Path $artifacts) { Remove-Item $artifacts -Recurse -Force }
 
 foreach ($arch in "x64", "arm64") {
@@ -47,7 +47,7 @@ foreach ($arch in "x64", "arm64") {
   if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed for $arch" }
 }
 
-$setups = Get-ChildItem $artifacts -File -Filter "DynamicNotch-Setup-*.exe"
+$setups = Get-ChildItem $artifacts -File -Filter "Pixo-Setup-*.exe"
 $setups | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name } |
   Set-Content (Join-Path $artifacts "SHA256SUMS.txt") -Encoding ascii
 

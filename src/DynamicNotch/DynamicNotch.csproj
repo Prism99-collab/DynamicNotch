@@ -11,18 +11,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/app.ico</ApplicationIcon>
-    <AssemblyName>DynamicNotch</AssemblyName>
+    <AssemblyName>Pixo</AssemblyName>
+    <RootNamespace>DynamicNotch</RootNamespace>
     <RootNamespace>DynamicNotch</RootNamespace>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
 
     <!-- What Windows shows in the exe's Properties > Details and in Settings > Apps -->
-    <Version>2.13.1</Version>
-    <Product>Dynamic Notch</Product>
-    <AssemblyTitle>Dynamic Notch</AssemblyTitle>
+    <Version>3.0.0</Version>
+    <Product>Pixo</Product>
+    <AssemblyTitle>Pixo</AssemblyTitle>
     <Description>A smooth animated notch and control center for Windows.</Description>
-    <Company>Prism99-collab</Company>
-    <Copyright>Copyright (c) 2026 Prism99-collab</Copyright>
+    <Company>Prism</Company>
+    <Copyright>Copyright (c) 2026 Prism. Pixo and its logo are owned by Prism.</Copyright>
 
     <!-- Workstation GC with background collections: full collections run beside the UI thread instead of
          pausing it mid-animation (a blocking GC was a source of random micro-stutters). -->

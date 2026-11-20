@@ -112,7 +112,7 @@ public partial class NotchWindow
 
     // ── the AI's words, kept on this PC ──
 
-    static readonly string AlertWordsFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DynamicNotch", "alert-words.json");
+    static readonly string AlertWordsFile = Path.Combine(Settings.Folder, "alert-words.json");
     static Dictionary<string, string[]>? _alertWords;
     static int _alertAsks;
     static DateTime _alertAsksDay;

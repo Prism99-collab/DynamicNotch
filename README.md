@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="docs/logo.png" alt="Dynamic Notch" width="128" />
+<img src="docs/logo.png" alt="Pixo" width="128" />
 
-# Dynamic Notch
+# Pixo
 
 A notch for Windows: live activity at the top of the screen, a control center under it, and a search that gets things done.
 
-[![Latest release](https://img.shields.io/github/v/release/Prism99-collab/DynamicNotch?label=download&color=0A84FF)](https://github.com/Prism99-collab/DynamicNotch/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/Prism99-collab/Pixo?label=download&color=0A84FF)](https://github.com/Prism99-collab/Pixo/releases/latest)
 [![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows)](#requirements)
 [![License: MIT](https://img.shields.io/badge/license-MIT-30D158)](LICENSE)
 
@@ -14,13 +14,13 @@ A notch for Windows: live activity at the top of the screen, a control center un
 
 ## Install
 
-Download the installer from the [latest release](https://github.com/Prism99-collab/DynamicNotch/releases/latest):
+Download the installer from the [latest release](https://github.com/Prism99-collab/Pixo/releases/latest):
 `x64` for Intel and AMD PCs, `arm64` for Snapdragon PCs. If you're not sure, use `x64`. No admin rights needed.
 
 The app isn't code-signed yet, so Windows may warn about an unknown publisher: choose **More info → Run anyway**.
 Checksums are in `SHA256SUMS.txt`.
 
-To uninstall: **Settings → Apps → Installed apps → Dynamic Notch**.
+To uninstall: **Settings → Apps → Installed apps → Pixo**.
 
 ## How it works
 
@@ -101,9 +101,9 @@ Windows 10 (version 2004 or later) or Windows 11, on x64 or ARM64.
 ## Troubleshooting
 
 - **Can't see it:** push the pointer against the top edge or press <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd>.
-- **Something's wrong:** attach `%APPDATA%\DynamicNotch\app.log` and `error.log` to an
-  [issue](https://github.com/Prism99-collab/DynamicNotch/issues).
-- **Reset settings:** exit from the tray icon, delete `%APPDATA%\DynamicNotch\settings.json`, then open it again.
+- **Something's wrong:** attach `%APPDATA%\Pixo\app.log` and `error.log` to an
+  [issue](https://github.com/Prism99-collab/Pixo/issues).
+- **Reset settings:** exit from the tray icon, delete `%APPDATA%\Pixo\settings.json`, then open it again.
 
 ## Building
 

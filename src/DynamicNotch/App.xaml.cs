@@ -24,13 +24,20 @@ public partial class App : Application
             Shutdown(code);
             return;
         }
+        // a developer look at the notch face's moods and feelings, drawn into one picture
+        if (Environment.GetEnvironmentVariable("DYNAMICNOTCH_FACESHEET") is { Length: > 0 } sheet)
+        {
+            try { Controls.NotchFace.RenderSheet(sheet); } catch (Exception ex) { System.IO.File.WriteAllText(sheet + ".txt", ex.ToString()); }
+            Shutdown();
+            return;
+        }
         bool auto = e.Args.Contains(KeepAlive.AutoArg, StringComparer.OrdinalIgnoreCase);
         bool restarted = e.Args.Contains(KeepAlive.RestartArg, StringComparer.OrdinalIgnoreCase);
 
         if (e.Args.Contains(KeepAlive.UninstallArg, StringComparer.OrdinalIgnoreCase))
         {
             // called by the uninstaller: close the running notch and undo everything it set up in Windows
-            foreach (var p in System.Diagnostics.Process.GetProcessesByName("DynamicNotch"))
+            foreach (var p in System.Diagnostics.Process.GetProcessesByName("Pixo").Concat(System.Diagnostics.Process.GetProcessesByName("DynamicNotch")))
                 using (p) { if (p.Id != Environment.ProcessId) try { p.Kill(); p.WaitForExit(3000); } catch { } }
             KeepAlive.RemoveAll();
             Shutdown();
@@ -79,8 +86,8 @@ public partial class App : Application
         {
             // never run invisibly: tell the user what happened and where the details are
             AppLog.Write($"FATAL (startup): {ex}");
-            MessageBox.Show($"Dynamic Notch couldn't start on this PC.\n\n{ex.GetBaseException().Message}\n\nDetails are in {Path.Combine(Settings.Folder, "app.log")}",
-                "Dynamic Notch", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"Pixo couldn't start on this PC.\n\n{ex.GetBaseException().Message}\n\nDetails are in {Path.Combine(Settings.Folder, "app.log")}",
+                "Pixo", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
             return;
         }
@@ -93,7 +100,7 @@ public partial class App : Application
         Forms.Application.EnableVisualStyles();
         // the tray menu stays short: open, Preferences (everything else lives there), lock, exit
         var menu = new Forms.ContextMenuStrip { ShowImageMargin = false, ShowCheckMargin = true };
-        menu.Items.Add(Controls.DarkMenu.Header("Dynamic Notch"));
+        menu.Items.Add(Controls.DarkMenu.Header("Pixo"));
         var open = menu.Items.Add("", null, (_, _) => { if (_window?.IsLocked == true) _window.SetLocked(false); _window?.Expand(byHotkey: true); });
         var prefs = (Forms.ToolStripMenuItem)menu.Items.Add("", null, (_, _) => { if (_window != null) PreferencesWindow.ShowFor(_window); });
         prefs.Font = new Drawing.Font("Segoe UI Variable Text", 9.5f, Drawing.FontStyle.Bold);
@@ -118,7 +125,7 @@ public partial class App : Application
         _tray = new Forms.NotifyIcon
         {
             Icon = CreateTrayIcon(),
-            Text = "Dynamic Notch",
+            Text = "Pixo",
             ContextMenuStrip = menu,
             Visible = true,
         };
@@ -130,7 +137,7 @@ public partial class App : Application
         };
         if (_window != null)
         {
-            void ShowLock() { if (_tray != null) _tray.Text = _window.IsLocked ? "Dynamic Notch (locked, click to unlock)" : "Dynamic Notch"; }
+            void ShowLock() { if (_tray != null) _tray.Text = _window.IsLocked ? "Pixo (locked, click to unlock)" : "Pixo"; }
             _window.LockChanged += ShowLock;
             ShowLock();
             // the tray icon (and the windows' icon) in the theme

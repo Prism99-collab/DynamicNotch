@@ -345,7 +345,24 @@ public partial class NotchWindow
         {
             // circuit traces: one along the bottom left that climbs a step, one up the right side
             var g = new StreamGeometry();
+            bool visor = _faceShown && h <= 34 && _mode is Mode.Idle or Mode.Media;
             using (var ctx = g.Open())
+            if (visor)
+            {
+                // the visor: two HUD brackets lock onto the face's eyes, a short trace leads in from the left
+                double cx = w / 2, half = 24, top = 5, bot = h - (s > 0 ? s + 3.5 : 5.5), arm = 4.5;
+                foreach (int side in new[] { -1, 1 })
+                {
+                    double x = cx + side * half;
+                    ctx.BeginFigure(new Point(x - side * arm, top), false, false);
+                    ctx.LineTo(new Point(x, top), true, false);
+                    ctx.LineTo(new Point(x, bot), true, false);
+                    ctx.LineTo(new Point(x - side * arm, bot), true, false);
+                }
+                double y = h - 4.5, x0 = c1 + 6, end = Math.Min(x0 + 20, cx - half - 12);
+                if (_mode == Mode.Idle && end > x0 + 6) { ctx.BeginFigure(new Point(x0, y), false, false); ctx.LineTo(new Point(end, y), true, false); }
+            }
+            else
             {
                 double y = h - 4.5, len = Math.Min(70, w * 0.22), x0 = c1 + 6;
                 ctx.BeginFigure(new Point(x0, y), false, false);
@@ -356,6 +373,7 @@ public partial class NotchWindow
                 ctx.BeginFigure(new Point(rx, ry), false, false);
                 ctx.LineTo(new Point(rx, Math.Max(4, ry - Math.Min(40, h * 0.35))), true, false);
             }
+            _cyTrace.StrokeThickness = visor ? 1.2 : 1.6;
             g.Freeze();
             _cyTrace.Data = g;
             _cyTrace.Visibility = Visibility.Visible;

@@ -84,6 +84,16 @@ public sealed class Settings
     /// <summary>The little hacker who drops by on her swing.</summary>
     public bool Companion { get; set; } = true;
     public bool CompanionInCalls { get; set; } = true;
+    /// <summary>The little face that lives in the idle notch.</summary>
+    public bool NotchFace { get; set; } = true;
+    /// <summary>The face's hat: auto (the season's), none, beanie, cap, party, crown, santa, witch.</summary>
+    public string FaceOutfit { get; set; } = "auto";
+    /// <summary>Unused for 5 s, the idle notch and the music pill tuck in small.</summary>
+    public bool CompactWhenResting { get; set; } = true;
+    /// <summary>The side pills tuck into the notch as a small light, sliding out when they start or the pointer is near.</summary>
+    public bool TuckPills { get; set; } = true;
+    /// <summary>The face's little sounds (hello, a poke, an answer done).</summary>
+    public bool FaceSounds { get; set; } = true;
     /// <summary>The companion's size: 0.85 small, 1 medium, 1.2 large.</summary>
     public double CompanionSize { get; set; } = 1.0;
     public DateTime? LastDownloadsNag { get; set; }
@@ -191,8 +201,18 @@ public sealed class Settings
     /// <summary>Chats older than this many days are deleted (0: keep the newest 60, whatever their age).</summary>
     public int AiKeepDays { get; set; }
 
-    public static string Folder =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DynamicNotch");
+    /// <summary>%APPDATA%\Pixo. The first time, the old %APPDATA%\DynamicNotch moves there whole (settings, keys, history).</summary>
+    public static string Folder => _folder ??= FindFolder();
+    static string? _folder;
+
+    static string FindFolder()
+    {
+        string roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string now = Path.Combine(roaming, "Pixo"), old = Path.Combine(roaming, "DynamicNotch");
+        try { if (!Directory.Exists(now) && Directory.Exists(old)) Directory.Move(old, now); } catch { }
+        // a move that couldn't happen (a file in use): keep using the old folder, nothing is lost
+        return Directory.Exists(now) || !Directory.Exists(old) ? now : old;
+    }
 
     static string FilePath => Path.Combine(Folder, "settings.json");
 

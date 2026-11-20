@@ -87,7 +87,7 @@ public sealed class GoogleSearch
     async Task<CoreWebView2> Core()
     {
         if (_controller?.CoreWebView2 is { } ready) return ready;
-        string data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DynamicNotch", "WebView");
+        string data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Pixo", "WebView");
         _env ??= await CoreWebView2Environment.CreateAsync(null, data, new CoreWebView2EnvironmentOptions("--mute-audio --disable-features=msSmartScreenProtection"));
         _controller = await _env.CreateCoreWebView2ControllerAsync(_parent);
         _controller.IsVisible = false;

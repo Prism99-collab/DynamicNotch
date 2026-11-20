@@ -140,6 +140,8 @@ public partial class NotchWindow : Window
         Safe(nameof(WireDesktopIcons), WireDesktopIcons);
         Safe(nameof(WireStrainLog), WireStrainLog);
         Safe(nameof(WireCompanion), WireCompanion);
+        Safe(nameof(WireFace), WireFace);
+        Safe(nameof(WireHeader), WireHeader);
         Safe(nameof(WireLauncher), WireLauncher);
         Safe(nameof(ApplyCustomColors), ApplyCustomColors); // your colours from the Colors page
         Safe(nameof(WireColors), WireColors);
@@ -376,7 +378,11 @@ public partial class NotchWindow : Window
     }
 
     /// <summary>Battery mode: on battery (or Windows battery saver) do the same job with fewer wake-ups.</summary>
-    bool Eco => LowGraphics || (_settings.EcoOnBattery && _power.HasBattery && (!_power.PluggedIn || _power.Saver));
+    // the motion is the same on every PC: unplugged is not enough to strip it. It goes light only on a PC that really
+    // can't draw it (no graphics chip, two cores, under 3 GB), or when Windows' battery saver is on (your choice to save)
+    bool Eco => LowGraphics || (_settings.EcoOnBattery && _power.HasBattery && _power.Saver);
+    /// <summary>On battery: background checks run less often (what you see stays the same).</summary>
+    bool SaveCpu => Eco || _power.HasBattery && !_power.PluggedIn;
 
     /// <summary>
     /// No graphics hardware for WPF to draw with (an old or basic GPU, a virtual machine, Remote Desktop, or hardware
@@ -393,7 +399,7 @@ public partial class NotchWindow : Window
             if ((System.Windows.Media.RenderCapability.Tier >> 16) == 0) return true;
             // a weak PC: two cores or less, or under 4 GB of memory (animations would take time from the apps in use)
             if (Environment.ProcessorCount <= 2) return true;
-            if (GC.GetGCMemoryInfo().TotalAvailableMemoryBytes is > 0 and < 3_800_000_000L) return true;
+            if (GC.GetGCMemoryInfo().TotalAvailableMemoryBytes is > 0 and < 2_900_000_000L) return true; // a 4 GB PC shows ~3.8 GB: it draws fine
             using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Avalon.Graphics");
             return key?.GetValue("DisableHWAcceleration") is int v && v != 0;
         }
@@ -402,7 +408,7 @@ public partial class NotchWindow : Window
 
     void ApplyPowerProfile()
     {
-        bool eco = Eco;
+        bool eco = SaveCpu;
         _notifications.SetInterval(TimeSpan.FromSeconds(eco ? 5 : 2));
         _sysTimer.Interval = TimeSpan.FromSeconds(eco ? 3 : 1.5);
         UpdateEqualizer();
@@ -423,7 +429,8 @@ public partial class NotchWindow : Window
                 case LiveActivity.Media: return Mode.Media;
                 case LiveActivity.Timer or LiveActivity.Download or LiveActivity.Focus or LiveActivity.Call: return Mode.Activity;
             }
-            return _settings.MinimalWhenIdle || (_overWindow && _settings.SlimOverWindows) ? Mode.Slim : Mode.Idle;
+            // the face needs the small idle notch to live in: with it on, "minimal" is that small notch, not the thin bar
+            return _settings.MinimalWhenIdle && !_settings.NotchFace || (_overWindow && _settings.SlimOverWindows) ? Mode.Slim : Mode.Idle;
         }
     }
 
@@ -481,7 +488,7 @@ public partial class NotchWindow : Window
         if (modeChanged && m != Mode.Expanded) Untarget();
         UpdateRain(); // Neon: rain behind the open cards, or in the idle notch
         UpdateAmbient(); // the other themes: their living background while it's open
-        if (modeChanged) PalMode(); // the companion gets out of the way
+        if (modeChanged) { PalMode(); FaceMode(); } // the companion and the face get out of the way
     }
 
     // ───────────────────────────── spring-driven shape ─────────────────────────────
@@ -507,12 +514,13 @@ public partial class NotchWindow : Window
                 // the file is right over it: the receptacle swells to welcome it
                 w = DropSize.Width + (_dropHot ? 16 : 0); h = DropSize.Height + (_dropHot ? 6 : 0); r = DropRadius; break;
             case Mode.Osd: w = _osdSize.Width; h = _osdSize.Height; r = _osdSize.Height / 2; break;
-            case Mode.Media: w = MediaSize.Width; h = MediaSize.Height; r = MediaRadius; break;
+            // resting (nothing used for 5 s) it tucks in small, like the idle notch with the song on it
+            case Mode.Media: w = _rest ? 172 : MediaSize.Width; h = _rest ? IdleSize.Height : MediaSize.Height; r = _rest ? IdleRadius : MediaRadius; break;
             case Mode.Activity: w = ActivitySize.Width; h = ActivitySize.Height; r = MediaRadius; break;
             // the cyber skin's FPS tag is a touch tighter (just the number, small cuts, no flares)
             case Mode.Game: w = GamePillWidth; h = GamePillHeight; r = h / 2; break;
             case Mode.Slim: w = SlimSize.Width; h = SlimSize.Height; r = SlimRadius; break;
-            default: w = IdleSize.Width; h = IdleSize.Height; r = IdleRadius; break;
+            default: w = _rest ? 118 : IdleSize.Width; h = IdleSize.Height; r = IdleRadius; break;
         }
 
         var style = w * h > _sw.Value * _sh.Value + 1 ? (_mode == Mode.Expanded ? SpringStyle.Open : SpringStyle.Pop) : SpringStyle.Close;
@@ -548,6 +556,7 @@ public partial class NotchWindow : Window
             else { w += 14; h += 4; r += 2; style = SpringStyle.Peek; }
         }
 
+        if (FaceGreetShape(ref w, ref h, ref r)) style = SpringStyle.Pop; // the face comes out to say hello
         if (_mode == Mode.Expanded && _sh.Value > 120 && Math.Abs(_sw.Value - w) < 2) style = SpringStyle.Page; // already open, only its height changes (the search): quick and calm
         _sw.Configure(style);
         _sr.Configure(style);
@@ -606,6 +615,7 @@ public partial class NotchWindow : Window
         bool done = _sw.Step(dt) & _sh.Step(dt) & _sr.Step(dt) & _pageX.Step(dt) & _lean.Step(dt);
         Pill.Width = Math.Max(4, _sw.Value);
         Pill.Height = Math.Max(3, _sh.Value);
+        if (_mode == Mode.Media) CompactMedia.Width = Math.Max(110, _sw.Value); // its cover and bars ride the edges as it tucks in
         Radius = _sr.Value;
         if (_pageX.Active) PagesShift.X = _pageX.Value;
         FollowLauncherEdge();
@@ -735,6 +745,7 @@ public partial class NotchWindow : Window
 
         if (!GetCursorPos(out var p)) return;
         PalPointer(p); // the companion is shy
+        FacePointer(p); // the face takes a poke
         if (_look != null) LookGlint(p.X, p.Y); // the glass themes' light follows the pointer near the top
         bool button = IsButtonDown();
         UpdateDropArming(p);

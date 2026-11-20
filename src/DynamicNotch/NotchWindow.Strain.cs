@@ -155,7 +155,7 @@ public partial class NotchWindow
 
     internal double PrefFpsScale => _settings.FpsScale;
 
-    /// <summary>The browsers the "Dynamic Notch Media" extension is connected from right now.</summary>
+    /// <summary>The browsers the "Pixo Media" extension is connected from right now.</summary>
     internal IReadOnlyList<string> PrefBrowsersConnected => _webLink.Connected;
 
     internal void PrefSetFpsScale(double k)

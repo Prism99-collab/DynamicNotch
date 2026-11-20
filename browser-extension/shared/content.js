@@ -1,4 +1,4 @@
-// Dynamic Notch Media — runs in every page and frame. It tells the notch what this page plays (a video, a song, a
+// Pixo Media — runs in every page and frame. It tells the notch what this page plays (a video, a song, a
 // stream), and acts on the notch's buttons: play / pause, next, previous, seek. Nothing leaves this PC: the notch
 // listens on 127.0.0.1 only.
 (() => {

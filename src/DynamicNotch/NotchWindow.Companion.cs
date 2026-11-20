@@ -361,6 +361,7 @@ public partial class NotchWindow
     {
         bool plugged = _power.PluggedIn, was = _palPlugged;
         _palPlugged = plugged;
+        if (plugged && !was && _power.HasBattery) FaceFromAct(Companion.Act.Cheer); // power: hearts
         if (!plugged || was || !_power.HasBattery || _pal is not { IsOut: true, Leaving: false }) return;
         _palMoment = Companion.Act.Cheer; // power: she cheers
         _palActUntil = DateTime.UtcNow.AddSeconds(3.6);
@@ -374,6 +375,7 @@ public partial class NotchWindow
     /// <summary>One of her reactions, for a few seconds, if she's out (then back to what she was doing).</summary>
     void PalReact(Companion.Act act, double seconds)
     {
+        FaceFromAct(act); // the face in the notch feels it too
         if (_pal is not { IsOut: true, Leaving: false }) return;
         _palMoment = act;
         _palActUntil = DateTime.UtcNow.AddSeconds(seconds);
@@ -381,7 +383,7 @@ public partial class NotchWindow
     }
 
     /// <summary>A strain warning went by: once the notch is calm again, she feels it too.</summary>
-    void PalStrain() => _palStrainUntil = DateTime.UtcNow.AddSeconds(30);
+    void PalStrain() { _palStrainUntil = DateTime.UtcNow.AddSeconds(30); FaceFromAct(Companion.Act.Strain); }
 
     /// <summary>Developer switch (DYNAMICNOTCH_OPEN=pal-strain, pal-cheer, pal-hack, pal-walk): one of her passing moments, 12 s after starting.</summary>
     void PalDevShow(string what) => After(12000, () =>

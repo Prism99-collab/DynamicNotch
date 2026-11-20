@@ -95,7 +95,7 @@ public sealed class PreferencesWindow : Window
     {
         _notch = notch;
         _s = notch.PrefSettings;
-        Title = "Dynamic Notch · " + Loc.T("Preferences");
+        Title = "Pixo · " + Loc.T("Preferences");
         Width = 880;
         Height = 600;
         MinWidth = 720;
@@ -149,7 +149,7 @@ public sealed class PreferencesWindow : Window
         if (_scroll.Parent is Panel oldRight) oldRight.Children.Remove(_scroll);
         if (_nav.Parent is ScrollViewer oldNav) oldNav.Content = null;
         FlowDirection = Loc.Rtl ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
-        Title = "Dynamic Notch · " + Loc.T("Preferences");
+        Title = "Pixo · " + Loc.T("Preferences");
         var root = new Grid();
         root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(232) });
         root.ColumnDefinitions.Add(new ColumnDefinition());
@@ -204,7 +204,7 @@ public sealed class PreferencesWindow : Window
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(20, 24, 16, 14) };
         panel.Children.Add(MiniNotch(46, 14, _s.Neon));
         var names = new StackPanel { Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        names.Children.Add(new TextBlock { Text = "Dynamic Notch", FontSize = 15, FontWeight = FontWeights.SemiBold, FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI") });
+        names.Children.Add(new TextBlock { Text = "Pixo", FontSize = 15, FontWeight = FontWeights.SemiBold, FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI") });
         names.Children.Add(new TextBlock { Text = Loc.T("Preferences") + " · " + Version, FontSize = 11, Foreground = Dim });
         panel.Children.Add(names);
         return panel;
@@ -322,10 +322,14 @@ public sealed class PreferencesWindow : Window
     {
         new(Sec.General, "", "Start with Windows", "Opens by itself when you sign in", () => _s.StartWithWindows, v => { _s.StartWithWindows = v; KeepAlive.Sync(_s); }),
         new(Sec.General, "", "Always keep running", "Comes back after a crash, a sleep or a lock", () => _s.KeepRunning, v => { _s.KeepRunning = v; KeepAlive.Sync(_s); }),
-        new(Sec.General, "", "Battery mode", "Fewer animations and checks when unplugged", () => _s.EcoOnBattery, v => _s.EcoOnBattery = v),
+        new(Sec.General, "", "Battery mode", "Lighter animations while Windows battery saver is on, fewer checks when unplugged", () => _s.EcoOnBattery, v => _s.EcoOnBattery = v),
 
         new(Sec.Appearance, "", "Companion", "A little hacker drops by on her swing, and leaves when the pointer comes near", () => _s.Companion, v => _s.Companion = v),
         new(Sec.Appearance, "", "Companion during calls", "She also drops by while you are on a call", () => _s.CompanionInCalls, v => _s.CompanionInCalls = v),
+        new(Sec.Appearance, "\uE76E", "Face in the notch", "A little face lives in the idle notch: it blinks, looks at the pointer and reacts to what happens. Click it to poke it, right-click for another hat", () => _s.NotchFace, v => _s.NotchFace = v),
+        new(Sec.Appearance, "\uE73F", "Compact when resting", "Unused for 5 seconds, the notch tucks in small; it grows back when the pointer comes near", () => _s.CompactWhenResting, v => _s.CompactWhenResting = v),
+        new(Sec.Appearance, "\uE767", "Face sounds", "Tiny sounds of its own: a hello, a boing when you poke it, a chime when an answer is done", () => _s.FaceSounds, v => _s.FaceSounds = v),
+        new(Sec.Appearance, "\uE8A0", "Tuck pills into the notch", "The side pills show as a small light in the notch, and slide out when they start or when the pointer comes near", () => _s.TuckPills, v => _s.TuckPills = v),
         new(Sec.Appearance, "", "Minimal when idle", "A thin bar when nothing is happening", () => _s.MinimalWhenIdle, v => _s.MinimalWhenIdle = v),
         new(Sec.Appearance, "", "Slim over windows", "Stays slim over browser tabs and windows", () => _s.SlimOverWindows, v => _s.SlimOverWindows = v),
         new(Sec.Appearance, "", "Music activity", "Artwork and a visualizer while music plays", () => _s.ShowMediaActivity, v => _s.ShowMediaActivity = v),
@@ -534,6 +538,24 @@ public sealed class PreferencesWindow : Window
             sizes.Children.Add(b);
         }
         _content.Children.Add(sizes);
+
+        Label(Loc.T("Face's hat"));
+        var hats = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+        foreach (var (name, key) in new[] { ("Auto (season)", "auto"), ("None", "none"), ("Beanie", "beanie"), ("Cap", "cap"), ("Party", "party"), ("Crown", "crown"), ("Santa", "santa"), ("Witch", "witch") })
+        {
+            var b = PillButton(null, Loc.T(name), () => { }, primary: false);
+            b.Margin = new Thickness(0, 0, 8, 8);
+            SetPill(b, (_s.FaceOutfit ?? "auto") == key);
+            b.Click += (_, _) =>
+            {
+                _s.FaceOutfit = key; // it puts it on at its next look (a tenth of a second)
+                _s.Save();
+                foreach (var other in hats.Children.OfType<Button>()) SetPill(other, ReferenceEquals(other, b));
+                Saved();
+            };
+            hats.Children.Add(b);
+        }
+        _content.Children.Add(hats);
     }
 
     static readonly string[] ThemeKeys = { "original", "neon", "liquid", "crystal", "abyss" };
@@ -864,7 +886,7 @@ public sealed class PreferencesWindow : Window
         });
         box.Children.Add(new TextBlock
         {
-            Text = Loc.T("The \"Dynamic Notch Media\" extension shows every tab playing a video, music or a stream, with play, pause, next and previous. It only talks to the notch on this PC."),
+            Text = Loc.T("The \"Pixo Media\" extension shows every tab playing a video, music or a stream, with play, pause, next and previous. It only talks to the notch on this PC."),
             FontSize = 12, Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 10),
         });
         string[] steps =
@@ -1507,14 +1529,14 @@ public sealed class PreferencesWindow : Window
         var mark = MiniNotch(120, 30, _s.Neon);
         mark.HorizontalAlignment = HorizontalAlignment.Center;
         hero.Children.Add(mark);
-        hero.Children.Add(new TextBlock { Text = "Dynamic Notch", FontSize = 24, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 0), FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI") });
+        hero.Children.Add(new TextBlock { Text = "Pixo", FontSize = 24, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 0), FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI") });
         hero.Children.Add(new TextBlock { Text = Loc.T("Version") + " " + Version, Foreground = Dim, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 0) });
         hero.Children.Add(new TextBlock { Text = Loc.T("A living island at the top of your screen."), Foreground = Dim, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 0) });
         _content.Children.Add(CardOf(hero));
 
         var actions = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
         actions.Children.Add(PillButton("", Loc.T("Open the settings folder"), () => Launch(Settings.Folder), primary: false));
-        actions.Children.Add(PillButton("", Loc.T("Releases on GitHub"), () => Launch("https://github.com/Prism99-collab/DynamicNotch/releases"), primary: false));
+        actions.Children.Add(PillButton("", Loc.T("Releases on GitHub"), () => Launch("https://github.com/Prism99-collab/Pixo/releases"), primary: false));
         var reset = PillButton("", Loc.T("Reset all preferences"), () =>
         {
             if (MessageBox.Show(this, Loc.T("Every preference goes back to how it was at install, and the notch restarts."), Loc.T("Reset all preferences"),
