@@ -100,7 +100,7 @@ public partial class NotchWindow
     double OnPixel(double dips) => Math.Round(dips * _scale) / Math.Max(0.5, _scale);
 
     /// <summary>The notch is at rest and on screen, and nobody is using it.</summary>
-    bool PalAllowed() =>
+    bool PalAllowed() => false && // retired: the face is the companion now (NotchWindow.FaceCompanion)
         _settings.Companion && !_hidden && !_offScreen && !_fgFullscreen && _game == null && _mode is Mode.Idle or Mode.Slim or Mode.Media or Mode.Activity or Mode.Osd
         && (!OnCall || _settings.CompanionInCalls) && !Ringing && !_inMeeting && !_dodged && !_peek && !_dropArmed
         && DateTime.UtcNow >= _palShyUntil && DateTime.UtcNow >= _palReadyAt;

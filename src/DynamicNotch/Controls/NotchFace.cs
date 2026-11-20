@@ -89,8 +89,10 @@ public sealed class NotchFace : FrameworkElement
     public NotchFace(double size)
     {
         _s = size;
-        Width = Math.Ceiling(size * BoxW);
-        Height = Math.Ceiling(size * BoxH);
+        Width = Math.Ceiling(size * BoxW / 2) * 2;
+        Height = Math.Ceiling(size * BoxH / 2) * 2;
+        UseLayoutRounding = true;
+        SnapsToDevicePixels = true;
         IsHitTestVisible = false;
         _life.Tick += (_, _) => Live();
         IsVisibleChanged += (_, _) =>
@@ -352,6 +354,11 @@ public sealed class NotchFace : FrameworkElement
             Blink();
             if (Rand.NextDouble() < .22) Dispatcher.InvokeAsync(async () => { await Task.Delay(240); Blink(); });
         }
+        else if (_t - _gazeAt > 1.5 && _mood == Mood.Idle && r > .86 && Clock.Elapsed.TotalSeconds - _lastFidget > 18)
+        {
+            _lastFidget = Clock.Elapsed.TotalSeconds;
+            Fidget();
+        }
         else if (_t - _gazeAt > 1.5 && _mood is Mood.Idle or Mood.Focus)
         {
             if (r > .95) { Play(Emote.Wink, .8); return; }
@@ -359,6 +366,41 @@ public sealed class NotchFace : FrameworkElement
             _glUntil = _t + .7 + Rand.NextDouble() * .7;
             Kick();
         }
+    }
+
+    double _lastFidget = -99;
+
+    /// <summary>One of its little moments, quiet and short (it never makes a sound for these).</summary>
+    public void Fidget()
+    {
+        switch (Rand.Next(6))
+        {
+            case 0: // a hum: happy eyes, a note floating out
+                Show(Eye.Happy, Mouth.Smile, 1.4);
+                Emit(Kind.Note, 1);
+                Anim(Tilt, (.08, 300, InOut), (-.08, 500, InOut), (0, 300, InOut));
+                break;
+            case 1: // a look around: left, then right, then back
+                _glX = -.85; _glY = 0; _glUntil = _t + .6;
+                Dispatcher.InvokeAsync(async () => { await Task.Delay(650); _glX = .85; _glUntil = _t + .6; Kick(); });
+                break;
+            case 2: // a little smile, cheeks warm
+                Show(Eye.Happy, Mouth.Smile, 1.0);
+                Anim(Blush, (.6, 250, Out), (0, 700, InOut));
+                break;
+            case 3: // a stretch: tall, then a soft squash
+                Anim(Sy, (1.14, 420, InOut), (.92, 220, InOut), (1, 300, Back));
+                Anim(Sx, (.92, 420, InOut), (1.06, 220, InOut), (1, 300, Back));
+                Show(Eye.Closed, Mouth.None, .7);
+                break;
+            case 4: // a wiggle
+                Anim(Tilt, (-.12, 120, Out), (.12, 160, InOut), (-.08, 140, InOut), (0, 160, Out));
+                break;
+            default: // a tiny hop
+                Hop(.45);
+                break;
+        }
+        Kick();
     }
 
     void Kick()
@@ -578,6 +620,12 @@ public sealed class NotchFace : FrameworkElement
         double s = _s, w = Width, h = Height;
         double rx = s * .62, ry = s * .5;
         double cx = w / 2 + _v[Ox] * s, cy = h / 2 + s * .06 + _v[Oy] * s;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        if (_tw.Count == 0 && Math.Abs(_v[Oy]) < .001 && Math.Abs(_v[Ox]) < .001)
+        {
+            cx = Math.Round(cx * dpi.DpiScaleX) / dpi.DpiScaleX;
+            cy = Math.Round(cy * dpi.DpiScaleY) / dpi.DpiScaleY;
+        }
         bool glitch = _neon && _t < _glitchUntil;
         if (glitch) cx += (Rand.NextDouble() - .5) * s * .14;
         _body ??= BodyGeometry(rx, ry);
@@ -607,6 +655,21 @@ public sealed class NotchFace : FrameworkElement
             dc.DrawGeometry(null, new Pen(Br(A(rim, .28)), Math.Max(2.4, s * .2)), _body);
             dc.DrawGeometry(_fill, new Pen(Br(rim), Math.Max(1, s * .065)), _body);
             if (_tint > .01) dc.DrawGeometry(new LinearGradientBrush(A(moodCol, .45 * _tint), A(moodCol, 0), 90) { StartPoint = new Point(0, 1), EndPoint = new Point(0, 0) }, null, _body);
+            if (s >= 13)
+            {
+                // a lit panel: a fine inner rim, faint scanlines across it, and HUD brackets at its top corners
+                dc.PushTransform(new ScaleTransform(.86, .84, 0, 0));
+                dc.DrawGeometry(null, new Pen(Br(A(rim, .3)), Math.Max(.6, s * .025)), _body);
+                dc.Pop();
+                dc.PushClip(_body);
+                var line = Br(A(rim, .07));
+                for (double y = -ry; y < ry; y += Math.Max(1.6, s * .07)) dc.DrawRectangle(line, null, new Rect(-rx * 1.1, y, rx * 2.2, Math.Max(.5, s * .018)));
+                dc.Pop();
+                var hud = new Pen(Br(A(Color.FromRgb(0xFE, 0xE8, 0x01), .85)), Math.Max(.8, s * .04)) { StartLineCap = PenLineCap.Flat, EndLineCap = PenLineCap.Flat };
+                double bx = rx * 1.08, by = -ry * 1.04, arm = s * .14;
+                dc.DrawLine(hud, new Point(-bx, by + arm), new Point(-bx, by)); dc.DrawLine(hud, new Point(-bx, by), new Point(-bx + arm, by));
+                dc.DrawLine(hud, new Point(bx, by + arm), new Point(bx, by)); dc.DrawLine(hud, new Point(bx, by), new Point(bx - arm, by));
+            }
             dc.DrawGeometry(_shine, null, _body);
         }
         else

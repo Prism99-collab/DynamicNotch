@@ -18,7 +18,7 @@
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
 
     <!-- What Windows shows in the exe's Properties > Details and in Settings > Apps -->
-    <Version>3.1.2</Version>
+    <Version>3.2.0</Version>
     <Product>Pixo</Product>
     <AssemblyTitle>Pixo</AssemblyTitle>
     <Description>A smooth animated notch and control center for Windows.</Description>

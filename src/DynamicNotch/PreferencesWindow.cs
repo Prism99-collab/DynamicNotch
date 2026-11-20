@@ -333,8 +333,7 @@ public sealed class PreferencesWindow : Window
         new(Sec.General, "", "Always keep running", "Comes back after a crash, a sleep or a lock", () => _s.KeepRunning, v => { _s.KeepRunning = v; KeepAlive.Sync(_s); }),
         new(Sec.General, "", "Battery mode", "Lighter animations while Windows battery saver is on, fewer checks when unplugged", () => _s.EcoOnBattery, v => _s.EcoOnBattery = v),
 
-        new(Sec.Appearance, "", "Companion", "A little hacker drops by on her swing, and leaves when the pointer comes near", () => _s.Companion, v => _s.Companion = v),
-        new(Sec.Appearance, "", "Companion during calls", "She also drops by while you are on a call", () => _s.CompanionInCalls, v => _s.CompanionInCalls = v),
+        new(Sec.Appearance, "", "Companion", "Now and then, Pixo's face comes down from the notch for a little moment. It sleeps there when you're away, and you can poke it", () => _s.FaceCompanion, v => _s.FaceCompanion = v),
         new(Sec.Appearance, "\uE76E", "Face in the notch", "A little face lives in the idle notch: it blinks, looks at the pointer and reacts to what happens. Click it to poke it, right-click for another hat", () => _s.NotchFace, v => _s.NotchFace = v),
         new(Sec.Appearance, "\uE73F", "Compact when resting", "Unused for 5 seconds, the notch tucks in small; it grows back when the pointer comes near", () => _s.CompactWhenResting, v => _s.CompactWhenResting = v),
         new(Sec.Appearance, "\uE767", "Face sounds", "Tiny sounds of its own: a hello, a boing when you poke it, a chime when an answer is done", () => _s.FaceSounds, v => _s.FaceSounds = v),
@@ -529,24 +528,6 @@ public sealed class PreferencesWindow : Window
         Label(Loc.T("Look"));
         Card(Rows().Where(r => r.Sec == Sec.Appearance));
 
-        Label(Loc.T("Companion size"));
-        var sizes = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
-        foreach (var (name, k) in new[] { ("Small", 0.85), ("Medium", 1.0), ("Large", 1.2) })
-        {
-            var b = PillButton(null, Loc.T(name), () => { }, primary: false);
-            b.Margin = new Thickness(0, 0, 8, 8);
-            SetPill(b, Math.Abs(_s.CompanionSize - k) < 0.01);
-            double size = k;
-            b.Click += (_, _) =>
-            {
-                _s.CompanionSize = size; // she takes it on her next breath (a quarter of a second)
-                _s.Save();
-                foreach (var other in sizes.Children.OfType<Button>()) SetPill(other, ReferenceEquals(other, b));
-                Saved();
-            };
-            sizes.Children.Add(b);
-        }
-        _content.Children.Add(sizes);
 
         Label(Loc.T("Face's hat"));
         var hats = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };

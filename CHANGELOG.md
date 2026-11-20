@@ -1,5 +1,28 @@
 # Changelog
 
+## [3.2.0] — 2026-11-20
+
+Meet your companion: Pixo's face comes down to keep you company.
+
+### Added
+- The companion: now and then, when you leave the notch alone, the face comes down on a thread for a little moment,
+  then climbs back up. It sleeps there when you're away and says hi when you're back. Come close and it smiles; click
+  to poke it.
+- It fits what you're doing: quiet company while you code, it reads along in a document, watches videos with you, and
+  stays up during meetings, calls, focus and full-screen apps.
+- It learns how often you want it, and its mood follows your day: playful in the evening, calm after a long session,
+  tired when the PC is overloaded.
+- Little moments of its own in the notch, and a tiny face next to the page name in the open notch.
+
+### Changed
+- The face is sharper on every screen, and its sounds are warmer and quieter.
+- In Neon the face looks like a lit panel, and it arrives as a hologram.
+- The old companion character is retired.
+
+### Fixed
+- "Today" on the AI page counts every request you actually sent, and a lost connection no longer counts against your
+  daily allowance.
+
 ## [3.1.2] — 2026-11-20
 
 Pixo joins your calls, and it's safer with the AI.

@@ -100,6 +100,23 @@ public static class AiUsage
         }
     }
 
+    /// <summary>
+    /// Every request actually sent today, all keys and models together (Google's and Groq's). Not "how far below
+    /// full" a model is: Groq refills as it goes, so that number stays near zero however many were sent.
+    /// </summary>
+    public static int SentToday()
+    {
+        lock (Gate)
+        {
+            string date = GoogleDate();
+            bool had = _days?.ContainsKey("") == true;
+            Today(null); // loads the file and drops past days
+            int n = _days!.Values.Where(d => d.Date == date).Sum(d => d.Counts.Values.Sum());
+            if (!had && _days.TryGetValue("", out var empty) && empty.Counts.Count == 0) _days.Remove(""); // only looked
+            return n;
+        }
+    }
+
     public static long TokensOf(string model, string? key)
     {
         lock (Gate) return Today(key).Tokens.GetValueOrDefault(model);

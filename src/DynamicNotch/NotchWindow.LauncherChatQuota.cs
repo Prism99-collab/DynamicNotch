@@ -247,7 +247,7 @@ public partial class NotchWindow
             big.ToolTip = guess ? EstimateTip : null;
             bigOf.Text = none ? "back at reset" : $"{(current.Left == 1 ? "request" : "requests")} left of {Compact(current.Limit)}";
             live.Fill = Frozen(none ? Warn : current.LeftShare < 0.2 ? Warn : Ok);
-            int requests = usage.Sum(u => u.Used);
+            int requests = AiUsage.SentToday(); // what was really sent today (Google's and Groq's), not what's missing from a limit
             long tokens = usage.Sum(u => u.Tokens);
             today.Text = $"Today: {requests:#,0} request{(requests == 1 ? "" : "s")}" + (tokens > 0 ? $"  ·  {(tokens >= 1000 ? $"{tokens / 1000.0:#,0.#}K" : tokens.ToString())} tokens" : "")
                 + (OpenRouter.IsGemini && usage.All(u => u.Exact) ? "  ·  Google's exact limits" : "");
@@ -261,8 +261,8 @@ public partial class NotchWindow
                 tiers.Children.Add(TierRow("Groq", q.Left, q.Limit, false, groqTone));
                 // everything the AI can still use today: every Google kind (it moves to the next as one runs out) and Groq
                 int total = usage.Sum(u => u.Left) + q.Left;
-                // today's requests: Google's and Groq's (Groq's own count, from what it says is left)
-                int all = requests + q.Used;
+                // today's requests: everything sent today, Google's and Groq's
+                int all = requests;
                 today.Text = $"Today: {all:#,0} request{(all == 1 ? "" : "s")}" + (tokens > 0 ? $"  ·  {(tokens >= 1000 ? $"{tokens / 1000.0:#,0.#}K" : tokens.ToString())} tokens" : "")
                     + (OpenRouter.IsGemini && usage.All(u => u.Exact) ? "  ·  Google's exact limits" : "");
                 pct.Text = Compact(total);

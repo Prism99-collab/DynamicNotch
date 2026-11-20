@@ -13,6 +13,9 @@ namespace DynamicNotch;
 public partial class NotchWindow
 {
     StackPanel? _clusterRow;
+    Controls.NotchFace? _headFace;
+    readonly System.Windows.Media.TranslateTransform _headFaceAt = new();
+    int _headLastPos;
     bool _clusterFolded;
     readonly Dictionary<Button, Thickness> _clusterMargins = new();
 
@@ -24,6 +27,20 @@ public partial class NotchWindow
         PageTitle.TextTrimming = TextTrimming.CharacterEllipsis;
         if (PageTitle.Parent is Grid header) header.SizeChanged += (_, _) => FitTitle();
         BatteryPanel.SizeChanged += (_, _) => FitTitle();
+
+        // a tiny face beside the page's name: it glances the way you swipe, winks when you turn something on
+        if (PageTitle.Parent is Grid head)
+        {
+            _headFace = new Controls.NotchFace(10) { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, RenderTransform = _headFaceAt, Visibility = Visibility.Collapsed };
+            Grid.SetColumnSpan(_headFace, 3);
+            head.Children.Add(_headFace);
+            PageTitle.SizeChanged += (_, _) => _headFaceAt.X = -(PageTitle.ActualWidth / 2 + 11);
+        }
+        Expanded.AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, new RoutedEventHandler((_, e) =>
+        {
+            if (_headFace is not { IsVisible: true } face || e.OriginalSource is not System.Windows.Controls.Primitives.ToggleButton t) return;
+            if (t.IsChecked == true) face.Play(Controls.NotchFace.Emote.Wink, .8); else face.Hop(.35);
+        }), handledEventsToo: true);
     }
 
     /// <summary>Folded everywhere but Home (and while the pointer isn't on them).</summary>
@@ -61,6 +78,19 @@ public partial class NotchWindow
     /// <summary>A page changed: the buttons fold or open, the name refits.</summary>
     void HeaderPage()
     {
+        if (_headFace != null)
+        {
+            bool show = _page != 0 && _settings.NotchFace;
+            _headFace.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            if (show)
+            {
+                _headFace.Neon = _cyber; _headFace.Accent = PalAccent(); _headFace.Eco = Eco;
+                int pos = PagePos(_page), dir = Math.Sign(pos - _headLastPos);
+                _headFace.LookAt(dir, 0);         // it looks the way the pages went
+                _headFace.Play(Controls.NotchFace.Emote.Happy, .9);
+            }
+            _headLastPos = PagePos(_page);
+        }
         ClusterFit();
         Dispatcher.BeginInvoke(FitTitle, System.Windows.Threading.DispatcherPriority.Loaded);
     }

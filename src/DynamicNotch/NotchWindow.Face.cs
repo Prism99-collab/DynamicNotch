@@ -45,7 +45,8 @@ public partial class NotchWindow
         WireFacePokes();
     }
 
-    bool FaceAllowed() => _settings.NotchFace && (_mode is Mode.Idle or Mode.Media || InCallPill) && !_hidden && !_offScreen && !_fgFullscreen && !_dodged;
+    // (while it's out visiting as the companion, it isn't in the notch)
+    bool FaceAllowed() => _settings.NotchFace && !_cOut && (_mode is Mode.Idle or Mode.Media || InCallPill) && !_hidden && !_offScreen && !_fgFullscreen && !_dodged;
 
     NotchFace FaceGet()
     {
@@ -160,8 +161,8 @@ public partial class NotchWindow
         _faceInCall = false;
         // with music on it dances along (and never dozes off)
         bool music = _mode == Mode.Media && _media.IsPlaying;
-        bool woke = face.Current == NotchFace.Mood.Sleep && idle < 180;
-        var mood = music ? NotchFace.Mood.Music : idle >= 180 ? NotchFace.Mood.Sleep : keys >= 3 ? NotchFace.Mood.Focus : NotchFace.Mood.Idle;
+        bool woke = face.Current == NotchFace.Mood.Sleep && idle < 60;
+        var mood = music ? NotchFace.Mood.Music : idle >= 60 ? NotchFace.Mood.Sleep : keys >= 3 ? NotchFace.Mood.Focus : NotchFace.Mood.Idle;
         if (!music && face.Current == NotchFace.Mood.Focus && mood == NotchFace.Mood.Idle && keys > 0) mood = NotchFace.Mood.Focus; // a pause between words
         face.SetMood(mood);
         if (woke) FaceGreet(); // you're back: it comes out to say hello

@@ -739,7 +739,7 @@ public partial class NotchWindow
         Add("Lock the notch", () => _settings.Locked, v => { _settings.Locked = !v; SetLocked(v); });
         Add("Always keep running", () => _settings.KeepRunning, v => { _settings.KeepRunning = v; KeepAlive.Sync(_settings); });
         Add("Start with Windows", () => _settings.StartWithWindows, v => { _settings.StartWithWindows = v; KeepAlive.Sync(_settings); });
-        Add("Companion", () => _settings.Companion, v => _settings.Companion = v);
+        Add("Companion", () => _settings.FaceCompanion, v => _settings.FaceCompanion = v);
         Add("Face in the notch", () => _settings.NotchFace, v => { _settings.NotchFace = v; RefreshBase(); });
         Add("Compact when resting", () => _settings.CompactWhenResting, v => { _settings.CompactWhenResting = v; FaceWake(); });
         Add("Face sounds", () => _settings.FaceSounds, v => _settings.FaceSounds = v);

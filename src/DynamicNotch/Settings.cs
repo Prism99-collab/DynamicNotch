@@ -86,6 +86,10 @@ public sealed class Settings
     public bool CompanionInCalls { get; set; } = true;
     /// <summary>The little face that lives in the idle notch.</summary>
     public bool NotchFace { get; set; } = true;
+    /// <summary>The companion: the face comes down from the notch now and then for a little moment.</summary>
+    public bool FaceCompanion { get; set; } = true;
+    /// <summary>How much you enjoy its visits (-10..10), learned from what you do when it's out: it sets how often it comes.</summary>
+    public int CompanionLike { get; set; }
     /// <summary>The face's hat: auto (the season's), none, beanie, cap, party, crown, santa, witch.</summary>
     public string FaceOutfit { get; set; } = "auto";
     /// <summary>Unused for 5 s, the idle notch and the music pill tuck in small.</summary>

@@ -203,7 +203,7 @@ public static partial class OpenRouter
         string mark = "groq:" + id;
         if (turn.Error?.StartsWith("groq-key") == true) AiUsage.RefuseKey(key);
         if (turn.Error == null && !cancel.IsCancellationRequested) AiUsage.Took(mark, firstWord > 0 ? firstWord : clock.Elapsed.TotalMilliseconds);
-        if (turn.Error == null || !Regex.IsMatch(turn.Error, @"^(quota|too-big|unsupported|groq-key)")) AiUsage.Count(mark, key, turn.Tokens);
+        if (turn.Error == null || !Regex.IsMatch(turn.Error, @"^(quota|too-big|unsupported|groq-key)") && !NotUsed(turn.Error)) AiUsage.Count(mark, key, turn.Tokens); // (never reached Groq: not counted)
         return turn;
     }
 

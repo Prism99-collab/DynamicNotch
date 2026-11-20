@@ -451,9 +451,14 @@ public static partial class OpenRouter
         if (turn.Error == null && AiUsage.PlanOf(key) == null && freeDay > 0 && AiUsage.Of(id, key).Used + 1 > freeDay) AiUsage.SetPlan(key, "paid");
         // what Google counted: a request that reached the model (one it turned away doesn't count, but says it's used up)
         if (turn.Error?.StartsWith("quota-day") == true) AiUsage.MarkFull(id, key);
-        else if (turn.Error == null || !turn.Error.StartsWith("quota-minute") && !turn.Error.StartsWith("unsupported")) AiUsage.Count(id, key, turn.Tokens);
+        // (never reached Google, or Google refused the key or the region: nothing of the allowance was used)
+        else if (turn.Error == null || !turn.Error.StartsWith("quota-minute") && !turn.Error.StartsWith("unsupported") && !NotUsed(turn.Error)) AiUsage.Count(id, key, turn.Tokens);
         return turn;
     }
+
+    /// <summary>A failure that used none of the allowance: the request never got there, or the key or region was refused.</summary>
+    internal static bool NotUsed(string error) =>
+        error.StartsWith("Can't reach") || error.StartsWith("Google didn't accept the key") || error.StartsWith("region ");
 
     /// <summary>The conversation as a Gemma / Gemini model takes it (Gemma has no system role: it goes first, as the user).</summary>
     static JsonArray Adapted(JsonArray messages, string id)

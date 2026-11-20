@@ -103,7 +103,7 @@ public static class FaceSound
     {
         if (syls.Length == 0) return Array.Empty<short>();
         // each variant: a touch higher or lower, a touch quicker or slower
-        double pitch = variant switch { 0 => 1.0, 1 => 1.07, _ => 0.94 }, pace = variant switch { 0 => 1.0, 1 => 0.93, _ => 1.06 };
+        double pitch = variant switch { 0 => 0.92, 1 => 0.98, _ => 0.87 }, pace = variant switch { 0 => 1.04, 1 => 0.97, _ => 1.1 }; // a touch lower and slower: warmer
         var buf = new List<float>();
         var noise = new Random(variant * 31 + 7);
         foreach (var s in syls)
@@ -127,23 +127,29 @@ public static class FaceSound
                     double hf = k * f;
                     if (hf > 5200) break;
                     if (neon && k % 2 == 0) continue; // the robot: odd harmonics only
-                    double amp = Math.Pow(k, neon ? -0.55 : -0.8) * (Bump(hf, F1, 140) + 0.75 * Bump(hf, F2, 190) + 0.12);
+                    double amp = Math.Pow(k, neon ? -0.75 : -1.1) * (Bump(hf, F1, 150) + 0.6 * Bump(hf, F2, 200) + 0.1); // the highs softened
                     v += amp * Math.Sin(k * ph);
                 }
                 if (s.Breath > 0) v += s.Breath * (noise.NextDouble() * 2 - 1) * 0.9;
-                double env = Math.Min(1, i / (Rate * 0.008)) * (t < 0.7 ? 1 : Math.Pow((1 - t) / 0.3, 1.5));
+                double env = Math.Pow(Math.Min(1, i / (Rate * 0.014)), 1.5) * (t < 0.62 ? 1 : Math.Pow((1 - t) / 0.38, 1.7)); // a soft start, a gentle fade
                 buf.Add((float)(v * env * s.Vol));
             }
             for (int i = 0; i < (int)(s.Gap * pace / 1000 * Rate); i++) buf.Add(0);
         }
-        // level it, then (Neon) crush its grain
+        // warmth: a gentle low-pass, then a little room (two soft echoes), then levelled; Neon keeps a fine grain
+        int tail = Rate * 9 / 100;
+        for (int i = 0; i < tail; i++) buf.Add(0);
+        double lp = 0, k1 = neon ? 0.38 : 0.3;
+        for (int i = 0; i < buf.Count; i++) { lp += (buf[i] - lp) * k1; buf[i] = (float)lp; }
+        int d1 = Rate * 23 / 1000, d2 = Rate * 41 / 1000;
+        for (int i = buf.Count - 1; i >= d1; i--) buf[i] += 0.16f * buf[i - d1] + (i >= d2 ? 0.09f * buf[i - d2] : 0);
         double peak = buf.Count == 0 ? 1 : buf.Max(x => Math.Abs(x));
-        double vol = (neon ? 0.16 : 0.2) / Math.Max(0.001, peak);
+        double vol = (neon ? 0.13 : 0.15) / Math.Max(0.001, peak);
         var pcm = new short[buf.Count + Rate / 50]; // a little silence at the end: no click
         for (int i = 0; i < buf.Count; i++)
         {
             double x = buf[i] * vol;
-            if (neon) x = Math.Round(x * 40) / 40;
+            if (neon) x = Math.Round(x * 96) / 96;
             pcm[i] = (short)Math.Clamp(x * short.MaxValue, short.MinValue, short.MaxValue);
         }
         return pcm;
