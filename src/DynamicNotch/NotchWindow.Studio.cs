@@ -313,14 +313,19 @@ public partial class NotchWindow
         ApplyCustomColors();
         if (_cyber) CyberGlitch(strong: false, light: true);
         SelectPaint(_paint);
+        FeelIt(_shuffling ? Feel.Spin : Feel.Love, Hex(pr.A)); // it wears the new colour
     }
+
+    bool _shuffling;
 
     /// <summary>A palette from one random hue: accent, a glow beside it on the wheel, an edge a third of the way round, a clock almost white.</summary>
     void Shuffle()
     {
         double h = _shuffleRand.NextDouble() * 360;
-        ApplyPreset(new Preset("", ToHex(ColorWheel.Hsv(h, 0.78, 1)), ToHex(ColorWheel.Hsv(h + 28, 0.85, 0.92)),
-            ToHex(ColorWheel.Hsv(h + 120, 0.6, 1)), ToHex(ColorWheel.Hsv(h, 0.18, 1))));
+        _shuffling = true;
+        try { ApplyPreset(new Preset("", ToHex(ColorWheel.Hsv(h, 0.78, 1)), ToHex(ColorWheel.Hsv(h + 28, 0.85, 0.92)),
+            ToHex(ColorWheel.Hsv(h + 120, 0.6, 1)), ToHex(ColorWheel.Hsv(h, 0.18, 1)))); }
+        finally { _shuffling = false; }
     }
 
     Color CurrentStudioColor() => Hex(GetPaint(_paint)) ?? DefaultFor(_paint);
@@ -345,6 +350,7 @@ public partial class NotchWindow
         SetPaint(_paint, ToHex(c));
         ApplyCustomColorsSoon();
         RefreshStudio();
+        FeelFace()?.Tint(c, 1.2); // the face wears the colour as you pick it
     }
 
     bool _colorsQueued;

@@ -211,9 +211,10 @@ public partial class NotchWindow
 
     void ClearClips()
     {
-        _clips.RemoveAll(c => !c.Pinned);
+        int gone = _clips.RemoveAll(c => !c.Pinned);
         ClipsChanged();
         RenderClipboard();
+        if (gone > 0) FeelIt(Feel.EatAll); // it gulps the lot
     }
 
     ClipEntry? _clipFresh;
@@ -259,12 +260,14 @@ public partial class NotchWindow
             c.Pinned = !c.Pinned;
             ClipsChanged();
             RenderClipboard();
+            FeelIt(c.Pinned ? Feel.Pin : Feel.Unpin);
         });
         var remove = ClipAction("\uE711", Loc.T("Remove"), () =>
         {
             _clips.Remove(c);
             ClipsChanged();
             RenderClipboard();
+            FeelIt(Feel.Eat); // nom
         }, DimBrush);
         var row = ClipLine(lead, title, link ? "LINK" : null, c.Pinned ? Loc.T("Pinned") : ShortAgo(c.At), pin, remove);
 
@@ -282,6 +285,7 @@ public partial class NotchWindow
                 else if (c.Image != null) Clipboard.SetImage(new BitmapImage(new Uri(Path.Combine(ClipFolder, c.Image))));
             }
             catch { }
+            FeelIt(Feel.Copy);
             // copied again: it moves to the top (pinned ones keep their place)
             if (!c.Pinned) { c.At = DateTime.Now; _clips.Remove(c); _clips.Insert(0, c); _clipFresh = c; _clipFreshAt = DateTime.UtcNow; ClipsChanged(); RenderClipboard(); }
             else ClipGlow(btn);
@@ -292,6 +296,7 @@ public partial class NotchWindow
             _clips.Remove(c);
             ClipsChanged();
             RenderClipboard();
+            FeelIt(Feel.Eat);
         };
         return btn;
     }

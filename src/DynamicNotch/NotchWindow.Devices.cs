@@ -107,8 +107,8 @@ public partial class NotchWindow
                 },
             };
             if (!Eco)
-                bolt.BeginAnimation(OpacityProperty, new DoubleAnimation(1, 0.45, TimeSpan.FromMilliseconds(900))
-                    { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
+                bolt.BeginAnimation(OpacityProperty, Capped(new DoubleAnimation(1, 0.45, TimeSpan.FromMilliseconds(900))
+                    { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } }, 20));
             bolt.Unloaded += (_, _) => bolt.BeginAnimation(OpacityProperty, null); // a replaced ring stops breathing
             grid.Children.Add(bolt);
         }

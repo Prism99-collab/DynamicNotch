@@ -192,6 +192,7 @@ public partial class NotchWindow
 
     void ApplyLook(Look? look, bool animate)
     {
+        if (animate && !_cyber) After(120, () => FeelIt(Feel.Spin));
         BuildLookLayers();
         if (look == null)
         {
@@ -411,6 +412,9 @@ public partial class NotchWindow
         double w = Pill.ActualWidth;
         if (w <= 0) return;
         double center = _winLeft + _winW / 2.0;
+        // closed, only when the pointer is near the notch: moving along browser tabs at the top of the screen
+        // used to start a new glide on every move, redrawing the notch for nothing
+        if (_mode != Mode.Expanded && (Math.Abs(cursorX - center) > (w / 2 + 120) * _scale || cursorY - _mon.Top > (Pill.ActualHeight + 90) * _scale)) return;
         double off = Math.Clamp((cursorX - center) / _scale, -w / 2, w / 2);
         double target = Math.Round(w / 2 + off * 0.8 - _glint.Width / 2);
         if (!double.IsNaN(_glintTarget) && Math.Abs(target - _glintTarget) < 3) return;

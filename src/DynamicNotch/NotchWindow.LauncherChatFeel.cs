@@ -29,18 +29,18 @@ public partial class NotchWindow
         if (_chatRoot == null) return;
         _chatRoot.IsHitTestVisible = true;
         if (Eco) { _chatRoot.BeginAnimation(OpacityProperty, null); _chatRoot.Opacity = 1; return; }
-        var scale = new ScaleTransform(0.975, 0.975);
-        var rise = new TranslateTransform(0, 10);
+        var scale = new ScaleTransform(0.96, 0.96);
+        var rise = new TranslateTransform(0, 14);
         var group = new TransformGroup();
         group.Children.Add(scale);
         group.Children.Add(rise);
         _chatRoot.RenderTransformOrigin = new Point(0.5, 0);
         _chatRoot.RenderTransform = group;
-        var ease = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 };
-        var time = TimeSpan.FromMilliseconds(320);
-        scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.975, 1, time) { EasingFunction = ease });
-        scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.975, 1, time) { EasingFunction = ease });
-        rise.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(10, 0, time) { EasingFunction = ease });
+        var ease = new Controls.SpringEase { Damping = 0.8 };
+        var time = TimeSpan.FromMilliseconds(460);
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.96, 1, time) { EasingFunction = ease });
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.96, 1, time) { EasingFunction = ease });
+        rise.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(14, 0, time) { EasingFunction = new Controls.SpringEase { Damping = 0.86 } });
         if (_cyber)
         {
             var on = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(220) };
@@ -51,7 +51,7 @@ public partial class NotchWindow
             _chatRoot.BeginAnimation(OpacityProperty, on);
             ScanIn();
         }
-        else _chatRoot.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(220)));
+        else _chatRoot.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
     }
 
     /// <summary>The chat goes: it fades and sinks a little while the search comes back under it.</summary>

@@ -1,5 +1,35 @@
 # Changelog
 
+## [4.0.0] — 2026-11-21
+
+A big one: Pixo names songs, joins Wi-Fi and Bluetooth, and moves better everywhere.
+
+### Added
+- What's this song? The wave button on Home names what your PC is playing, or what's playing around you. It shows the
+  cover, with Shazam, YouTube, Spotify, copy and "ask the AI".
+- Hold the Wi-Fi or Bluetooth button on Home to pick a network or a device. Join networks with a password, connect or
+  disconnect headphones and speakers, and pair new devices.
+- Drop a file on the notch to ask the AI about it.
+- One-line tips from the face, now and then, each said only once.
+- A short, quiet welcome when Pixo starts.
+- The face reacts to what you do: picking, copying, pinning, deleting and more, with soft new sounds.
+- New sliders on Home: a flowing wave for the song, bars for volume, a sun for brightness and dots for an app's
+  volume, coloured from low to high.
+- The wheel over the Work page's side bar switches tabs.
+
+### Changed
+- The notch opens and closes faster, pages arrive more smoothly, and the AI chat pops in and out of its own window
+  with a smoother animation.
+- The Projects page is simpler: one row per project, done in one click, delete and pin on hover.
+- The Calls page buttons sit in one tidy row.
+- The Work page has a new look, with the face in its side bar.
+- Hover hints show only when they help, and never cover other buttons.
+- Lighter on the CPU: less redrawing while idle and while the notch moves.
+
+### Fixed
+- Bluetooth devices no longer show as connected after they're turned off.
+- The music row no longer shows through other panels.
+
 ## [3.2.0] — 2026-11-20
 
 Meet your companion: Pixo's face comes down to keep you company.

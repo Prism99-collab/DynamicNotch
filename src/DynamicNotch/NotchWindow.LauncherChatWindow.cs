@@ -122,7 +122,7 @@ public partial class NotchWindow
         Expanded.Height = ExpandedSize.Height;
         After(650, () =>
         {
-            if (_chatExtra > 0 || _smallWindow) return;
+            if (_chatExtra > 0 || _smallWindow || _restWindow) return;
             Height = FullHeight;
             PositionWindow();
         });
@@ -132,7 +132,34 @@ public partial class NotchWindow
 
     void TogglePop() { if (ChatPopped) PopIn(); else PopOut(); }
 
+    bool _popMoving;
+
+    /// <summary>
+    /// Out of the notch: the chat lifts and lets go (a quick shrink and fade), then its window blooms open where it was
+    /// last, the same chat inside. Light motion: no lift, it's simply there.
+    /// </summary>
     void PopOut()
+    {
+        if (_pop != null || _popMoving || _launch == null || !_chatMode || _launchBox == null) return;
+        if (Eco) { PopOutNow(); return; }
+        _popMoving = true;
+        var ease = new CubicEase { EasingMode = EasingMode.EaseIn };
+        _launch.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(120)) { EasingFunction = ease });
+        _launchScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.92, TimeSpan.FromMilliseconds(120)) { EasingFunction = ease });
+        FeelSound(Services.Sfx.Cue.Open);
+        After(115, () => { _popMoving = false; if (_launcherOpen && _chatMode && _pop == null) PopOutNow(); else RestoreLaunchLook(); });
+    }
+
+    void RestoreLaunchLook()
+    {
+        if (_launch == null) return;
+        _launch.BeginAnimation(OpacityProperty, null);
+        _launch.Opacity = 1;
+        _launchScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        _launchScale.ScaleY = 1;
+    }
+
+    void PopOutNow()
     {
         if (_pop != null || _launch == null || !_chatMode || _launchBox == null) return;
         // the notch lets go of the panel
@@ -152,7 +179,7 @@ public partial class NotchWindow
         UpdateRain(); UpdateAmbient();
         if (_mode == Mode.Expanded) Collapse();
 
-        _pop = new ChatPopWindow(this, _launch, ChatAccent, _cyber, _settings.AiPopBounds, _settings.AiPopTopmost);
+        _pop = new ChatPopWindow(this, _launch, ChatAccent, _cyber, _settings.AiPopBounds, _settings.AiPopTopmost, Eco);
         foreach (var key in new[] { "LookTile", "LookEdge", "LookSheen", "LookLabel", "LookSwitchOff", "LookSwitchOn" })
             if (Resources.Contains(key)) _pop.Resources[key] = Resources[key];
         _pop.WantsBack += PopIn;
@@ -164,16 +191,26 @@ public partial class NotchWindow
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () => { _launchBox?.Focus(); ChatScrollTo(double.MaxValue, 0); });
     }
 
+    /// <summary>Back in: the window folds up toward the notch, then the notch opens on the chat, as it was.</summary>
     void PopIn()
     {
-        if (_pop == null || _launch == null) return;
+        if (_pop == null || _launch == null || _popMoving) return;
         var w = _pop;
-        _pop = null;
         _settings.AiPopBounds = w.BoundsText;
         _settings.AiPopTopmost = w.Topmost;
         _settings.Save();
+        if (Eco || w.WindowState == WindowState.Minimized || !w.IsVisible) { PopInNow(w); return; }
+        _popMoving = true;
+        w.FoldAway(() => { _popMoving = false; if (_pop == w) PopInNow(w); });
+    }
+
+    void PopInNow(ChatPopWindow w)
+    {
+        if (_launch == null) return;
+        _pop = null;
         w.Release();
         w.Close();
+        RestoreLaunchLook();
         Expanded.Children.Add(_launch);
         // back in the notch, in the chat, as it was
         OpenLauncher(null);
@@ -222,7 +259,7 @@ sealed class ChatPopWindow : Window
     bool _letGo;
     public event Action? WantsBack;
 
-    public ChatPopWindow(NotchWindow owner, FrameworkElement content, Color accent, bool neon, string bounds, bool topmost)
+    public ChatPopWindow(NotchWindow owner, FrameworkElement content, Color accent, bool neon, string bounds, bool topmost, bool eco)
     {
         Title = "AI chat · Pixo";
         WindowStyle = WindowStyle.None;
@@ -259,22 +296,47 @@ sealed class ChatPopWindow : Window
             BorderBrush = new LinearGradientBrush(Color.FromArgb(0xB0, accent.R, accent.G, accent.B), Color.FromArgb(0x30, accent.R, accent.G, accent.B), new Point(0, 0), new Point(1, 1)),
         };
         Content = _frame;
+        // a light that washes over it as it opens, in the AI's colour
+        _flash = new Border
+        {
+            IsHitTestVisible = false, Opacity = 0,
+            Background = new LinearGradientBrush(Color.FromArgb(0x40, accent.R, accent.G, accent.B), Color.FromArgb(0, accent.R, accent.G, accent.B), new Point(0.5, 0), new Point(0.5, 0.6)),
+        };
+        inner.Children.Add(_flash);
+        _eco = eco;
         SourceInitialized += (_, _) =>
         {
             var hwnd = new WindowInteropHelper(this).Handle;
-            int dark = 1, corner = neon ? 1 /* square */ : 2 /* round */;
+            int dark = 1, corner = neon ? 1 /* square */ : 2 /* round */, cloak = 1, noTransitions = 1;
             DwmSetWindowAttribute(hwnd, 20, ref dark, 4);     // dark frame
             DwmSetWindowAttribute(hwnd, 33, ref corner, 4);   // Windows 11 corners
+            DwmSetWindowAttribute(hwnd, 3, ref noTransitions, 4); // our own opening, not the system's on top of it
+            DwmSetWindowAttribute(hwnd, 13, ref cloak, 4);    // hidden until its first frame is drawn: no empty flash
         };
-        // it arrives: a quick rise and fade
-        Opacity = 0;
-        var rise = new TranslateTransform(0, 10);
-        _frame.RenderTransform = rise;
-        Loaded += (_, _) =>
+        // it arrives: the content blooms open from the top (where the notch is), a light washes over it
+        _bloom = new ScaleTransform(1, 1);
+        _rise = new TranslateTransform(0, 0);
+        inner.RenderTransformOrigin = new Point(0.5, 0);
+        inner.RenderTransform = new TransformGroup { Children = { _bloom, _rise } };
+        _inner = inner;
+        if (!_eco) { inner.Opacity = 0; _bloom.ScaleX = 0.94; _bloom.ScaleY = 0.9; _rise.Y = -14; }
+        ContentRendered += (_, _) =>
         {
-            BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)));
-            rise.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(10, 0, TimeSpan.FromMilliseconds(260)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+            Uncloak();
+            if (_eco) return;
+            var spring = new Controls.SpringEase { Damping = 0.78 };
+            var t = TimeSpan.FromMilliseconds(460);
+            _bloom.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.94, 1, t) { EasingFunction = spring });
+            _bloom.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.9, 1, t) { EasingFunction = spring });
+            _rise.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-14, 0, t) { EasingFunction = spring });
+            inner.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+            var wash = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(700) };
+            wash.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(160)), new CubicEase { EasingMode = EasingMode.EaseOut }));
+            wash.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(700)), new CubicEase { EasingMode = EasingMode.EaseInOut }));
+            _flash.BeginAnimation(OpacityProperty, wash);
         };
+        // never left hidden, whatever happens to the first frame
+        Loaded += (_, _) => Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, new Action(Uncloak));
         // closing it docks the chat back in the notch (unless the whole app is quitting)
         PreviewMouseLeftButtonDown += (_, e) =>
         {
@@ -312,11 +374,45 @@ sealed class ChatPopWindow : Window
 
     public string BoundsText => string.Join(",", new[] { Left, Top, ActualWidth, ActualHeight }.Select(v => Math.Round(v).ToString(System.Globalization.CultureInfo.InvariantCulture)));
 
+    readonly Border _flash;
+    readonly ScaleTransform _bloom;
+    readonly TranslateTransform _rise;
+    readonly Grid _inner;
+    readonly bool _eco;
+    bool _uncloaked;
+
+    void Uncloak()
+    {
+        if (_uncloaked) return;
+        _uncloaked = true;
+        try { int off = 0; DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 13, ref off, 4); } catch { }
+    }
+
+    /// <summary>Going back to the notch: the content folds up toward the top and fades, then <paramref name="then"/>.</summary>
+    public void FoldAway(Action then)
+    {
+        IsHitTestVisible = false;
+        var ease = new CubicEase { EasingMode = EasingMode.EaseIn };
+        var t = TimeSpan.FromMilliseconds(140);
+        _bloom.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.95, t) { EasingFunction = ease });
+        _bloom.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.9, t) { EasingFunction = ease });
+        _rise.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-12, t) { EasingFunction = ease });
+        var fade = new DoubleAnimation(0, t) { EasingFunction = ease };
+        bool done = false;
+        void Finish() { if (done) return; done = true; then(); }
+        fade.Completed += (_, _) => Finish();
+        _inner.BeginAnimation(OpacityProperty, fade);
+        // if the animation never ends (the window hidden meanwhile), it goes back anyway
+        var guard = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        guard.Tick += (_, _) => { guard.Stop(); Finish(); };
+        guard.Start();
+    }
+
     /// <summary>Gives the chat back (before closing) so it can return to the notch.</summary>
     public void Release()
     {
         _letGo = true;
-        if (_frame.Child is Grid g) g.Children.Clear();
+        _inner.Children.Clear();
     }
 
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);

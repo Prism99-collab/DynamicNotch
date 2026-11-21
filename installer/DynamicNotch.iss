@@ -3,7 +3,7 @@
 ; Per-user install: no administrator prompt, installs to %LOCALAPPDATA%\Programs\Pixo.
 
 #ifndef AppVersion
-  #define AppVersion "3.2.0"
+  #define AppVersion "4.0.0"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish"

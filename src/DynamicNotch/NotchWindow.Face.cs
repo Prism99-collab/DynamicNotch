@@ -89,7 +89,9 @@ public partial class NotchWindow
             if (!Eco) { _faceScale.BeginAnimation(ScaleTransform.ScaleXProperty, pop); _faceScale.BeginAnimation(ScaleTransform.ScaleYProperty, pop); }
             // the first time after starting, and the first time each day: it comes out to say hello
             var today = DateTime.Today;
-            if (_faceHelloOn != today || !_faceGreetedStart) { _faceHelloOn = today; _faceGreetedStart = true; After(700, FaceGreet); }
+            // Pixo just started: its own quiet welcome (NotchWindow.Welcome); later, the first time each day: the wave
+            if (!_faceGreetedStart) { _faceHelloOn = today; _faceGreetedStart = true; After(500, () => { if (!StartWelcome()) FaceGreet(); }); }
+            else if (_faceHelloOn != today) { _faceHelloOn = today; After(700, FaceGreet); }
             return;
         }
         var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(110));
@@ -316,7 +318,7 @@ public partial class NotchWindow
     void RestTick(POINT cur)
     {
         var now = DateTime.UtcNow;
-        bool can = _settings.CompactWhenResting && _mode is Mode.Idle or Mode.Media && !_faceGreet && !_hidden && !_peek;
+        bool can = _settings.CompactWhenResting && _mode is Mode.Idle or Mode.Media && !_faceGreet && _welcomePhase == 0 && !_hidden && !_peek;
         double cx = _winLeft + _winW / 2.0, half = (_sw.Value / 2 + 90) * _scale;
         bool near = Math.Abs(cur.X - cx) < half && cur.Y - _mon.Top < 130 * _scale;
         PointerNear(near && IsBase(_mode));

@@ -269,16 +269,19 @@ public partial class NotchWindow
         CloseLauncher(giveBack: !handsOff);
         await Task.Delay(260); // the notch settles before it says anything
         var said = new List<string>();
+        bool failed = false;
         foreach (var t in list)
         {
             if (list.Count > 1 && Describe(t).Done) continue; // that one's that way already
             try { if (await Execute(t) is { Length: > 0 } s) said.Add(s); }
-            catch (Exception ex) { AppLog.Write("task " + t.Kind + ": " + ex.Message); }
+            catch (Exception ex) { AppLog.Write("task " + t.Kind + ": " + ex.Message); failed = true; }
             if (list.Count > 1) await Task.Delay(t.Kind == Do.Open ? 700 : 160);
         }
         if (list.Count == 1 && list[0].Kind == Do.Volume) { RefreshVolume(); ShowVolumeOsd(); return; }
         if (list.Count == 1 && list[0].Kind == Do.Brightness && _bri.Supported) { ShowBrightnessOsd(); return; }
+        if (failed) FeelSound(Services.Sfx.Cue.Oops);
         if (said.Count == 0) return;
+        if (!failed) FeelSound(Services.Sfx.Cue.Done); // the pop-up's face is proud; a warm chime with it
         ShowOsd("task", G.Check, null, said[0], said.Count > 1 ? string.Join(" · ", said.Skip(1)) : "Done", null, glyphBrush: Blue, seconds: 2.4, force: true);
     }
 

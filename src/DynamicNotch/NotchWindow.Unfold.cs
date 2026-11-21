@@ -27,18 +27,18 @@ public partial class NotchWindow
         var begin = TimeSpan.FromMilliseconds(delayMs);
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
 
-        panel.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(190)) { BeginTime = begin, EasingFunction = ease });
+        panel.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(170)) { BeginTime = begin, EasingFunction = ease });
         if (panel.RenderTransform is ScaleTransform st && !st.IsFrozen)
         {
-            st.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.95, 1, TimeSpan.FromMilliseconds(440)) { BeginTime = begin, EasingFunction = new SpringEase { Damping = 0.76 } });
-            st.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.84, 1, TimeSpan.FromMilliseconds(460)) { BeginTime = begin, EasingFunction = new SpringEase { Damping = 0.72 } });
+            st.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.95, 1, TimeSpan.FromMilliseconds(400)) { BeginTime = begin, EasingFunction = new SpringEase { Damping = 0.76 } });
+            st.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.86, 1, TimeSpan.FromMilliseconds(420)) { BeginTime = begin, EasingFunction = new SpringEase { Damping = 0.72 } });
         }
 
         // the soft edge sweeping down
         var (mask, front, back) = Wipe(-0.25);
         panel.OpacityMask = mask;
-        var down = new DoubleAnimation(-0.25, 1.05, TimeSpan.FromMilliseconds(330)) { BeginTime = begin, EasingFunction = ease };
-        var downBack = new DoubleAnimation(0, 1.3, TimeSpan.FromMilliseconds(330)) { BeginTime = begin, EasingFunction = ease };
+        var down = new DoubleAnimation(-0.25, 1.05, TimeSpan.FromMilliseconds(290)) { BeginTime = begin, EasingFunction = ease };
+        var downBack = new DoubleAnimation(0, 1.3, TimeSpan.FromMilliseconds(290)) { BeginTime = begin, EasingFunction = ease };
         down.Completed += (_, _) => { if (id == _unfoldId && _activePanel == panel) panel.OpacityMask = null; };
         front.BeginAnimation(GradientStop.OffsetProperty, down);
         back.BeginAnimation(GradientStop.OffsetProperty, downBack);
@@ -50,9 +50,9 @@ public partial class NotchWindow
         var panel = Expanded;
         panel.RenderTransformOrigin = new Point(0.5, 0);
         var ease = new CubicEase { EasingMode = EasingMode.EaseIn };
-        var d = TimeSpan.FromMilliseconds(170);
+        var d = TimeSpan.FromMilliseconds(150);
 
-        var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(160)) { EasingFunction = ease };
+        var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(140)) { EasingFunction = ease };
         fade.Completed += (_, _) =>
         {
             if (id != _unfoldId || _activePanel == panel) return;

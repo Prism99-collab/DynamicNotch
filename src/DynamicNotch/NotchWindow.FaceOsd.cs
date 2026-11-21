@@ -66,6 +66,10 @@ public partial class NotchWindow
 
         var (feel, secs) = FeelingFor(r);
         if (feel is { } e) face.Play(e, Math.Min(secs, r.Seconds + 0.2));
+        // a few pop-ups say it out loud too (rare ones only: never the volume, never every copy)
+        if (r.Kind is "shelf") FeelSound(Services.Sfx.Cue.Eat);
+        else if (r.Kind is "screenshot") FeelSound(Services.Sfx.Cue.Snap);
+        else if (r.Kind is "download") FeelSound(Services.Sfx.Cue.Done);
         // then it reads the words (they're to its left)
         After((int)(Math.Min(secs, 1.2) * 1000), () => { if (ReferenceEquals(_osd, r)) face.LookAt(-0.85, -0.1); });
     }
@@ -83,7 +87,7 @@ public partial class NotchWindow
             "download" or "ai" => (NotchFace.Emote.Done, 1.6),
             "task" => (NotchFace.Emote.Proud, 1.6),
             "download-failed" or "dead-mic" or "smart-net" => (NotchFace.Emote.Sad, 2.2),
-            "screenshot" => (NotchFace.Emote.Surprised, 1.0),
+            "screenshot" => (NotchFace.Emote.Flash, 1.0),
             "smart-break" => (NotchFace.Emote.Yawn, 2.0),
             "reminder" or "timer" => (NotchFace.Emote.Alert, 1.6),
             "ring" or "call" => (NotchFace.Emote.Excited, 2.4),

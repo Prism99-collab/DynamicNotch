@@ -60,6 +60,22 @@ public sealed class BluetoothService
 
     public string? ConnectedName => Primary?.Name;
 
+    /// <summary>Every paired device with a name, one per device (a headset seen as classic and Low Energy counts once; connected wins).</summary>
+    public IReadOnlyList<BtDevice> Paired
+    {
+        get
+        {
+            try
+            {
+                return _devices.Values.Where(d => d.Name.Length > 0)
+                    .GroupBy(d => d.Container?.ToString() ?? d.Id)
+                    .Select(g => g.OrderByDescending(d => d.Connected).ThenBy(d => d.LowEnergy).First() with { Connected = g.Any(d => d.Connected) })
+                    .OrderByDescending(d => d.Connected).ThenBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+            }
+            catch { return Array.Empty<BtDevice>(); }
+        }
+    }
+
     public void Start()
     {
         try
@@ -93,9 +109,68 @@ public sealed class BluetoothService
             };
             _watcher.Removed += (_, u) => { try { string id = u.Id; _ui.InvokeAsync(() => { _devices.Remove(id); Changed?.Invoke(); }); } catch { } };
             _watcher.EnumerationCompleted += (_, _) => _ui.InvokeAsync(() => { _ready = true; Changed?.Invoke(); UpdateBatteryTimer(); });
+            // Windows stops the watcher when the radio goes off (or the stack restarts): it would miss every change after
+            // that and keep showing devices as connected. Start a fresh one, then read the truth again.
+            _watcher.Stopped += (w, _) => _ui.InvokeAsync(async () =>
+            {
+                if (_watcher != w || _stopping) return;
+                await Task.Delay(3000);
+                if (_watcher != w || _stopping) return;
+                _watcher = null;
+                Start();
+                await ResyncAsync();
+            });
             _watcher.Start();
         }
         catch { }
+    }
+
+    bool _stopping;
+
+    /// <summary>
+    /// Reads every paired device's connection from Windows again and corrects what's shown, quietly (no
+    /// "connected / disconnected" pop-ups for a correction). Called when Bluetooth comes back on, when the device list
+    /// is opened, and while it's open.
+    /// </summary>
+    public async Task ResyncAsync()
+    {
+        try
+        {
+            var found = await DeviceInformation.FindAllAsync(Aqs, new[] { IsConnectedKey, CategoryKey, ContainerKey }, DeviceInformationKind.AssociationEndpoint);
+            bool changed = false;
+            var seen = new HashSet<string>();
+            foreach (var d in found)
+            {
+                seen.Add(d.Id);
+                bool connected = d.Properties.TryGetValue(IsConnectedKey, out var v) && v is true;
+                if (_devices.TryGetValue(d.Id, out var had))
+                {
+                    if (had.Connected == connected) continue;
+                    _devices[d.Id] = had with { Connected = connected, Battery = connected ? had.Battery : null };
+                    if (connected) _ = RefreshBatteryAsync(d.Id);
+                }
+                else
+                {
+                    bool le = d.Properties.TryGetValue("System.Devices.Aep.ProtocolId", out var p) && p is Guid g ? g == Guid.Parse(LowEnergyProtocol) : d.Id.StartsWith("BluetoothLE", StringComparison.OrdinalIgnoreCase);
+                    _devices[d.Id] = Read(d.Id, d.Name, d.Properties, le);
+                }
+                changed = true;
+            }
+            foreach (var id in _devices.Keys.Where(k => !seen.Contains(k)).ToList()) { _devices.Remove(id); changed = true; }
+            if (changed) { UpdateBatteryTimer(); Changed?.Invoke(); }
+        }
+        catch { }
+    }
+
+    /// <summary>The radio went off: nothing is connected any more (said at once, quietly).</summary>
+    public void RadioOff()
+    {
+        bool changed = false;
+        foreach (var (id, d) in _devices.ToList())
+            if (d.Connected) { _devices[id] = d with { Connected = false, Battery = null }; changed = true; }
+        if (!changed) return;
+        UpdateBatteryTimer();
+        Changed?.Invoke();
     }
 
     static BtDevice Read(string id, string name, IReadOnlyDictionary<string, object> props, bool lowEnergy)

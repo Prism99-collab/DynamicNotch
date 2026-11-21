@@ -154,7 +154,7 @@ public partial class NotchWindow
         _vitalsTimer.Interval = every;
         _vitalsTimer.Start();
         if (_vScan != null && !Eco)
-            ((TranslateTransform)_vScan.RenderTransform).BeginAnimation(TranslateTransform.YProperty, new DoubleAnimationUsingKeyFrames
+            ((TranslateTransform)_vScan.RenderTransform).BeginAnimation(TranslateTransform.YProperty, Capped(new DoubleAnimationUsingKeyFrames
             {
                 RepeatBehavior = RepeatBehavior.Forever,
                 KeyFrames =
@@ -163,7 +163,7 @@ public partial class NotchWindow
                     new EasingDoubleKeyFrame(220, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(2.6)), new SineEase { EasingMode = EasingMode.EaseInOut }),
                     new DiscreteDoubleKeyFrame(220, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(7))),
                 },
-            });
+            }, 30));
         if (_vCaret != null) _vCaret.Opacity = 0.6; // it rests: nothing on the page moves unless it means something
         _ = SampleVitalsAsync();
         PlayVitalsArrival();
@@ -783,6 +783,8 @@ public partial class NotchWindow
         if (_page != 1 || _mode != Mode.Expanded) { VTween(false); return; }
         var now = ((RenderingEventArgs)e).RenderingTime;
         if (now == _vTweenLast) return;
+        // numbers counting: about 50 steps a second is smooth to the eye; a 144 Hz screen doesn't need three times the text layouts
+        if (_vTweenLast != TimeSpan.Zero && (now - _vTweenLast).TotalMilliseconds < 19) return;
         double dt = _vTweenLast == TimeSpan.Zero ? 1 / 60.0 : Math.Min((now - _vTweenLast).TotalSeconds, 0.1);
         _vTweenLast = now;
         bool moving = false;
@@ -961,6 +963,7 @@ public partial class NotchWindow
         {
             AppLog.Write($"system page: ended {name} ({(t.Result ? "ok" : "some processes refused")})");
             VitalsSay(t.Result ? string.Format(Loc.T("Closed {0}"), display) : string.Format(Loc.T("{0} didn't close completely"), display), 3500);
+            FeelIt(t.Result ? Feel.Eat : Feel.Oops); // closed: it ate it
             FlashRim(t.Result ? Calm : Hot);
             _vAppList = _vAppList.Where(x => !string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
             RenderVitalsApps(swap: false);
@@ -1079,7 +1082,7 @@ public partial class NotchWindow
             ((SolidColorBrush)_vTag.BorderBrush).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(quiet ? A(tone, 0x70) : tone, d0));
             ((SolidColorBrush)_vTag.Background).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(quiet ? A(tone, 0x14) : tone, d0));
             if (c == Hot && !Eco)
-                _vTag.BeginAnimation(OpacityProperty, new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, KeyFrames = { new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)), new DiscreteDoubleKeyFrame(0.3, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(500))), new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(800))) } });
+                _vTag.BeginAnimation(OpacityProperty, Capped(new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, KeyFrames = { new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)), new DiscreteDoubleKeyFrame(0.3, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(500))), new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(800))) } }, 20));
             else { _vTag.BeginAnimation(OpacityProperty, null); _vTag.Opacity = 1; }
             if (_vCaret != null) _vCaret.Foreground = Frozen(c == Calm ? CyCyan : c);
         }
@@ -1090,8 +1093,8 @@ public partial class NotchWindow
             // a calm dot rests; a warning one breathes (Neon: blinks like a status LED)
             if (c == Calm || Eco) { _vDot.BeginAnimation(OpacityProperty, null); _vDot.Opacity = 1; }
             else _vDot.BeginAnimation(OpacityProperty, _cyber
-                ? new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, KeyFrames = { new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)), new DiscreteDoubleKeyFrame(0.25, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(600))), new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(900))) } }
-                : new DoubleAnimation(1, 0.35, TimeSpan.FromMilliseconds(900)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
+                ? Capped(new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, KeyFrames = { new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)), new DiscreteDoubleKeyFrame(0.25, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(600))), new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(900))) } }, 20)
+                : Capped(new DoubleAnimation(1, 0.35, TimeSpan.FromMilliseconds(900)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } }, 20));
         }
 
         // a download in progress takes the second line, with its bar

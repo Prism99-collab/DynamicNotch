@@ -147,7 +147,7 @@ public partial class NotchWindow
         _launch.Visibility = Visibility.Visible;
         _launch.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140)));
         OpenStaged();
-        _launchScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.94, 1, TimeSpan.FromMilliseconds(220)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+        _launchScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.93, 1, TimeSpan.FromMilliseconds(Eco ? 1 : 380)) { EasingFunction = new Controls.SpringEase { Damping = 0.8 } });
         _launchBox.Text = seed ?? "";
         _launchBox.CaretIndex = _launchBox.Text.Length;
         _launchBox.Focus();
@@ -166,6 +166,8 @@ public partial class NotchWindow
             if (_launchBody is { ActualHeight: > 20, ActualWidth: > 20 } b && _launcherOpen) { b.Width = b.ActualWidth; b.Height = b.ActualHeight; }
             ScanIn();
         });
+        FeelWake(); // the search's face (NotchWindow.FaceFeel)
+        UpdateSearchFace();
     }
 
     void CloseLauncher(bool giveBack)
@@ -538,6 +540,7 @@ public partial class NotchWindow
                 () => OpenTarget(engineUrl + Uri.EscapeDataString(query)), Section: "Web", Key: "web|search"));
         if (ask != null) _hits.Add(ask);
 
+        SearchFaceSaw(query, pool.Count, understood); // nothing found: a "?"; a command it knows: it brightens
         _launchSel = 0;
         if (keepKey != null && _hits.FindIndex(h => h.Key == keepKey) is >= 0 and var at) _launchSel = at;
         RenderHits(animate: !merge);
@@ -1001,6 +1004,7 @@ public partial class NotchWindow
         string typed = _launchBox.Text;
         var picked = _actionsFor?.Entry ?? h.Entry;
         FlashPicked();
+        if (h.Key != "nothing") FeelIt(Feel.Pick); // a nod and a pluck, before the search closes
         if (reveal && h.Reveal != null) { CloseLauncher(giveBack: false); h.Reveal(); }
         else h.Run();
         // it did something (the search closed): remember what was typed, and what it meant
@@ -1029,6 +1033,7 @@ public partial class NotchWindow
     void CopyAnswer(string text)
     {
         try { Clipboard.SetText(text); } catch { }
+        FeelIt(Feel.Copy);
         CloseLauncher(giveBack: true);
         After(200, () => ShowOsd("copied", "", null, "Copied", text, null, glyphBrush: Blue, seconds: 1.4, prio: Prio.Low));
     }

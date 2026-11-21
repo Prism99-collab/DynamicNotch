@@ -57,6 +57,7 @@ public partial class NotchWindow
                 DropOutline.BeginAnimation(System.Windows.Shapes.Shape.StrokeDashOffsetProperty, march);
                 var bob = new DoubleAnimation(-3, 3, TimeSpan.FromSeconds(0.55))
                 { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } };
+                Timeline.SetDesiredFrameRate(bob, 40);
                 DropArrowShift.BeginAnimation(TranslateTransform.YProperty, bob);
             }
             else
@@ -142,7 +143,8 @@ public partial class NotchWindow
         if (_mode != Mode.Drop) { OnShelfDragEnter(sender, e); return; }
         // "hot" once the file is over the receptacle itself, not just near it
         var pos = e.GetPosition(Pill);
-        bool hot = pos.X >= 0 && pos.Y >= 0 && pos.X <= Pill.ActualWidth && pos.Y <= Pill.ActualHeight + 8;
+        DropAskOver(e.GetPosition(DropPanel)); // over Pixo, to ask about it (NotchWindow.DropAsk)
+        bool hot = !_dropAsk && pos.X >= 0 && pos.Y >= 0 && pos.X <= Pill.ActualWidth && pos.Y <= Pill.ActualHeight + 8;
         if (hot != _dropHot) SetDropHot(hot);
     }
 
@@ -164,6 +166,7 @@ public partial class NotchWindow
         _ignoreClipboardUntil = DateTime.UtcNow.AddMilliseconds(800);
         try { ShelfTransfer.CopyToClipboard(item.Path, item.Text); } catch { }
         FlashRow(row);
+        FeelIt(Feel.Copy);
         ShowOsd("copied", "\uE8C8", null, "Copied", item.Path != null ? $"{item.Name} · Ctrl+V to paste" : "Ctrl+V to paste", null, glyphBrush: Blue, seconds: 1.6, prio: Prio.Low);
     }
 
@@ -208,6 +211,7 @@ public partial class NotchWindow
         }
         if (added.Count == 0 && text != null) added.Add(new ShelfItem(null, text));
         if (added.Count == 0) { LeaveDropZone(); return; }
+        if (_dropAsk) { DropAskTake(added.Where(a => a.Path != null).Select(a => a.Path!).ToList(), added.FirstOrDefault(a => a.Text != null)?.Text); return; }
 
         foreach (var item in added)
         {
@@ -246,6 +250,7 @@ public partial class NotchWindow
     /// <summary>The drop zone's text and the fanned-out cards of what's already kept.</summary>
     void RenderDropZone()
     {
+        DropAskShow();
         DropTitle.Text = "Drop to keep it here";
         DropSub.Text = _shelf.Count == 0 ? "On the shelf until you drag it out" : $"Shelf · {_shelf.Count} kept";
         DropOutline.Stroke = new SolidColorBrush(Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF));
@@ -306,7 +311,7 @@ public partial class NotchWindow
             Button btn = null!;
             // copy (for Ctrl+V into anything that pastes) and remove: under the pointer
             var copy = ClipAction("\uE8C8", Loc.T("Copy, then paste anywhere with Ctrl+V"), () => CopyShelfItem(item, btn));
-            var remove = ClipAction("\uE711", Loc.T("Remove from the shelf"), () => { Forget(item); _shelf.Remove(item); SaveShelf(); RenderShelfOrRecent(); }, DimBrush);
+            var remove = ClipAction("\uE711", Loc.T("Remove from the shelf"), () => { Forget(item); _shelf.Remove(item); SaveShelf(); RenderShelfOrRecent(); FeelIt(Feel.Eat); }, DimBrush);
             var row = ClipLine(icon, nice, item.Path == null ? "TEXT" : tag, item.Path == null ? "" : size >= 0 ? SystemMonitor.Bytes(size) : Loc.T("Folder"), copy, remove);
 
             btn = new Button { Style = (Style)FindResource("RowButton"), Content = row, Height = ClipRowHeight + 2,

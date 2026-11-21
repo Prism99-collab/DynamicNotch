@@ -756,6 +756,7 @@ public partial class NotchWindow
     void DeleteChat(string id)
     {
         ChatStore.Delete(id);
+        FeelIt(Feel.Eat);
         if (_session?.Id == id) { _session = null; _chatStack?.Children.Clear(); }
         _histArmed = null;
         LoadHistory(_launchBox?.Text ?? "");
@@ -1669,7 +1670,7 @@ public partial class NotchWindow
                     var blink = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(900), RepeatBehavior = RepeatBehavior.Forever };
                     blink.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)));
                     blink.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(450))));
-                    caret.BeginAnimation(OpacityProperty, blink);
+                    caret.BeginAnimation(OpacityProperty, Capped(blink, 10)); // an on/off blink: a few frames a second is all it needs
                 }
             }
         };
@@ -1745,15 +1746,25 @@ public partial class NotchWindow
         return tb;
     }
 
+    /// <summary>
+    /// A message arrives with a little weight: yours pops out of the bottom-right corner (where the typing line is),
+    /// the answer slides off its rail. Springs on the compositor; nothing is measured again.
+    /// </summary>
     void Arrive(FrameworkElement el, bool fromRight = false)
     {
         if (Eco) return;
-        var shift = new TranslateTransform(fromRight ? 10 : 0, 7);
-        el.RenderTransform = shift;
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(7, 0, TimeSpan.FromMilliseconds(260)) { EasingFunction = ease });
-        if (fromRight) shift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(10, 0, TimeSpan.FromMilliseconds(260)) { EasingFunction = ease });
-        el.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200)));
+        double s0 = fromRight ? 0.9 : 0.985;
+        var scale = new ScaleTransform(s0, s0);
+        var shift = new TranslateTransform(fromRight ? 14 : -6, 10);
+        el.RenderTransformOrigin = fromRight ? new Point(1, 1) : new Point(0, 0);
+        el.RenderTransform = new TransformGroup { Children = { scale, shift } };
+        var t = TimeSpan.FromMilliseconds(fromRight ? 440 : 400);
+        var spring = new Controls.SpringEase { Damping = fromRight ? 0.7 : 0.82 };
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(s0, 1, t) { EasingFunction = spring });
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(s0, 1, t) { EasingFunction = spring });
+        shift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(fromRight ? 14 : -6, 0, t) { EasingFunction = spring });
+        shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(10, 0, t) { EasingFunction = new Controls.SpringEase { Damping = 0.86 } });
+        el.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
     }
 
     // ───────────────────────────── scrolling: smooth, by wheel and keys ─────────────────────────────

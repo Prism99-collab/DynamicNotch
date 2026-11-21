@@ -29,12 +29,12 @@ public sealed class Spring
     {
         switch (s)
         {
-            case SpringStyle.Open: Configure(0.38, 0.80); break;
-            case SpringStyle.Close: Configure(0.30, 1.0); break;
-            case SpringStyle.Pop: Configure(0.34, 0.74); break;
+            case SpringStyle.Open: Configure(0.34, 0.80); break;
+            case SpringStyle.Close: Configure(0.27, 1.0); break;
+            case SpringStyle.Pop: Configure(0.32, 0.74); break;
             case SpringStyle.Peek: Configure(0.22, 0.76); break;
             case SpringStyle.Press: Configure(0.18, 0.9); break;
-            case SpringStyle.Page: Configure(0.34, 0.92); break;
+            case SpringStyle.Page: Configure(0.31, 0.92); break;
         }
     }
 
@@ -57,7 +57,8 @@ public sealed class Spring
         return false;
     }
 
-    public bool IsSettled => Math.Abs(Value - Target) < 0.02 && Math.Abs(Velocity) < 0.6;
+    // a tenth of a pixel and barely moving is "there": the last frames of a tail can't be seen, and each costs a redraw
+    public bool IsSettled => Math.Abs(Value - Target) < 0.1 && Math.Abs(Velocity) < 2.5;
 }
 
 public enum SpringStyle { Open, Close, Pop, Peek, Press, Page }

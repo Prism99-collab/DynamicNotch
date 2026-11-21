@@ -17,12 +17,12 @@ namespace DynamicNotch.Controls;
 public sealed class NotchFace : FrameworkElement
 {
     public enum Mood { Idle, Thinking, Searching, Working, Error, Sleep, Focus, Music, Talk, Listen, Muted }
-    public enum Emote { Happy, Hello, Love, Surprised, Proud, Done, Annoyed, Tired, Wink, Dizzy, Yawn, Wave, Sad, Alert, Excited, Gulp, Overload }
+    public enum Emote { Happy, Hello, Love, Surprised, Proud, Done, Annoyed, Tired, Wink, Dizzy, Yawn, Wave, Sad, Alert, Excited, Gulp, Overload, Nod, Confused, Spin, Hush, Flash }
     /// <summary>What it can wear on its head ("auto" is decided outside: by the season).</summary>
     public static readonly string[] Outfits = { "none", "beanie", "cap", "party", "crown", "santa", "witch" };
     enum Eye { Pill, Wide, Dot, Happy, Closed, Flat, Chevron, Heart, Star, Spiral, Tired, Wink, Sad }
     enum Mouth { None, Smile, O, BigO, Frown }
-    enum Kind { Heart, Star, Spark, Sweat, Z, Note, Tear, Bang }
+    enum Kind { Heart, Star, Spark, Sweat, Z, Note, Tear, Bang, Question }
 
     // the box around the bun: room for a squash, a tilt and the badge
     const double BoxW = 1.62, BoxH = 1.3;
@@ -225,6 +225,39 @@ public sealed class NotchFace : FrameworkElement
                 Emit(Kind.Sweat, 2);
                 if (_neon) _glitchUntil = _t + .5;
                 break;
+            case Emote.Nod:
+                // "got it": a quick bow and back, smiling
+                Show(Eye.Happy, Mouth.Smile, Math.Min(secs, .8));
+                Anim(Oy, (.11, 90, Out), (-.03, 130, InOut), (0, 170, Back));
+                Anim(Sy, (.92, 90, Out), (1.03, 130, InOut), (1, 170, Back));
+                _glX = 0; _glY = -.6; _glUntil = _t + .16;
+                break;
+            case Emote.Confused:
+                // nothing there: a head tilt, round eyes, a little "?"
+                Show(Eye.Dot, Mouth.None, secs);
+                Anim(Tilt, (.2, 180, Out), (.2, Math.Max(100, (secs - .5) * 1000), Lin), (0, 260, InOut));
+                Emit(Kind.Question, 1);
+                break;
+            case Emote.Spin:
+                // a full turn, landing with a hop (a new look, a new theme)
+                Show(Eye.Happy, Mouth.BigO, Math.Max(secs, .7));
+                Anim(Tilt, (Math.PI * 2, 560, InOut), (0, 0, Lin));
+                Anim(Sy, (.9, 120, Out), (1.08, 260, InOut), (1, 260, Back));
+                Emit(Kind.Spark, 3);
+                break;
+            case Emote.Hush:
+                // shh: eyes closed, a small "o", it shrinks a little
+                Show(Eye.Closed, Mouth.O, secs);
+                Anim(Sy, (.9, 220, InOut), (.9, Math.Max(100, (secs - .5) * 1000), Lin), (1, 280, InOut));
+                Anim(Sx, (.95, 220, InOut), (.95, Math.Max(100, (secs - .5) * 1000), Lin), (1, 280, InOut));
+                break;
+            case Emote.Flash:
+                // a camera flash: a squint, then wide eyes and sparkles
+                Show(Eye.Closed, Mouth.None, .16);
+                Anim(Sy, (.88, 70, Out), (1.06, 140, Out), (1, 200, Back));
+                Emit(Kind.Spark, 4);
+                Dispatcher.InvokeAsync(async () => { await Task.Delay(170); Show(Eye.Wide, Mouth.O, Math.Max(.3, secs - .2)); Anim(Es, (1.2, 100, Out), (1, 400, InOut)); Kick(); });
+                break;
             case Emote.Yawn:
                 Show(Eye.Closed, Mouth.BigO, secs);
                 Anim(Sy, (1.12, 500, InOut), (1, 600, InOut));
@@ -310,7 +343,7 @@ public sealed class NotchFace : FrameworkElement
             {
                 b.X = -.32; b.Y = .1; b.Vx = 0; b.Vy = .5; b.Life = 1.1; b.Size = .14;
             }
-            else if (kind == Kind.Bang)
+            else if (kind is Kind.Bang or Kind.Question)
             {
                 b.X = .55; b.Y = -.45; b.Vx = .12; b.Vy = -.25; b.Life = 1.2; b.Size = .28;
             }
@@ -574,10 +607,27 @@ public sealed class NotchFace : FrameworkElement
     static SolidColorBrush Br(Color c)
     {
         if (BrushCache.TryGetValue(c, out var b)) return b;
-        if (BrushCache.Count > 512) BrushCache.Clear();
+        if (BrushCache.Count > 512) { BrushCache.Clear(); PenCache.Clear(); }
         b = new SolidColorBrush(c);
         b.Freeze();
         return BrushCache[c] = b;
+    }
+
+    /// <summary>
+    /// Pens reused, frozen, like the brushes: the face used to make a dozen new ones on every frame while it moved,
+    /// garbage the memory cleanup then had to chase (a hitch on slow PCs). The width is kept to a twentieth of a pixel.
+    /// </summary>
+    static readonly Dictionary<(Brush, int, bool, bool), Pen> PenCache = new();
+    static Pen P(Brush brush, double width, bool round = false, bool roundJoin = false)
+    {
+        var key = (brush, (int)Math.Round(width * 20), round, roundJoin);
+        if (PenCache.TryGetValue(key, out var pen)) return pen;
+        if (PenCache.Count > 1024) PenCache.Clear();
+        pen = new Pen(brush, key.Item2 / 20.0);
+        if (round) pen.StartLineCap = pen.EndLineCap = PenLineCap.Round;
+        if (roundJoin) pen.LineJoin = PenLineJoin.Round;
+        if (brush.CanFreeze) pen.Freeze(); else return pen; // a live brush: not kept
+        return PenCache[key] = pen;
     }
 
     /// <summary>The bun: a rounded square-ish oval, a touch wider at the bottom, as if it sat on something.</summary>
@@ -646,26 +696,26 @@ public sealed class NotchFace : FrameworkElement
             {
                 // a signal tearing for a moment: the outline splits into magenta and cyan
                 dc.PushTransform(new TranslateTransform(-s * .06, 0));
-                dc.DrawGeometry(null, new Pen(Br(A(Color.FromRgb(0xFF, 0x2B, 0xD6), .7)), 1), _body);
+                dc.DrawGeometry(null, P(Br(A(Color.FromRgb(0xFF, 0x2B, 0xD6), .7)), 1), _body);
                 dc.Pop();
                 dc.PushTransform(new TranslateTransform(s * .06, 0));
-                dc.DrawGeometry(null, new Pen(Br(A(Color.FromRgb(0x3D, 0xE8, 0xFF), .7)), 1), _body);
+                dc.DrawGeometry(null, P(Br(A(Color.FromRgb(0x3D, 0xE8, 0xFF), .7)), 1), _body);
                 dc.Pop();
             }
-            dc.DrawGeometry(null, new Pen(Br(A(rim, .28)), Math.Max(2.4, s * .2)), _body);
-            dc.DrawGeometry(_fill, new Pen(Br(rim), Math.Max(1, s * .065)), _body);
+            dc.DrawGeometry(null, P(Br(A(rim, .28)), Math.Max(2.4, s * .2)), _body);
+            dc.DrawGeometry(_fill, P(Br(rim), Math.Max(1, s * .065)), _body);
             if (_tint > .01) dc.DrawGeometry(new LinearGradientBrush(A(moodCol, .45 * _tint), A(moodCol, 0), 90) { StartPoint = new Point(0, 1), EndPoint = new Point(0, 0) }, null, _body);
             if (s >= 13)
             {
                 // a lit panel: a fine inner rim, faint scanlines across it, and HUD brackets at its top corners
                 dc.PushTransform(new ScaleTransform(.86, .84, 0, 0));
-                dc.DrawGeometry(null, new Pen(Br(A(rim, .3)), Math.Max(.6, s * .025)), _body);
+                dc.DrawGeometry(null, P(Br(A(rim, .3)), Math.Max(.6, s * .025)), _body);
                 dc.Pop();
                 dc.PushClip(_body);
                 var line = Br(A(rim, .07));
                 for (double y = -ry; y < ry; y += Math.Max(1.6, s * .07)) dc.DrawRectangle(line, null, new Rect(-rx * 1.1, y, rx * 2.2, Math.Max(.5, s * .018)));
                 dc.Pop();
-                var hud = new Pen(Br(A(Color.FromRgb(0xFE, 0xE8, 0x01), .85)), Math.Max(.8, s * .04)) { StartLineCap = PenLineCap.Flat, EndLineCap = PenLineCap.Flat };
+                var hud = P(Br(A(Color.FromRgb(0xFE, 0xE8, 0x01), .85)), Math.Max(.8, s * .04));
                 double bx = rx * 1.08, by = -ry * 1.04, arm = s * .14;
                 dc.DrawLine(hud, new Point(-bx, by + arm), new Point(-bx, by)); dc.DrawLine(hud, new Point(-bx, by), new Point(-bx + arm, by));
                 dc.DrawLine(hud, new Point(bx, by + arm), new Point(bx, by)); dc.DrawLine(hud, new Point(bx, by), new Point(bx - arm, by));
@@ -692,7 +742,7 @@ public sealed class NotchFace : FrameworkElement
         }
         var ink = _neon ? Mix(_accent, moodCol, Math.Min(1, _tint * 1.3)) : Color.FromRgb(0x1C, 0x17, 0x15);
         var inkBrush = Br(ink);
-        var glowPen = _neon ? new Pen(Br(A(ink, .35)), Math.Max(1.6, s * .1)) { LineJoin = PenLineJoin.Round } : null;
+        var glowPen = _neon ? P(Br(A(ink, .35)), Math.Max(1.6, s * .1), roundJoin: true) : null;
         DrawEyes(dc, rx, ry, inkBrush, glowPen);
         DrawMouth(dc, rx, ry, ink);
         dc.Pop(); // clip
@@ -710,7 +760,7 @@ public sealed class NotchFace : FrameworkElement
         double k = _v[Hands];
         if (k < .01) return;
         double hw = _s * .15 * k, hh = _s * .125 * k;
-        var pen = _neon ? new Pen(Br(_accent), Math.Max(.8, _s * .05)) : new Pen(Br(A(Colors.Black, .14)), .6);
+        var pen = _neon ? P(Br(_accent), Math.Max(.8, _s * .05)) : P(Br(A(Colors.Black, .14)), .6);
         foreach (int side in new[] { -1, 1 })
         {
             double x = side * rx * 1.02, y = ry * .42, rot = 0;
@@ -739,12 +789,12 @@ public sealed class NotchFace : FrameworkElement
         {
             var band = new StreamGeometry();
             using (var c = band.Open()) { c.BeginFigure(new Point(-rx * .98, -ry * .05), false, false); c.BezierTo(new Point(-rx * 1.02, -ry * 1.55), new Point(rx * 1.02, -ry * 1.55), new Point(rx * .98, -ry * .05), true, true); }
-            dc.DrawGeometry(null, new Pen(Br(_neon ? _accent : Color.FromRgb(0x2A, 0x2D, 0x34)), Math.Max(1, s * .075)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round }, band);
+            dc.DrawGeometry(null, P(Br(_neon ? _accent : Color.FromRgb(0x2A, 0x2D, 0x34)), Math.Max(1, s * .075), round: true), band);
         }
         foreach (int side in new[] { -1, 1 })
         {
             var r = new Rect(side * rx * 1.0 - s * .09, -ry * .26, s * .18, s * .3);
-            dc.DrawRoundedRectangle(cup, new Pen(Br(A(Colors.Black, .35)), Math.Max(.6, s * .03)), r, s * .07, s * .07);
+            dc.DrawRoundedRectangle(cup, P(Br(A(Colors.Black, .35)), Math.Max(.6, s * .03)), r, s * .07, s * .07);
         }
         dc.Pop(); dc.Pop();
     }
@@ -754,8 +804,8 @@ public sealed class NotchFace : FrameworkElement
         double p = _v[Hat], s = _s;
         dc.PushOpacity(Math.Clamp(p, 0, 1));
         dc.PushTransform(new TranslateTransform(0, -(1 - p) * ry * .8)); // it drops on from above
-        var line = _neon ? new Pen(Br(A(_accent, .8)), Math.Max(.7, s * .035)) : new Pen(Br(A(Colors.Black, .18)), Math.Max(.5, s * .025));
-        SolidColorBrush B(byte r, byte g, byte b) => new(Color.FromRgb(r, g, b));
+        var line = _neon ? P(Br(A(_accent, .8)), Math.Max(.7, s * .035)) : P(Br(A(Colors.Black, .18)), Math.Max(.5, s * .025));
+        SolidColorBrush B(byte r, byte g, byte b) => Br(Color.FromRgb(r, g, b)); // reused, frozen
         Geometry Poly(params Point[] pts)
         {
             var g = new StreamGeometry();
@@ -791,7 +841,7 @@ public sealed class NotchFace : FrameworkElement
                 var cone = Poly(new Point(-rx * .36, -ry * .78), new Point(rx * .36, -ry * .78), new Point(0, -ry * 1.85));
                 dc.DrawGeometry(B(0xFF, 0x5F, 0xA2), line, cone);
                 dc.PushClip(cone);
-                var stripe = new Pen(B(0xFF, 0xD2, 0x3F), s * .07);
+                var stripe = P(B(0xFF, 0xD2, 0x3F), s * .07);
                 dc.DrawLine(stripe, new Point(-rx * .4, -ry * 1.0), new Point(rx * .4, -ry * 1.18));
                 dc.DrawLine(stripe, new Point(-rx * .4, -ry * 1.35), new Point(rx * .4, -ry * 1.53));
                 dc.Pop();
@@ -846,7 +896,7 @@ public sealed class NotchFace : FrameworkElement
     {
         double s = _s;
         var ink = Mix(_accent, _col, Math.Min(1, _tint * 1.3));
-        var glow = new Pen(Br(A(ink, .4)), Math.Max(2, s * .17)) { LineJoin = PenLineJoin.Round };
+        var glow = P(Br(A(ink, .4)), Math.Max(2, s * .17), roundJoin: true);
         dc.PushTransform(new ScaleTransform(1.28, 1.28));
         if (_neon && _t < _glitchUntil)
         {
@@ -863,7 +913,7 @@ public sealed class NotchFace : FrameworkElement
         double blush = _v[Blush];
         if (blush > .02)
         {
-            var pen = new Pen(Br(A(Color.FromRgb(0xFF, 0x5F, 0xA2), .9 * blush)), Math.Max(.8, s * .06)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            var pen = P(Br(A(Color.FromRgb(0xFF, 0x5F, 0xA2), .9 * blush)), Math.Max(.8, s * .06), round: true);
             double shift = Math.Sin(_yaw) * rx * .8;
             foreach (int side in new[] { -1, 1 })
                 dc.DrawLine(pen, new Point(side * rx * .62 + shift - s * .07, ry * .34), new Point(side * rx * .62 + shift + s * .05, ry * .28));
@@ -906,8 +956,8 @@ public sealed class NotchFace : FrameworkElement
         void Fill(Geometry g) { if (glow != null) dc.DrawGeometry(null, glow, g); dc.DrawGeometry(ink, null, g); }
         void Stroke(Geometry g, double width)
         {
-            if (glow != null) dc.DrawGeometry(null, new Pen(glow.Brush, width + glow.Thickness) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round }, g);
-            dc.DrawGeometry(null, new Pen(ink, width) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round }, g);
+            if (glow != null) dc.DrawGeometry(null, P(glow.Brush, width + glow.Thickness, round: true, roundJoin: true), g);
+            dc.DrawGeometry(null, P(ink, width, round: true, roundJoin: true), g);
         }
         Geometry Pill(double w, double h) { double r = Math.Min(w, h) / 2; return new RectangleGeometry(new Rect(-w / 2, -h / 2, w, h), r, r); }
         Geometry Curve(double w, double y0, double bend)
@@ -987,7 +1037,7 @@ public sealed class NotchFace : FrameworkElement
                 dc.DrawEllipse(brush, null, new Point(x, y + s * .03), s * (.06 + .02 * _level), s * (.015 + .09 * _level));
             else if (_mood == Mood.Muted)
             {
-                var pen = new Pen(brush, Math.Max(.9, s * .045)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+                var pen = P(brush, Math.Max(.9, s * .045), round: true);
                 double w = s * .11;
                 dc.DrawLine(pen, new Point(x - w, y + s * .03), new Point(x + w, y + s * .03));
                 for (int i = -1; i <= 1; i++) dc.DrawLine(pen, new Point(x + i * w * .55, y - s * .005), new Point(x + i * w * .55, y + s * .065));
@@ -1001,7 +1051,7 @@ public sealed class NotchFace : FrameworkElement
                 var g = new StreamGeometry();
                 double m = s * .09;
                 using (var c = g.Open()) { c.BeginFigure(new Point(x - m, y), false, false); c.QuadraticBezierTo(new Point(x, y + m * 1.1), new Point(x + m, y), true, true); }
-                dc.DrawGeometry(null, new Pen(brush, Math.Max(1, s * .055)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round }, g);
+                dc.DrawGeometry(null, P(brush, Math.Max(1, s * .055), round: true), g);
                 break;
             }
             case Mouth.O: dc.DrawEllipse(brush, null, new Point(x, y + s * .03), s * .055, s * .07); break;
@@ -1011,7 +1061,7 @@ public sealed class NotchFace : FrameworkElement
                 var g = new StreamGeometry();
                 double m = s * .08;
                 using (var c = g.Open()) { c.BeginFigure(new Point(x - m, y + m * .7), false, false); c.QuadraticBezierTo(new Point(x, y - m * .4), new Point(x + m, y + m * .7), true, true); }
-                dc.DrawGeometry(null, new Pen(brush, Math.Max(1, s * .05)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round }, g);
+                dc.DrawGeometry(null, P(brush, Math.Max(1, s * .05), round: true), g);
                 break;
             }
         }
@@ -1037,24 +1087,36 @@ public sealed class NotchFace : FrameworkElement
         foreach (var b in _bits)
         {
             if (b.Age <= 0) continue;
-            double o = b.Age / b.Life, alpha = o < .2 ? o / .2 : 1 - (o - .2) / .8;
-            double x = cx + (b.X + b.Vx * b.Age) * s * 1.3, y = cy + (b.Y + b.Vy * b.Age) * s * 1.3, u = Math.Max(2.2, s * b.Size * (1 + o * .4));
+            double o = b.Age / b.Life, alpha = o < .12 ? o / .12 : o < .55 ? 1 : 1 - (o - .55) / .45;
+            // they burst out quickly and slow down in the air (drag); drops fall instead (a little gravity)
+            bool drop = b.Kind is Kind.Tear or Kind.Sweat;
+            double drift = drop ? b.Age : (1 - Math.Exp(-1.9 * b.Age)) / 1.9 * 1.45;
+            double fall = drop ? .55 * b.Age * b.Age : 0;
+            double sway = b.Kind is Kind.Heart or Kind.Note or Kind.Z ? Math.Sin(b.Age * 4.2 + b.Rot) * .07 : 0;
+            double x = cx + (b.X + b.Vx * drift + sway) * s * 1.3, y = cy + (b.Y + b.Vy * drift + fall) * s * 1.3;
+            // a pop as it appears (a touch past full size, then settles), a twinkle for sparks
+            double pop = o < .16 ? BackOut(o / .16) : 1;
+            double twinkle = b.Kind == Kind.Spark ? .78 + .22 * Math.Sin(b.Age * 17 + b.Rot) : 1;
+            double u = Math.Max(2.2, s * b.Size * (1 + o * .3) * pop * twinkle);
             dc.PushOpacity(Math.Clamp(alpha, 0, 1));
             dc.PushTransform(new TranslateTransform(x, y));
             switch (b.Kind)
             {
                 case Kind.Heart:
                     dc.PushTransform(new RotateTransform(Math.Sin(b.Age * 6) * 17));
+                    if (!Eco) dc.DrawEllipse(Br(Color.FromArgb(0x30, 0xFF, 0x4D, 0x6D)), null, new Point(0, 0), u * 1.15, u * 1.15);
                     dc.DrawGeometry(Br(Color.FromRgb(0xFF, 0x4D, 0x6D)), null, HeartGeometry(u));
                     dc.Pop();
                     break;
                 case Kind.Star:
                     dc.PushTransform(new RotateTransform((b.Rot + b.Age * 2) * 57.3));
+                    if (!Eco) dc.DrawEllipse(Br(Color.FromArgb(0x2C, 0xFF, 0xC2, 0x33)), null, new Point(0, 0), u * 1.2, u * 1.2);
                     dc.DrawGeometry(Br(Color.FromRgb(0xFF, 0xC2, 0x33)), null, StarGeometry(u, u * .45));
                     dc.Pop();
                     break;
                 case Kind.Spark:
-                    dc.PushTransform(new RotateTransform(b.Rot * 57.3));
+                    dc.PushTransform(new RotateTransform((b.Rot + b.Age * .8) * 57.3));
+                    if (!Eco) dc.DrawEllipse(Br(_neon ? Color.FromArgb(0x30, _accent.R, _accent.G, _accent.B) : Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF)), null, new Point(0, 0), u * .7, u * .7);
                     dc.DrawGeometry(Br(_neon ? _accent : Colors.White), null, StarGeometry(u * .85, u * .2, 4));
                     dc.Pop();
                     break;
@@ -1065,9 +1127,9 @@ public sealed class NotchFace : FrameworkElement
                     dc.DrawGeometry(Br(Color.FromRgb(0x6F, 0xC3, 0xFF)), null, g);
                     break;
                 }
-                case Kind.Bang:
+                case Kind.Bang or Kind.Question:
                 {
-                    var text = new FormattedText("!", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                    var text = new FormattedText(b.Kind == Kind.Bang ? "!" : "?", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
                         new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Black, FontStretches.Normal), u * 2.2,
                         Br(_neon ? Color.FromRgb(0xFE, 0xE8, 0x01) : Color.FromRgb(0xFF, 0xC2, 0x33)), dip);
                     dc.DrawText(text, new Point(-text.Width / 2, -text.Height / 2));
@@ -1092,6 +1154,9 @@ public sealed class NotchFace : FrameworkElement
             dc.Pop(); dc.Pop();
         }
     }
+
+    /// <summary>0→1 with a small overshoot at the end (a pop).</summary>
+    static double BackOut(double t) { const double c = 1.9; t -= 1; return 1 + (c + 1) * t * t * t + c * t * t; }
 
     static Geometry HeartGeometry(double e)
     {

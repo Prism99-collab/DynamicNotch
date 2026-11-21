@@ -130,6 +130,12 @@ public partial class NotchWindow
     /// The notch leans a few pixels toward the cursor while you touch the top edge or hover a clickable
     /// alert, like something that noticed you. It settles back to the centre otherwise.
     /// </summary>
+    /// <summary>
+    /// A looping animation at a set pace. Left alone, WPF runs every animation at the screen's full rate (144, 240 Hz)
+    /// and redraws the window that often for as long as it loops: a slow breath or blink looks the same at 20.
+    /// </summary>
+    static T Capped<T>(T t, int fps) where T : Timeline { Timeline.SetDesiredFrameRate(t, fps); return t; }
+
     void UpdateLean(Interop.Native.POINT p, bool engaged)
     {
         double target = 0;

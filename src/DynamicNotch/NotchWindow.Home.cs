@@ -184,6 +184,7 @@ public partial class NotchWindow
         ArtistText.Text = !has ? Loc.T("Play something in Spotify, YouTube…") : _media.Artist.Length > 0 ? _media.Artist : _media.Title.Length > 0 ? app : "";
         TitleText.ToolTip = has && _media.Title.Length > 0 ? _media.Title : null; // a long title, in full
         PlayIcon.Visibility = _media.IsPlaying ? Visibility.Collapsed : Visibility.Visible;
+        WaveLife();
         PauseIcon.Visibility = _media.IsPlaying ? Visibility.Visible : Visibility.Collapsed;
         PlayBtn.IsEnabled = has;
         NextBtn.IsEnabled = has && _media.CanNext;      // only what the player can really do
@@ -192,6 +193,9 @@ public partial class NotchWindow
         RefreshClockAndProgress();
         RefreshDisc(); // the neon record: its art, its glow, turning or still
     }
+
+    /// <summary>The song's bar flows while it plays and you can see it (Home, open, not saving power); else it rests flat.</summary>
+    void WaveLife() => ProgressSlider.Live = _media.IsPlaying && _mode == Mode.Expanded && _page == 0 && !Eco;
 
     string? _appVolLogged;
 
@@ -479,6 +483,7 @@ public partial class NotchWindow
         _devicesOpen = open;
         if (open)
         {
+            CloseRadioSheet(instant: true); // one list at a time
             _devicesInput = false; // always opens on speakers / headphones
             _devicesMixer = false;
             StyleDevicesBack(); // the theme and panel colour of right now
@@ -497,10 +502,7 @@ public partial class NotchWindow
             var a = new DoubleAnimation(0, TimeSpan.FromMilliseconds(120));
             a.Completed += (_, _) => { if (!_devicesOpen) DevicesPanel.Visibility = Visibility.Collapsed; };
             DevicesPanel.BeginAnimation(OpacityProperty, a);
-            Fade(MediaRow, 1, 180);
-            Fade(CallRow, 1, 180);
-            Fade(TogglesRow, 1, 180);
-            MediaRow.IsHitTestVisible = CallRow.IsHitTestVisible = TogglesRow.IsHitTestVisible = true;
+            RestoreHomeRows(); // (the music row stays away while a song card is up)
         }
     }
 

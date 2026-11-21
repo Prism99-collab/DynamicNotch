@@ -29,7 +29,40 @@ public partial class NotchWindow
 
         for (int i = 0; i < items.Count && i < 16; i++)
             if (_cyber) ClickIn(items[i], 50 + i * 26); // Neon: they power up instead (NotchWindow.Boot)
-            else Rise(items[i], 60 + i * 32);
+            else Rise(items[i], 45 + i * 26);
+    }
+
+    /// <summary>
+    /// A page arrives (dots, the wheel, a swipe): its rows trail the page a little, one after another, as if they had
+    /// weight, then settle. Only transforms and opacity: the compositor does the work. The System and Work pages have
+    /// their own arrival.
+    /// </summary>
+    void PageArrive(int page, int dir)
+    {
+        if (Eco || _mode != Mode.Expanded || page == 1 || page == WorkPage || _launcherOpen) return;
+        if (_pageEls[page] == null || PageElement(page) is not Panel root || root.Children.OfType<Panel>().FirstOrDefault(c => c.Visibility == Visibility.Visible) is not Panel content) return;
+        int i = 0;
+        foreach (var c in content.Children.OfType<FrameworkElement>())
+        {
+            if (i >= 10) break;
+            if (c.Visibility != Visibility.Visible || c.Opacity < 0.99 || !c.IsHitTestVisible) continue;
+            TranslateTransform? tt = c.RenderTransform as TranslateTransform;
+            if (tt == null && (c.RenderTransform == null || c.RenderTransform.Value.IsIdentity && c.RenderTransform is MatrixTransform))
+                c.RenderTransform = tt = new TranslateTransform();
+            if (tt == null || tt.IsFrozen) continue;
+            int delay = 30 + i * 22;
+            var trail = new DoubleAnimationUsingKeyFrames { FillBehavior = FillBehavior.Stop };
+            trail.KeyFrames.Add(new DiscreteDoubleKeyFrame(dir * (18 + i * 3), KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            trail.KeyFrames.Add(new DiscreteDoubleKeyFrame(dir * (18 + i * 3), KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(delay))));
+            trail.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(delay + 460)), new SpringEase { Damping = 0.8 }));
+            tt.BeginAnimation(TranslateTransform.XProperty, trail);
+            var fade = new DoubleAnimationUsingKeyFrames { FillBehavior = FillBehavior.Stop };
+            fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(0.3, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(0.3, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(delay))));
+            fade.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(delay + 220)), new CubicEase { EasingMode = EasingMode.EaseOut }));
+            c.BeginAnimation(OpacityProperty, fade);
+            i++;
+        }
     }
 
     static void Rise(FrameworkElement el, int delayMs)

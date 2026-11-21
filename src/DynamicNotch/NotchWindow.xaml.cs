@@ -22,7 +22,7 @@ public partial class NotchWindow : Window
 
     // Shapes, in device-independent pixels (rendered crisply at the monitor's real DPI).
     static readonly Size IdleSize = new(150, 26), SlimSize = new(118, 6), MediaSize = new(252, 30),
-        ActivitySize = new(230, 30), ExpandedSize = new(440, 268), DropSize = new(380, 92),
+        ActivitySize = new(230, 30), ExpandedSize = new(440, 268), DropSize = new(440, 92),
         GameSize = new(54, 18); // in a game: just the frame rate, as small as it can be
     const double IdleRadius = 13, SlimRadius = 3, MediaRadius = 15, ExpandedRadius = 30, DropRadius = 28;
     const int HotkeyId = 0x4E01;
@@ -142,6 +142,10 @@ public partial class NotchWindow : Window
         Safe(nameof(WireCompanion), WireCompanion);
         Safe(nameof(WireFace), WireFace);
         Safe(nameof(WireHeader), WireHeader);
+        Safe(nameof(WireFeel), WireFeel);
+        Safe(nameof(WireFaceTips), WireFaceTips);
+        Safe(nameof(WireSongFind), WireSongFind);
+        Safe(nameof(WireRadioSheet), WireRadioSheet); // hold Wi-Fi / Bluetooth for networks and devices (NotchWindow.RadioSheet) // "what's this song?" on Home (NotchWindow.SongFind)
         Safe(nameof(WireTextBoxes), WireTextBoxes);
         Safe(nameof(WireFaceCompanion), WireFaceCompanion); // the face comes down to visit (NotchWindow.FaceCompanion) // every box: the keyboard on click, a right-click Cut / Copy / Paste
         Safe(nameof(StyleArtDisc), StyleArtDisc); // the cover is a record in every theme (NotchWindow.Disc)
@@ -265,14 +269,38 @@ public partial class NotchWindow : Window
     // In a game the notch is a 54 px pill: the window shrinks around it, so each refresh of the frame rate redraws
     // a few thousand pixels instead of the whole 560 x 300 transparent window.
     const double FullWidth = 560, FullHeight = 300, SmallWidth = 140, SmallHeight = 36;
-    bool _smallWindow;
+    // Closed (idle, music, a timer...), the window is only a strip at the top: room for the notch, its side bubbles,
+    // the face's hello (66) and the glow below it. A see-through window costs in proportion to its size on every
+    // frame that moves (the bars, the face, a glow), so this makes each frame about three times lighter.
+    const double RestHeight = 112;
+    bool _smallWindow, _restWindow;
 
     void SetSmallWindow(bool small)
     {
         if (small == _smallWindow) return;
         _smallWindow = small;
+        if (small) _restWindow = false;
         Width = small ? Math.Max(SmallWidth, GamePillWidth + 40) : FullWidth; // wide enough for the FPS pill's extras
-        Height = small ? Math.Max(SmallHeight, GamePillHeight + 18) : FullHeight;
+        Height = small ? Math.Max(SmallHeight, GamePillHeight + 18) : FullHeight + _chatExtra;
+        PositionWindow();
+    }
+
+    /// <summary>Full height back at once (before the notch grows past the strip).</summary>
+    void FullWindow()
+    {
+        if (!_restWindow) return;
+        _restWindow = false;
+        Height = FullHeight + _chatExtra;
+        PositionWindow();
+    }
+
+    /// <summary>The strip, once the notch has settled closed (never mid-animation: the shape would be cut).</summary>
+    void TryRestWindow()
+    {
+        if (_restWindow || _smallWindow || _animating || _pulling || _chatExtra > 0 || _launcherOpen) return;
+        if (!IsBase(_mode) || _mode == Mode.Game || _sh.Value > RestHeight - 30) return;
+        _restWindow = true;
+        Height = RestHeight;
         PositionWindow();
     }
 
@@ -392,7 +420,7 @@ public partial class NotchWindow : Window
     /// drawing switched off): every frame is drawn by the CPU, so the notch keeps to its light motion (the same as
     /// battery mode). Checked again whenever Windows reports the graphics changed.
     /// </summary>
-    static bool LowGraphics => _lowGraphics ??= DetectLowGraphics();
+    internal static bool LowGraphics => _lowGraphics ??= DetectLowGraphics();
     static bool? _lowGraphics;
 
     static bool DetectLowGraphics()
@@ -454,8 +482,9 @@ public partial class NotchWindow : Window
     {
         bool modeChanged = m != _mode;
         var from = _mode;
-        if (modeChanged) { HideTip(); HideLiveMenu(); }
+        if (modeChanged) { HideTip(); HideLiveMenu(); TipHide(); } // hints and the face's tip never outlive the shape they were for
         if (m != Mode.Game) SetSmallWindow(false); // anything else gets the full window back before it starts to grow
+        if (!IsBase(m)) FullWindow(); // open, a pop-up, the drop zone: the whole window, before the shape grows
         else if (modeChanged) After(350, () => { if (_mode == Mode.Game) SetSmallWindow(true); }); // once the pill has settled
         _mode = m;
         if (m != Mode.Osd) _osd = null;
@@ -560,6 +589,7 @@ public partial class NotchWindow : Window
         }
 
         if (FaceGreetShape(ref w, ref h, ref r)) style = SpringStyle.Pop; // the face comes out to say hello
+        if (WelcomeShape(ref w, ref h, ref r)) style = _welcomePhase == 1 ? SpringStyle.Close : SpringStyle.Pop; // Pixo starting: a point of light, then hello
         if (_mode == Mode.Expanded && _sh.Value > 120 && Math.Abs(_sw.Value - w) < 2) style = SpringStyle.Page; // already open, only its height changes (the search): quick and calm
         _sw.Configure(style);
         _sr.Configure(style);
@@ -567,9 +597,9 @@ public partial class NotchWindow : Window
         // Opening, it trails the width and overshoots a touch; closing, it tucks in first.
         switch (style)
         {
-            case SpringStyle.Open: _sh.Configure(0.45, 0.74); break;
-            case SpringStyle.Pop: _sh.Configure(0.39, 0.68); break;
-            case SpringStyle.Close: _sh.Configure(0.24, 1.0); break;
+            case SpringStyle.Open: _sh.Configure(0.40, 0.75); break;
+            case SpringStyle.Pop: _sh.Configure(0.36, 0.69); break;
+            case SpringStyle.Close: _sh.Configure(0.22, 1.0); break;
             default: _sh.Configure(style); break;
         }
         _sw.Target = w;
@@ -623,12 +653,14 @@ public partial class NotchWindow : Window
         if (_pageX.Active) PagesShift.X = _pageX.Value;
         FollowLauncherEdge();
         _leanShift.X = _lean.Value;
+        TipFollow();
 
         if (!done) return;
         CompositionTarget.Rendering -= OnFrame;
         StopPacer();
         _animating = false;
         _lastFrameRaw = TimeSpan.Zero;
+        if (!_restWindow && IsBase(_mode)) After(250, TryRestWindow); // settled closed: the window shrinks to a strip
         if (FrameLog is { Count: > 0 })
         {
             // diagnostics only (DYNAMICNOTCH_FRAMELOG=1): frame pacing of the last animation
@@ -715,6 +747,7 @@ public partial class NotchWindow : Window
         _tick.Start();
         LandOnCallsPage();
         OnPageShown(_page);
+        FeelWake();
         KeepOnTop();
     }
 
@@ -730,6 +763,9 @@ public partial class NotchWindow : Window
         ShowDevices(false);
         CloseStrainLog(); // it opens again on the page, not on top of it
         CancelSleepConfirm();
+        SongCardOnCollapse();
+        ProgressSlider.Live = false;
+        CloseRadioSheet(instant: true);
         SetMode(BaseMode);
         if (_hidden) Fade(Shell, 0, 200);
     }
@@ -825,9 +861,20 @@ public partial class NotchWindow : Window
         if (busy) { _lastBusyAt = now; _tidied = false; return; }
         if (_tidied || (now - _lastBusyAt).TotalSeconds < 10) return;
         _tidied = true;
-        System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
-        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+        // at most every few minutes: after every volume pop-up it was a full stop-the-app cleanup, a hitch on slow PCs
+        if ((now - _lastTidy).TotalMinutes < 3) return;
+        _lastTidy = now;
+        if ((now - _lastDeepTidy).TotalMinutes >= 30)
+        {
+            // now and then the thorough one (it also packs the large blocks the pictures leave behind)
+            _lastDeepTidy = now;
+            System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+        }
+        else GC.Collect(2, GCCollectionMode.Optimized, blocking: false); // in the background, beside the app
     }
+
+    DateTime _lastTidy, _lastDeepTidy = DateTime.UtcNow;
 
     void CheckForeground()
     {

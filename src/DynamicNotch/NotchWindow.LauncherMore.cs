@@ -164,6 +164,7 @@ public partial class NotchWindow
     {
         _ignoreClipboardUntil = DateTime.UtcNow.AddMilliseconds(600);
         try { if (c.Text != null) Clipboard.SetText(c.Text); } catch { }
+        FeelIt(Feel.Copy);
         if (!c.Pinned) { c.At = DateTime.Now; _clips.Remove(c); _clips.Insert(0, c); ClipsChanged(); }
         CloseLauncher(giveBack: true);
         After(200, () => ShowOsd("copied", "", null, "Copied", Trim(OneLine(c.Text ?? ""), 60), null, glyphBrush: Blue, seconds: 1.4, prio: Prio.Low));
@@ -268,8 +269,8 @@ public partial class NotchWindow
     List<HitAction> ClipActions(ClipEntry c) => new()
     {
         new("Copy", "", () => CopyClipAgain(c)),
-        new(c.Pinned ? "Unpin" : "Pin", "", () => { c.Pinned = !c.Pinned; ClipsChanged(); LeaveActions(); Search(); }, c.Pinned ? "Back to the normal list" : "Stays at the top, through Clear"),
-        new("Remove from the history", "", () => { _clips.Remove(c); ClipsChanged(); LeaveActions(); Search(); }),
+        new(c.Pinned ? "Unpin" : "Pin", "", () => { c.Pinned = !c.Pinned; FeelIt(c.Pinned ? Feel.Pin : Feel.Unpin); ClipsChanged(); LeaveActions(); Search(); }, c.Pinned ? "Back to the normal list" : "Stays at the top, through Clear"),
+        new("Remove from the history", "", () => { _clips.Remove(c); FeelIt(Feel.Eat); ClipsChanged(); LeaveActions(); Search(); }),
     };
 
     static void Start(string file, string args)

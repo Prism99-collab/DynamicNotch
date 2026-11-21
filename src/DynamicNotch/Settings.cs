@@ -98,6 +98,11 @@ public sealed class Settings
     public bool TuckPills { get; set; } = true;
     /// <summary>The face's little sounds (hello, a poke, an answer done).</summary>
     public bool FaceSounds { get; set; } = true;
+    /// <summary>Small sounds for what you do in the notch (pick, copy, pin, delete, done...).</summary>
+    public bool UiSounds { get; set; } = true;
+    /// <summary>Now and then a one-line tip from the face, each said once (NotchWindow.FaceTips).</summary>
+    public bool FaceTips { get; set; } = true;
+    public List<string> FaceTipsSeen { get; set; } = new();
     /// <summary>The companion's size: 0.85 small, 1 medium, 1.2 large.</summary>
     public double CompanionSize { get; set; } = 1.0;
     public DateTime? LastDownloadsNag { get; set; }

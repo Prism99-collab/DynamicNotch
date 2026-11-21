@@ -31,15 +31,15 @@ public partial class NotchWindow
         // a tiny face beside the page's name: it glances the way you swipe, winks when you turn something on
         if (PageTitle.Parent is Grid head)
         {
-            _headFace = new Controls.NotchFace(10) { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, RenderTransform = _headFaceAt, Visibility = Visibility.Collapsed };
+            _headFace = new Controls.NotchFace(12) { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, RenderTransform = _headFaceAt, Visibility = Visibility.Collapsed };
             Grid.SetColumnSpan(_headFace, 3);
             head.Children.Add(_headFace);
-            PageTitle.SizeChanged += (_, _) => _headFaceAt.X = -(PageTitle.ActualWidth / 2 + 11);
+            PageTitle.SizeChanged += (_, _) => HeadFaceFit();
         }
         Expanded.AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, new RoutedEventHandler((_, e) =>
         {
             if (_headFace is not { IsVisible: true } face || e.OriginalSource is not System.Windows.Controls.Primitives.ToggleButton t) return;
-            if (t.IsChecked == true) face.Play(Controls.NotchFace.Emote.Wink, .8); else face.Hop(.35);
+            FeelIt(t.IsChecked == true ? Feel.On : Feel.Off);
         }), handledEventsToo: true);
     }
 
@@ -80,9 +80,8 @@ public partial class NotchWindow
     {
         if (_headFace != null)
         {
-            bool show = _page != 0 && _settings.NotchFace;
-            _headFace.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-            if (show)
+            HeadFaceFit(); // in the middle on Home, beside the name elsewhere (NotchWindow.FaceFeel)
+            if (_headFace.Visibility == Visibility.Visible)
             {
                 _headFace.Neon = _cyber; _headFace.Accent = PalAccent(); _headFace.Eco = Eco;
                 int pos = PagePos(_page), dir = Math.Sign(pos - _headLastPos);

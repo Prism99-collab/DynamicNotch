@@ -60,8 +60,8 @@ public partial class NotchWindow
         if (bolt == (ChargeBolt.Visibility == Visibility.Visible)) return;
         ChargeBolt.Visibility = bolt ? Visibility.Visible : Visibility.Collapsed;
         if (bolt)
-            ChargeBolt.BeginAnimation(OpacityProperty, new DoubleAnimation(1, 0.35, TimeSpan.FromMilliseconds(900))
-                { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
+            ChargeBolt.BeginAnimation(OpacityProperty, Capped(new DoubleAnimation(1, 0.35, TimeSpan.FromMilliseconds(900))
+                { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } }, 20));
         else ChargeBolt.BeginAnimation(OpacityProperty, null);
     }
 
@@ -154,8 +154,8 @@ public partial class NotchWindow
         _dlSheenSecs = secs;
         if (secs == 0) { DlSheenShift.BeginAnimation(TranslateTransform.XProperty, null); DlSheen.Opacity = 0; return; }
         DlSheen.Opacity = 1;
-        DlSheenShift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(-DlSheen.Width, track, TimeSpan.FromSeconds(secs))
-            { RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
+        DlSheenShift.BeginAnimation(TranslateTransform.XProperty, Capped(new DoubleAnimation(-DlSheen.Width, track, TimeSpan.FromSeconds(secs))
+            { RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } }, 40));
     }
 
     string? _dlIconFor;

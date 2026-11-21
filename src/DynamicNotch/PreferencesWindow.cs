@@ -337,6 +337,8 @@ public sealed class PreferencesWindow : Window
         new(Sec.Appearance, "\uE76E", "Face in the notch", "A little face lives in the idle notch: it blinks, looks at the pointer and reacts to what happens. Click it to poke it, right-click for another hat", () => _s.NotchFace, v => _s.NotchFace = v),
         new(Sec.Appearance, "\uE73F", "Compact when resting", "Unused for 5 seconds, the notch tucks in small; it grows back when the pointer comes near", () => _s.CompactWhenResting, v => _s.CompactWhenResting = v),
         new(Sec.Appearance, "\uE767", "Face sounds", "Tiny sounds of its own: a hello, a boing when you poke it, a chime when an answer is done", () => _s.FaceSounds, v => _s.FaceSounds = v),
+        new(Sec.Appearance, "", "Interface sounds", "Soft little sounds for what you do: a pluck when you pick, a tick when you copy, a sparkle when you pin, a nom when you delete", () => _s.UiSounds, v => _s.UiSounds = v),
+        new(Sec.Appearance, "", "Tips from Pixo", "Now and then a one-line tip in a bubble under the face, each said only once", () => _s.FaceTips, v => _s.FaceTips = v),
         new(Sec.Appearance, "\uE8A0", "Tuck pills into the notch", "The side pills show as a small light in the notch, and slide out when they start or when the pointer comes near", () => _s.TuckPills, v => _s.TuckPills = v),
         new(Sec.Appearance, "", "Minimal when idle", "A thin bar when nothing is happening", () => _s.MinimalWhenIdle, v => _s.MinimalWhenIdle = v),
         new(Sec.Appearance, "", "Slim over windows", "Stays slim over browser tabs and windows", () => _s.SlimOverWindows, v => _s.SlimOverWindows = v),

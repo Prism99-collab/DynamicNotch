@@ -86,7 +86,13 @@ public partial class NotchWindow
             if (external && !RecentlyTouched) ShowBrightnessOsd();
         };
 
-        _radio.Changed += () => { RefreshToggles(); OnNetworkMaybeChanged(); };
+        _radio.Changed += () =>
+        {
+            // Bluetooth off: nothing is connected; back on: what's connected is read again from Windows
+            if (_radio.HasBluetooth && _radio.BluetoothOn != _btWasOn) { _btWasOn = _radio.BluetoothOn; if (!_btWasOn) _bt.RadioOff(); else _ = _bt.ResyncAsync(); }
+            RefreshToggles();
+            OnNetworkMaybeChanged();
+        };
         _focus.Changed += OnFocusChanged;
 
         _bt.Changed += RefreshToggles;

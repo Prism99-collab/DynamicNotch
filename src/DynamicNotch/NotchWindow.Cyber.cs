@@ -96,6 +96,70 @@ public partial class NotchWindow
                 }
                 if (open.StartsWith("prefs")) { PreferencesWindow.ShowFor(this, int.TryParse(open[5..], out int sec) ? sec : 0); return; }
                 if (open.StartsWith("pal")) { PalDevShow(open); return; }
+                if (open.StartsWith("wheeltest:"))
+                {
+                    // =wheeltest:7:1 — page 7 (tab 1 on Work): a wheel turn routed like the mouse hook does, the list's offset logged
+                    var parts = open.Split(':');
+                    int pgN = int.Parse(parts[1]);
+                    Expand(byHotkey: true);
+                    _expandedAt = DateTime.UtcNow.AddSeconds(25);
+                    GoToPage(pgN, instant: true);
+                    if (pgN == WorkPage && parts.Length > 2) ShowWorkTab(int.Parse(parts[2]));
+                    After(1500, () =>
+                    {
+                        var svs = new List<ScrollViewer>();
+                        void Walk(DependencyObject d) { for (int i = 0; i < VisualTreeHelper.GetChildrenCount(d); i++) { var c = VisualTreeHelper.GetChild(d, i); if (c is ScrollViewer s && s.IsVisible) svs.Add(s); Walk(c); } }
+                        Walk(PageElement(pgN));
+                        foreach (var sv in svs)
+                        {
+                            var at = sv.PointToScreen(new Point(sv.ActualWidth / 2, Math.Min(40, sv.ActualHeight / 2)));
+                            double before = sv.VerticalOffset;
+                            Services.AppLog.Write($"wheeltest: viewer {sv.ActualWidth:0}x{sv.ActualHeight:0} scrollable={sv.ScrollableHeight:0} hookArea=({_hitL},{_hitT})-({_hitR},{_hitB}) at=({at.X:0},{at.Y:0})");
+                            RouteWheel(false, -240, (int)at.X, (int)at.Y);
+                            After(700, () => Services.AppLog.Write($"wheeltest: offset {before:0} -> {sv.VerticalOffset:0}"));
+                        }
+                    });
+                    return;
+                }
+                if (open == "welcome")
+                {
+                    After(3000, () => DevWelcome());
+                    return;
+                }
+                if (open == "welcome-now")
+                {
+                    _welcomeDev = true;
+                    SetMode(Mode.Idle);
+                    FaceGet();
+                    if (!_faceShown) { _faceGreetedStart = true; FaceShow(true); }
+                    bool ok = StartWelcome();
+                    Services.AppLog.Write($"welcome dev: started={ok} mode={_mode} base={BaseMode} hidden={_hidden} faceShown={_faceShown} offScreen={_offScreen} dodged={_dodged} w={_sw.Target:0}x{_sh.Target:0}");
+                    After(1200, () => Services.AppLog.Write($"welcome dev +1.2s: phase={_welcomePhase} mode={_mode} shape={_sw.Value:0}x{_sh.Value:0} hidden={_hidden} opacity={Root.Opacity:0.00}/{Shell.Opacity:0.00}"));
+                    return;
+                }
+                if (open.StartsWith("work:"))
+                {
+                    // =work:1 (a tab), =work:1:open (its first project open) — for a look
+                    Expand(byHotkey: true);
+                    _expandedAt = DateTime.UtcNow.AddSeconds(25);
+                    GoToPage(WorkPage, instant: true);
+                    ShowWorkTab(int.Parse(open.Split(':')[1]));
+                    if (open.EndsWith(":open") && Services.WorkLog.Projects().FirstOrDefault(x => x.Stage < 2) is { } first) { _openProject = first.Kept?.Id ?? first.Id; RenderWorkTab(animate: false); }
+                    return;
+                }
+                if (open.StartsWith("sheet:"))
+                {
+                    // =sheet:wifi, =sheet:wifi-pw (a password line open, never focused), =sheet:bt — for a look, no keys taken
+                    Expand(byHotkey: true);
+                    _expandedAt = DateTime.UtcNow.AddSeconds(25); // stays open for the look
+                    GoToPage(0, instant: true);
+                    After(400, () =>
+                    {
+                        OpenRadioSheet(open.Contains("bt") ? SheetKind.Bt : SheetKind.Wifi, open.Contains("bt") ? BtTile : WifiTile);
+                        if (open.EndsWith("-pw")) After(3500, () => { if (_nets.FirstOrDefault(n => !n.Connected) is { } n) { _netOpen = n.Ssid; _nets = _nets.Select(x => x.Ssid == n.Ssid ? x with { Saved = false, Signal = 70 } : x).ToList(); RenderSheet(); } });
+                    });
+                    return;
+                }
                 if (open.StartsWith("typing:"))
                 {
                     // =typing:spotify — the box fills one letter every 90 ms (set in code, no keys pressed), each search timed in the log
@@ -157,6 +221,7 @@ public partial class NotchWindow
 
     void ApplyCyber(bool on, bool animate)
     {
+        if (animate) After(120, () => FeelIt(Feel.Spin)); // a new look: the face spins into it
         // switching back: one last burst in the old skin, then it's gone
         if (animate && !on) CyberGlitch(strong: true);
         _cyber = on;

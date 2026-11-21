@@ -120,8 +120,8 @@ public partial class NotchWindow
         if (breathe == _privacyBreathing) return;
         _privacyBreathing = breathe;
         if (breathe)
-            PrivacyAura.BeginAnimation(OpacityProperty, new DoubleAnimation(0.25, 0.7, TimeSpan.FromMilliseconds(1300))
-                { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
+            PrivacyAura.BeginAnimation(OpacityProperty, Capped(new DoubleAnimation(0.25, 0.7, TimeSpan.FromMilliseconds(1300))
+                { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } }, 20));
         else PrivacyAura.BeginAnimation(OpacityProperty, null);
     }
 

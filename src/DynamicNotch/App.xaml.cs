@@ -74,8 +74,13 @@ public partial class App : Application
         Loc.Set(_settings.Language);
         // WPF caps every animation at 60 fps unless told otherwise: let them run at the screen's real refresh
         // rate (144 / 180 / 240 Hz...). Animations that pick their own rate (visualizer, glow) keep theirs.
+        // A PC without graphics hardware (or one starting in battery saver) keeps them at 60: each frame of a
+        // see-through window is copied by the CPU there, and 144 of them a second is what made it lag.
+        int hz = Interop.Native.RefreshRate();
+        bool saver = Interop.Native.GetSystemPowerStatus(out var ps) && ps.SystemStatusFlag == 1;
+        if (NotchWindow.LowGraphics || saver) hz = Math.Min(hz, 60);
         System.Windows.Media.Animation.Timeline.DesiredFrameRateProperty.OverrideMetadata(
-            typeof(System.Windows.Media.Animation.Timeline), new FrameworkPropertyMetadata { DefaultValue = (int?)Interop.Native.RefreshRate() });
+            typeof(System.Windows.Media.Animation.Timeline), new FrameworkPropertyMetadata { DefaultValue = (int?)hz });
         AppLog.Write($"started ({(restarted ? "after a crash" : auto ? "automatically" : "by user/login")}), pid {Environment.ProcessId}");
         try
         {

@@ -42,6 +42,12 @@ public partial class NotchWindow
     readonly Dictionary<string, (string Q, string Md, DateTime At)> _nowAnswers = new();
     string? _nowShownKey;
     bool _workAskRunning;
+    const double RailTile = 46, RailGap = 4;
+    Border? _workPill, _workPillBar;
+    readonly TranslateTransform _workPillAt = new();
+    Controls.NotchFace? _workFace;
+    TextBlock? _workCount;
+    ContentControl? _workHeadRight;
 
     Color WorkAcc => _cyber ? CyCyan : ChatAccent;
     Color WorkHot => _cyber ? CyYellow : Lighten(ChatAccent, 0.35);
@@ -64,58 +70,114 @@ public partial class NotchWindow
         _workTabs.Clear();
         _workGlyphs.Clear();
         var acc = WorkAcc;
-        // a slim rail of three tiles on the left, the tab's own space on the right
+        // a slim rail on the left: three tabs, a pill that glides to the one you're on, and Pixo resting at the bottom
         var root = new Grid { Margin = new Thickness(10, 2, 12, 4) };
-        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(58) });
+        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(56) });
         root.ColumnDefinitions.Add(new ColumnDefinition());
 
-        var rail = new StackPanel { VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 2, 0, 0) };
+        var railGrid = new Grid();
+        var rail = new StackPanel { VerticalAlignment = VerticalAlignment.Top };
+        _workPill = new Border
+        {
+            Height = RailTile, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false, CornerRadius = new CornerRadius(_cyber ? 0 : 11),
+            Background = _cyber ? Frozen(A(CyYellow, 0x18)) : Frozen(new LinearGradientBrush(A(acc, 0x4A), A(AiSecond, 0x26), 90)),
+            BorderBrush = Frozen(_cyber ? A(CyYellow, 0x70) : A(Lighten(acc, 0.3), 0x50)), BorderThickness = new Thickness(1),
+            RenderTransform = _workPillAt,
+        };
+        if (_cyber) NeonCorner(_workPill, 6, 0);
+        _workPillBar = new Border { Width = 3, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(-1, 12, 0, 12), CornerRadius = new CornerRadius(1.5), Background = Frozen(_cyber ? CyYellow : Lighten(acc, 0.25)) };
+        _workPill.Child = _workPillBar;
+        railGrid.Children.Add(_workPill);
+        railGrid.Children.Add(rail);
         var railFrame = new Border
         {
-            Child = rail, Padding = new Thickness(4), Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Top,
-            Background = Frozen(_cyber ? Color.FromArgb(0xB0, 0x02, 0x08, 0x0C) : Color.FromArgb(0x1C, 0x00, 0x00, 0x00)),
-            BorderBrush = Frozen(_cyber ? A(CyCyan, 0x45) : Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(_cyber ? 0 : 14),
+            Child = railGrid, Padding = new Thickness(4), Margin = new Thickness(0, 0, 9, 0),
+            Background = Frozen(_cyber ? Color.FromArgb(0xB0, 0x02, 0x08, 0x0C) : Color.FromArgb(0x22, 0x00, 0x00, 0x00)),
+            BorderBrush = Frozen(_cyber ? A(CyCyan, 0x45) : Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(_cyber ? 0 : 15),
         };
         if (_cyber) NeonCorner(railFrame, 7, 7);
+        // the wheel over the rail moves between Now, Projects and Inbox (one notch, one tab)
+        railFrame.PreviewMouseWheel += (_, e) =>
+        {
+            e.Handled = true;
+            var now = DateTime.UtcNow;
+            if ((now - _railWheelAt).TotalMilliseconds > 400) _railWheel = 0;
+            _railWheelAt = now;
+            _railWheel += e.Delta;
+            if (Math.Abs(_railWheel) < 100 || (now - _railTabAt).TotalMilliseconds < 220) return;
+            int to = Math.Clamp(_workTab + (_railWheel < 0 ? 1 : -1), 0, 2);
+            _railWheel = 0;
+            if (to == _workTab) return;
+            _railTabAt = now;
+            ShowWorkTab(to);
+        };
         (string Name, string Glyph)[] tabs = { ("Now", ""), ("Projects", ""), ("Inbox", "") };
         for (int i = 0; i < tabs.Length; i++)
         {
             int idx = i;
-            var glyph = new TextBlock { Text = tabs[i].Glyph, FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 16, HorizontalAlignment = HorizontalAlignment.Center };
-            var label = new TextBlock { Text = Cap(tabs[i].Name), FontFamily = WorkFont, FontSize = _cyber ? 8.5 : 9, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 3, 0, 0) };
-            var line = new Border { Width = 2, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(-4, 6, 0, 6), Opacity = 0 };
+            var glyph = new TextBlock { Text = tabs[i].Glyph, FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 15, HorizontalAlignment = HorizontalAlignment.Center, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1) };
+            var label = new TextBlock { Text = Cap(tabs[i].Name), FontFamily = WorkFont, FontSize = _cyber ? 8 : 8.5, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 3, 0, 0) };
+            var line = new Border { Width = 0, Opacity = 0 }; // (the pill's bar shows the tab you're on now)
             var cell = new Grid();
             cell.Children.Add(new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { glyph, label } });
-            cell.Children.Add(line);
             if (i == 2)
             {
                 _inboxBadge = new TextBlock { FontSize = 8.5, FontWeight = FontWeights.Bold, Foreground = Frozen(_cyber ? Colors.Black : Colors.White), FontFamily = WorkFont, HorizontalAlignment = HorizontalAlignment.Center };
                 cell.Children.Add(new Border
                 {
                     Child = _inboxBadge, Background = Frozen(_cyber ? CyYellow : Color.FromRgb(0xFF, 0x5A, 0x5F)), CornerRadius = new CornerRadius(_cyber ? 0 : 7), MinWidth = 14, Height = 14,
-                    Padding = new Thickness(3, 0, 3, 0), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, -2, -2, 0),
+                    Padding = new Thickness(3, 0, 3, 0), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 1, 1, 0),
+                    BorderBrush = Frozen(Color.FromArgb(0xFF, 0x10, 0x10, 0x14)), BorderThickness = new Thickness(_cyber ? 0 : 1.5),
                 });
             }
-            var hit = new Border { Child = cell, Height = 52, Margin = new Thickness(0, 0, 0, i < tabs.Length - 1 ? 4 : 0), Cursor = Cursors.Hand, CornerRadius = new CornerRadius(_cyber ? 0 : 11), Background = Brushes.Transparent, ToolTip = tabs[i].Name };
-            hit.MouseEnter += (_, _) => { if (idx != _workTab) hit.Background = Frozen(_cyber ? A(CyCyan, 0x12) : Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF)); };
-            hit.MouseLeave += (_, _) => { if (idx != _workTab) hit.Background = Brushes.Transparent; };
+            var hit = new Border { Child = cell, Height = RailTile, Margin = new Thickness(0, 0, 0, i < tabs.Length - 1 ? RailGap : 0), Cursor = Cursors.Hand, CornerRadius = new CornerRadius(_cyber ? 0 : 11), Background = Brushes.Transparent, ToolTip = tabs[i].Name };
+            hit.MouseEnter += (_, _) =>
+            {
+                if (idx != _workTab) hit.Background = Frozen(_cyber ? A(CyCyan, 0x10) : Color.FromArgb(0x0E, 0xFF, 0xFF, 0xFF));
+                if (!Eco && glyph.RenderTransform is ScaleTransform gs) { var k = new DoubleAnimation(1.12, TimeSpan.FromMilliseconds(220)) { EasingFunction = new BackEase { Amplitude = 0.5, EasingMode = EasingMode.EaseOut } }; gs.BeginAnimation(ScaleTransform.ScaleXProperty, k); gs.BeginAnimation(ScaleTransform.ScaleYProperty, k); }
+                _workFace?.LookAt(0, -(idx - 1) * 0.8 + 0.6); // Pixo glances up at the tab you point at
+            };
+            hit.MouseLeave += (_, _) =>
+            {
+                hit.Background = Brushes.Transparent;
+                if (glyph.RenderTransform is ScaleTransform gs) { var k = new DoubleAnimation(1, TimeSpan.FromMilliseconds(200)); gs.BeginAnimation(ScaleTransform.ScaleXProperty, k); gs.BeginAnimation(ScaleTransform.ScaleYProperty, k); }
+            };
             hit.PreviewMouseLeftButtonDown += (_, _) => _maybeSwipe = false;
             hit.MouseLeftButtonUp += (_, e) => { e.Handled = true; ShowWorkTab(idx); };
             _workTabs.Add((hit, label, line));
             _workGlyphs.Add(glyph);
             rail.Children.Add(hit);
         }
+        // Pixo, at the foot of the rail: it watches the page and feels what you do on it
+        _workFace = new Controls.NotchFace(13) { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 4), Neon = _cyber, Accent = PalAccent(), Eco = Eco, Cursor = Cursors.Hand, IsHitTestVisible = true, ToolTip = "Pixo" };
+        _workFace.SetOutfit(FaceOutfitNow(), animate: false);
+        _workFace.MouseLeftButtonUp += (_, e) => { e.Handled = true; _workFace.Poke(); };
+        _workFace.PreviewMouseLeftButtonDown += (_, _) => _maybeSwipe = false;
+        _workFace.Visibility = _settings.NotchFace ? Visibility.Visible : Visibility.Collapsed;
+        railGrid.Children.Add(_workFace);
         root.Children.Add(railFrame);
 
         // the tab's title and a line for what just happened, then its content
         var side = new Grid();
-        side.RowDefinitions.Add(new RowDefinition { Height = new GridLength(22) });
+        side.RowDefinitions.Add(new RowDefinition { Height = new GridLength(26) });
         side.RowDefinitions.Add(new RowDefinition());
-        var head = new Grid();
-        _workTitle = new TextBlock { FontFamily = WorkFont, FontSize = _cyber ? 13 : 13.5, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Foreground = Frozen(_cyber ? CyYellow : Colors.White) };
-        head.Children.Add(_workTitle);
-        _workNote = new TextBlock { FontSize = 10, FontFamily = WorkFont, Foreground = Frozen(A(acc, 0xD0)), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 190, Opacity = 0 };
+        // the tab's title, a quiet count beside it ("3 active"), and on the right its one action and what just happened
+        var head = new Grid { Margin = new Thickness(0, 0, 0, 2) };
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        head.ColumnDefinitions.Add(new ColumnDefinition());
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var titleRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        _workTitle = new TextBlock { FontFamily = WorkFont, FontSize = _cyber ? 13 : 14, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, Foreground = Frozen(_cyber ? CyYellow : Colors.White) };
+        titleRow.Children.Add(_workTitle);
+        _workCount = new TextBlock { FontFamily = WorkFont, FontSize = 10.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 1, 0, 0), Foreground = Frozen(A(TextTone, 0x88)) };
+        titleRow.Children.Add(_workCount);
+        head.Children.Add(titleRow);
+        _workNote = new TextBlock { FontSize = 10, FontFamily = WorkFont, Foreground = Frozen(_cyber ? CyCyan : Lighten(acc, 0.35)), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 170, Opacity = 0, Margin = new Thickness(8, 0, 8, 0) };
+        Grid.SetColumn(_workNote, 1);
         head.Children.Add(_workNote);
+        _workHeadRight = new ContentControl { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(_workHeadRight, 2);
+        head.Children.Add(_workHeadRight);
         side.Children.Add(head);
         _workBody = new Grid { Margin = new Thickness(0, 2, 0, 0), ClipToBounds = true };
         Grid.SetRow(_workBody, 1);
@@ -138,18 +200,24 @@ public partial class NotchWindow
         if (_cyber && _workTitle != null) CyberDecode(_workTitle);
     }
 
+    int _railWheel;
+    DateTime _railWheelAt, _railTabAt;
+
     void ShowWorkTab(int tab)
     {
         if (tab == _workTab) { RenderWorkTab(animate: false); return; }
         _workTab = tab;
         EndWorkTyping(giveBack: true);
         RenderWorkTab(animate: true);
+        _workFace?.Play(Controls.NotchFace.Emote.Nod, .6);
+        FeelSound(Sfx.Cue.Tap);
         if (_cyber) { CyberGlitch(strong: false, light: true); if (_workTitle != null) CyberDecode(_workTitle); }
     }
 
     /// <summary>A short line at the top right ("Reopened 5"), for a few seconds.</summary>
     void WorkSay(string text)
     {
+        WorkFeel(text);
         if (_workNote == null) return;
         _workNote.Text = Cap(text);
         _workNote.BeginAnimation(OpacityProperty, null);
@@ -160,22 +228,78 @@ public partial class NotchWindow
         _workNote.BeginAnimation(OpacityProperty, a);
     }
 
+    /// <summary>What the page just said, as Pixo feels it (pinned: hearts; removed: it eats it; done: proud...).</summary>
+    void WorkFeel(string said)
+    {
+        string t = said.ToLowerInvariant();
+        Feel? f =
+            t.StartsWith("couldn't") || t.Contains("didn't") || t.Contains("not found") && !t.StartsWith("reopened") ? Feel.Oops :
+            t.StartsWith("unpinned") ? Feel.Unpin : t.StartsWith("pinned") ? Feel.Pin :
+            t.StartsWith("cleared") || t.StartsWith("history cleared") ? Feel.EatAll :
+            t.StartsWith("removed") || t.StartsWith("deleted") || t.StartsWith("hidden") && !t.StartsWith("hidden projects") ? Feel.Eat :
+            t.StartsWith("moved to") || t.StartsWith("added") || t.StartsWith("merged") ? Feel.Eat :
+            t.StartsWith("muted") || t.StartsWith("back in") ? Feel.Hush :
+            t.StartsWith("unmuted") ? Feel.On :
+            t.StartsWith("done") || t.StartsWith("reopened") ? Feel.Done :
+            t.StartsWith("renamed") || t.StartsWith("note saved") || t.StartsWith("back to work") || t.StartsWith("hidden projects are back") ? Feel.Pick :
+            t.StartsWith("copied") ? Feel.Copy : null;
+        if (f is { } feel) FeelIt(feel);
+    }
+
+    /// <summary>The tab's quiet count beside its title, and its one action on the right.</summary>
+    void WorkHead(string count, UIElement? right = null)
+    {
+        if (_workCount != null) _workCount.Text = Cap(count);
+        if (_workHeadRight != null) _workHeadRight.Content = right;
+    }
+
+    /// <summary>An empty place, said by Pixo: its face, a title, a line.</summary>
+    Border WorkEmpty(Controls.NotchFace.Emote? feel, string title, string line, Controls.NotchFace.Mood mood = Controls.NotchFace.Mood.Idle)
+    {
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition());
+        if (_settings.NotchFace)
+        {
+            var face = new Controls.NotchFace(24) { Neon = _cyber, Accent = PalAccent(), Eco = Eco, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
+            face.SetOutfit(FaceOutfitNow(), animate: false);
+            face.SetMood(mood);
+            if (feel is { } e) face.Loaded += (_, _) => After(250, () => { if (face.IsVisible) face.Play(e, 1.6); });
+            row.Children.Add(face);
+        }
+        var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        words.Children.Add(WorkText(Cap(title), 12, _cyber ? CyYellow : Colors.White, bold: true));
+        words.Children.Add(WorkText(line, 10.5, A(TextTone, 0xA8)).Also(t => t.Margin = new Thickness(0, 2, 0, 0)));
+        Grid.SetColumn(words, 1);
+        row.Children.Add(words);
+        return WorkCard(row);
+    }
+
     void RenderWorkTab(bool animate)
     {
         if (_workBody == null) return;
         for (int i = 0; i < _workTabs.Count; i++)
         {
-            var (hit, label, line) = _workTabs[i];
+            var (hit, label, _) = _workTabs[i];
             bool on = i == _workTab;
-            var tone = Frozen(on ? (_cyber ? CyYellow : Colors.White) : A(_cyber ? CyCyan : Colors.White, (byte)(_cyber ? 0x90 : 0x80)));
+            var tone = Frozen(on ? (_cyber ? CyYellow : Colors.White) : A(_cyber ? CyCyan : Colors.White, (byte)(_cyber ? 0x90 : 0x78)));
             label.Foreground = tone;
             if (i < _workGlyphs.Count) _workGlyphs[i].Foreground = tone;
-            line.Background = Frozen(_cyber ? CyYellow : WorkAcc);
-            line.Opacity = on ? 1 : 0;
-            hit.Background = !on ? Brushes.Transparent : _cyber ? Frozen(A(CyYellow, 0x16)) : Frozen(new LinearGradientBrush(A(WorkAcc, 0x55), A(AiSecond, 0x30), 90));
-            hit.BorderBrush = Frozen(on && _cyber ? A(CyYellow, 0x60) : Colors.Transparent);
-            hit.BorderThickness = new Thickness(on && _cyber ? 1 : 0);
+            hit.Background = Brushes.Transparent;
         }
+        // the pill glides to the tab you're on, with a little stretch on the way
+        double pillTo = _workTab * (RailTile + RailGap);
+        if (!animate || Eco || _workPill == null) _workPillAt.Y = pillTo;
+        else
+        {
+            _workPillAt.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(pillTo, TimeSpan.FromMilliseconds(420)) { EasingFunction = new Controls.SpringEase { Damping = 0.7 } });
+            var squash = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(380) };
+            squash.KeyFrames.Add(new EasingDoubleKeyFrame(RailTile + 8, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(140)), new CubicEase { EasingMode = EasingMode.EaseOut }));
+            squash.KeyFrames.Add(new EasingDoubleKeyFrame(RailTile, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(380)), new CubicEase { EasingMode = EasingMode.EaseInOut }));
+            _workPill.BeginAnimation(HeightProperty, squash);
+        }
+        if (_workCount != null) _workCount.Text = "";
+        if (_workHeadRight != null) _workHeadRight.Content = null;
         if (_workTitle != null)
         {
             string[] titles = { "Now", "Projects", "Inbox" };
@@ -207,13 +331,19 @@ public partial class NotchWindow
     Border WorkCard(UIElement child, bool hot = false, Thickness? margin = null)
     {
         var acc = WorkAcc;
+        var idle = _cyber ? A(hot ? CyYellow : CyCyan, hot ? (byte)0x90 : (byte)0x55) : hot ? A(Lighten(acc, 0.2), 0x5C) : Color.FromArgb(0x1C, 0xFF, 0xFF, 0xFF);
+        var lit = _cyber ? (hot ? CyYellow : A(CyCyan, 0x90)) : hot ? A(Lighten(acc, 0.3), 0x90) : Color.FromArgb(0x34, 0xFF, 0xFF, 0xFF);
+        var edge = new SolidColorBrush(idle);
         var card = new Border
         {
-            Child = child, Padding = new Thickness(12, 9, 12, 10), Margin = margin ?? new Thickness(0, 0, 0, 8),
-            Background = Frozen(_cyber ? new LinearGradientBrush(Color.FromArgb(0xC8, 0x04, 0x0C, 0x12), Color.FromArgb(0x90, 0x08, 0x10, 0x16), 0) : new LinearGradientBrush(A(acc, 0x1A), Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF), 0)),
-            BorderBrush = Frozen(_cyber ? A(hot ? CyYellow : CyCyan, hot ? (byte)0x90 : (byte)0x55) : A(acc, hot ? (byte)0x70 : (byte)0x30)),
-            BorderThickness = _cyber ? new Thickness(hot ? 2 : 1, 1, 1, 1) : new Thickness(1), CornerRadius = new CornerRadius(_cyber ? 0 : 11),
+            Child = child, Padding = new Thickness(12, 10, 12, 10), Margin = margin ?? new Thickness(0, 0, 0, 7),
+            // glass: a breath of the accent at the top, fading to plain; it reads as part of the notch, not a coloured block
+            Background = Frozen(_cyber ? new LinearGradientBrush(Color.FromArgb(0xC8, 0x04, 0x0C, 0x12), Color.FromArgb(0x90, 0x08, 0x10, 0x16), 0)
+                : new LinearGradientBrush(hot ? A(acc, 0x1E) : Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF), Color.FromArgb(0x08, 0xFF, 0xFF, 0xFF), 90)),
+            BorderBrush = edge, BorderThickness = _cyber ? new Thickness(hot ? 2 : 1, 1, 1, 1) : new Thickness(1), CornerRadius = new CornerRadius(_cyber ? 0 : 13),
         };
+        card.MouseEnter += (_, _) => edge.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(lit, TimeSpan.FromMilliseconds(Eco ? 1 : 160)));
+        card.MouseLeave += (_, _) => edge.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(idle, TimeSpan.FromMilliseconds(Eco ? 1 : 260)));
         if (_cyber) NeonCorner(card, 8, 0);
         return card;
     }
@@ -244,14 +374,17 @@ public partial class NotchWindow
     Border WorkChip(string label, Action act, string? tip = null, bool strong = false)
     {
         var acc = WorkAcc;
-        var text = new TextBlock { Text = Cap(label), FontSize = 11.5, FontFamily = WorkFont, VerticalAlignment = VerticalAlignment.Center, Foreground = Frozen(strong ? (_cyber ? Colors.Black : Colors.White) : Lighten(acc, 0.3)), FontWeight = strong ? FontWeights.SemiBold : FontWeights.Normal };
+        var text = new TextBlock { Text = Cap(label), FontSize = 11, FontFamily = WorkFont, VerticalAlignment = VerticalAlignment.Center, Foreground = Frozen(strong ? (_cyber ? Colors.Black : Colors.White) : _cyber ? Lighten(acc, 0.3) : Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF)), FontWeight = FontWeights.SemiBold };
+        var restEdge = _cyber ? A(acc, 0x55) : Color.FromArgb(0x24, 0xFF, 0xFF, 0xFF);
+        var restFill = _cyber ? A(acc, 0x16) : Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF);
         var chip = new Border
         {
-            Child = text, Padding = new Thickness(11, 4, 11, 5), Margin = new Thickness(0, 0, 6, 6), Cursor = Cursors.Hand, CornerRadius = new CornerRadius(_cyber ? 0 : 11), ToolTip = tip, MinHeight = 24,
-            Background = Frozen(strong ? (_cyber ? CyYellow : A(acc, 0xC0)) : A(acc, 0x16)), BorderBrush = Frozen(strong ? Colors.Transparent : A(acc, 0x55)), BorderThickness = new Thickness(1),
+            Child = text, Padding = new Thickness(11, 3, 11, 4), Margin = new Thickness(0, 0, 5, 5), Cursor = Cursors.Hand, CornerRadius = new CornerRadius(_cyber ? 0 : 11), ToolTip = tip, MinHeight = 23,
+            Background = strong ? (_cyber ? Frozen(CyYellow) : Frozen(new LinearGradientBrush(Lighten(acc, 0.12), acc, 90))) : Frozen(restFill),
+            BorderBrush = Frozen(strong ? A(Lighten(acc, 0.35), _cyber ? (byte)0 : (byte)0x70) : restEdge), BorderThickness = new Thickness(1),
         };
-        chip.MouseEnter += (_, _) => { if (!strong) chip.BorderBrush = Frozen(_cyber ? CyYellow : acc); };
-        chip.MouseLeave += (_, _) => { if (!strong) chip.BorderBrush = Frozen(A(acc, 0x55)); };
+        chip.MouseEnter += (_, _) => { if (!strong) { chip.BorderBrush = Frozen(_cyber ? CyYellow : A(Lighten(acc, 0.3), 0xC0)); chip.Background = Frozen(A(acc, 0x26)); } };
+        chip.MouseLeave += (_, _) => { if (!strong) { chip.BorderBrush = Frozen(restEdge); chip.Background = Frozen(restFill); } };
         chip.PreviewMouseLeftButtonDown += (_, e) => { _maybeSwipe = false; };
         chip.MouseLeftButtonUp += (_, e) => { e.Handled = true; try { act(); } catch { WorkSay("Couldn't do that"); } };
         return chip;
@@ -274,7 +407,7 @@ public partial class NotchWindow
     // ───────────────────────────── typing on the page ─────────────────────────────
 
     /// <summary>The notch takes the keyboard for a box on the page (and gives it back after).</summary>
-    void BeginWorkTyping(TextBox box)
+    void BeginWorkTyping(Control box)
     {
         if (!_workTyping)
         {
@@ -381,10 +514,11 @@ public partial class NotchWindow
         var wrap = inner;
         host.Children.Add(wrapBorder);
         FollowWork(wrapBorder);
-        if (!Eco) thinking.BeginAnimation(OpacityProperty, new DoubleAnimation(0.45, 1, TimeSpan.FromMilliseconds(600)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever });
+        if (!Eco) thinking.BeginAnimation(OpacityProperty, Capped(new DoubleAnimation(0.45, 1, TimeSpan.FromMilliseconds(600)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever }, 20));
 
         string answer;
         _workAskRunning = true;
+        _workFace?.SetMood(Controls.NotchFace.Mood.Thinking);
         try
         {
             PrepareAi();
@@ -419,6 +553,10 @@ public partial class NotchWindow
         catch (Exception ex) { answer = "Couldn't answer: " + ex.Message; }
         _workAskRunning = false;
         if (_workAsk != cts) return; // another question took over this card
+        _workFace?.SetMood(Controls.NotchFace.Mood.Idle);
+        bool failed = answer.StartsWith("Couldn't") || answer.StartsWith("No answer") || answer.StartsWith("Connect the AI");
+        _workFace?.Play(failed ? Controls.NotchFace.Emote.Sad : Controls.NotchFace.Emote.Proud, 1.3);
+        FeelSound(failed ? Sfx.Cue.Oops : Sfx.Cue.Done);
         thinking.BeginAnimation(OpacityProperty, null);
         thinking.Visibility = Visibility.Collapsed;
         RenderMarkdown(box, answer);
@@ -518,11 +656,12 @@ public partial class NotchWindow
         if (subject == null || subject.Name.Length == 0)
         {
             _nowShownKey = null;
-            stack.Children.Add(WorkCard(WorkText("Open a document, a PDF or a page: it shows up here, with what's worth doing with it.", 11.5, A(TextTone, 0xB0))));
+            stack.Children.Add(WorkEmpty(null, "Nothing open right now", "Open a document, a PDF or a page: it shows up here, with what's worth doing with it."));
             stack.Children.Add(RecentStrip());
             return stack;
         }
         string kind = subject.Kind, name = subject.Name, app = subject.App;
+        WorkHead(subject.InFront ? "live" : "last worked on");
         var item = subject.Item;
         var project = item != null ? WorkLog.Projects().FirstOrDefault(p => p.Items.Any(i => i.Key == item.Key)) : null;
 
@@ -541,7 +680,7 @@ public partial class NotchWindow
         // live: a dot that breathes while you're on it
         var live = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var dot = new Ellipse { Width = 6, Height = 6, Fill = Frozen(_cyber ? CyCyan : Color.FromRgb(0x4C, 0xD9, 0x64)), VerticalAlignment = VerticalAlignment.Center };
-        if (!Eco) dot.BeginAnimation(OpacityProperty, new DoubleAnimation(0.35, 1, TimeSpan.FromMilliseconds(900)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever });
+        if (!Eco) dot.BeginAnimation(OpacityProperty, Capped(new DoubleAnimation(0.35, 1, TimeSpan.FromMilliseconds(900)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever }, 20));
         if (subject.InFront) live.Children.Add(dot); // not in front: what you worked on last, no live dot
         live.Children.Add(WorkText(Cap(subject.InFront ? (_cyber ? "LIVE" : "Now") : "Last worked on"), 9, A(TextTone, 0xA0), wrap: false).Also(t => t.Margin = new Thickness(4, 0, 0, 0)));
         Grid.SetColumn(live, 2);
@@ -797,51 +936,269 @@ public partial class NotchWindow
         var finished = projects.Where(p => p.Stage == 2).ToList();
         int hidden = WorkLog.HiddenCount();
 
-        var bar = new Grid { Margin = new Thickness(0, 0, 0, 5) };
-        bar.Children.Add(WorkText(Cap(active.Count == 0 ? "No active project" : active.Count == 1 ? "1 active project" : $"{active.Count} active projects"), 9.5, A(TextTone, 0x80), bold: true, wrap: false).Also(t => t.VerticalAlignment = VerticalAlignment.Center));
-        var add = WorkChip("+ New project", () =>
+        var add = WorkChip("+ New", () =>
         {
             var m = WorkLog.NewProject("New project");
             SaveWorkSoon();
             _renaming = m.Id;
+            _openProject = m.Id;
             RenderWorkTab(animate: false);
-        }, "An empty project: drag files or tabs into it");
-        add.HorizontalAlignment = HorizontalAlignment.Right;
+            _workFace?.Play(Controls.NotchFace.Emote.Excited, 1.0);
+            FeelSound(Sfx.Cue.Pick);
+        }, "A new, empty project: drag files or tabs into it");
         add.Margin = new Thickness(0);
-        bar.Children.Add(add);
-        stack.Children.Add(bar);
+        WorkHead(active.Count == 0 ? "none active" : $"{active.Count} active", add);
 
         if (projects.Count == 0)
         {
-            var empty = WorkCard(new StackPanel
-            {
-                Children =
-                {
-                    WorkText(Cap("Your projects build themselves"), 11.5, _cyber ? CyYellow : Colors.White, bold: true),
-                    WorkText("The documents, PDFs and pages you use together become a project here. Or drag a file from Explorer onto this card to start one.", 11, A(TextTone, 0xB0)).Also(t => t.Margin = new Thickness(0, 3, 0, 0)),
-                },
-            });
+            var empty = WorkEmpty(Controls.NotchFace.Emote.Wave, "Your projects build themselves",
+                "The documents, PDFs and pages you use together become a project here. Or drag a file from Explorer onto this card.");
             MakeDropTarget(empty, null);
             stack.Children.Add(empty);
         }
         int i = 0;
-        foreach (var p in active.Take(12)) stack.Children.Add(Arriving(ProjectCard(p), i++));
+        foreach (var p in active.Take(14)) stack.Children.Add(Arriving(ProjectRow(p), i++));
         if (finished.Count > 0)
         {
-            var toggle = WorkChip((_showFinished ? "▾ " : "▸ ") + $"Finished · {finished.Count}", () => { _showFinished = !_showFinished; RenderWorkTab(animate: false); }, "Projects you marked done");
-            toggle.Margin = new Thickness(0, 4, 0, 5);
-            toggle.HorizontalAlignment = HorizontalAlignment.Left;
-            stack.Children.Add(toggle);
-            if (_showFinished) foreach (var p in finished.Take(12)) stack.Children.Add(ProjectCard(p));
+            stack.Children.Add(SectionToggle((_showFinished ? "\uE70D" : "\uE76C"), $"Done · {finished.Count}", () => { _showFinished = !_showFinished; RenderWorkTab(animate: false); }));
+            if (_showFinished) foreach (var p in finished.Take(14)) stack.Children.Add(ProjectRow(p));
         }
         if (hidden > 0)
-        {
-            var restore = WorkChip($"Show {hidden} hidden", () => { WorkLog.UnhideAll(); SaveWorkSoon(); WorkSay("Hidden projects are back"); RenderWorkTab(animate: false); }, "Bring back the projects you hid or deleted");
-            restore.HorizontalAlignment = HorizontalAlignment.Left;
-            restore.Margin = new Thickness(0, 2, 0, 4);
-            stack.Children.Add(restore);
-        }
+            stack.Children.Add(SectionToggle("\uE7A7", $"Bring back {hidden} removed", () => { WorkLog.UnhideAll(); SaveWorkSoon(); WorkSay("Removed projects are back"); RenderWorkTab(animate: false); }, quiet: true));
         return stack;
+    }
+
+    /// <summary>A quiet line that opens a section ("Done · 3") or does one small thing.</summary>
+    FrameworkElement SectionToggle(string glyph, string text, Action act, bool quiet = false)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(4, quiet ? 2 : 6, 0, 5), Cursor = Cursors.Hand, Background = Brushes.Transparent, HorizontalAlignment = HorizontalAlignment.Left };
+        var tone = A(TextTone, quiet ? (byte)0x70 : (byte)0xA0);
+        var g = new TextBlock { Text = glyph, FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 8.5, Foreground = Frozen(tone), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 1, 6, 0) };
+        var t = WorkText(Cap(text), 10, tone, bold: !quiet, wrap: false);
+        row.Children.Add(g);
+        row.Children.Add(t);
+        row.MouseEnter += (_, _) => { g.Foreground = t.Foreground = Frozen(_cyber ? CyYellow : Colors.White); };
+        row.MouseLeave += (_, _) => { g.Foreground = t.Foreground = Frozen(tone); };
+        row.PreviewMouseLeftButtonDown += (_, _) => _maybeSwipe = false;
+        row.MouseLeftButtonUp += (_, e) => { e.Handled = true; FeelSound(Sfx.Cue.Tap); act(); };
+        return row;
+    }
+
+    string? _openProject;
+
+    /// <summary>
+    /// A project, as one quiet row: a ring (filled ✓ once done), its name, how much is in it and how long you spent.
+    /// Hovered, its three controls show: pin, done, delete (asks once). A click opens it: its files and pages, and
+    /// one line of actions (Open all · Ask · Rename · Merge). One project open at a time.
+    /// </summary>
+    Border ProjectRow(WorkLog.Project p)
+    {
+        bool done = p.Stage == 2, found = p.Kept == null;
+        string id = p.Kept?.Id ?? p.Id;
+        bool open = _openProject == id || _renaming == id;
+        var acc = WorkAcc;
+        var icon = (FontFamily)FindResource("IconFont");
+        var body = new StackPanel();
+
+        var head = new Grid { Background = Brushes.Transparent, Cursor = Cursors.Hand };
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(22) });
+        head.ColumnDefinitions.Add(new ColumnDefinition());
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
+
+        // the ring: a click marks it done (and back)
+        var ring = new Border
+        {
+            Width = 15, Height = 15, CornerRadius = new CornerRadius(_cyber ? 0 : 7.5), BorderThickness = new Thickness(1.4), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left,
+            BorderBrush = Frozen(done ? acc : A(TextTone, 0x70)), Background = done ? Frozen(acc) : Brushes.Transparent, Cursor = Cursors.Hand,
+            ToolTip = done ? "Reopen it" : "Mark it done",
+            Child = new TextBlock { Text = "\uE73E", FontFamily = icon, FontSize = 8, Foreground = done ? Frozen(_cyber ? Colors.Black : Colors.White) : Frozen(A(TextTone, 0x00)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+            RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1),
+        };
+        var check = (TextBlock)ring.Child;
+        ring.MouseEnter += (_, _) => { if (!done) { ring.BorderBrush = Frozen(acc); check.Foreground = Frozen(A(acc, 0xC0)); } };
+        ring.MouseLeave += (_, _) => { if (!done) { ring.BorderBrush = Frozen(A(TextTone, 0x70)); check.Foreground = Frozen(A(TextTone, 0x00)); } };
+        ring.PreviewMouseLeftButtonDown += (_, _) => _maybeSwipe = false;
+        ring.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            HideTip();
+            if (!done)
+            {
+                // it fills and pops, then the row goes to Done
+                ring.Background = Frozen(acc);
+                ring.BorderBrush = Frozen(acc);
+                check.Foreground = Frozen(_cyber ? Colors.Black : Colors.White);
+                if (!Eco)
+                {
+                    var pop = new DoubleAnimation(0.6, 1, TimeSpan.FromMilliseconds(380)) { EasingFunction = new Controls.SpringEase { Damping = 0.5 } };
+                    ((ScaleTransform)ring.RenderTransform).BeginAnimation(ScaleTransform.ScaleXProperty, pop);
+                    ((ScaleTransform)ring.RenderTransform).BeginAnimation(ScaleTransform.ScaleYProperty, pop);
+                }
+                FeelIt(Feel.Done);
+            }
+            else FeelSound(Sfx.Cue.Tap);
+            After(done || Eco ? 1 : 420, () =>
+            {
+                var m = WorkLog.Keep(p);
+                m.Stage = m.Stage == 2 ? 0 : 2;
+                if (_openProject == id) _openProject = null;
+                SaveWorkSoon();
+                WorkSay(m.Stage == 2 ? "Done: " + m.Name : "Back to work: " + m.Name);
+                if (_cyber && m.Stage == 2) CyberGlitch(strong: false, tint: CyCyan);
+                RenderWorkTab(animate: false);
+            });
+        };
+        head.Children.Add(ring);
+
+        // name and what's in it
+        var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
+        if (_renaming == id)
+        {
+            var box = WorkBox("Name", name => { var m = WorkLog.Keep(p); m.Name = name; _renaming = null; SaveWorkSoon(); WorkSay("Renamed"); RenderWorkTab(animate: false); }, p.Name);
+            words.Children.Add(BoxHost(box));
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { BeginWorkTyping(box); box.SelectAll(); });
+        }
+        else
+        {
+            var name = WorkText(p.Name, 12.5, done ? A(TextTone, 0x90) : (_cyber ? CyYellow : Colors.White), bold: !done, wrap: false);
+            name.TextTrimming = TextTrimming.CharacterEllipsis;
+            if (done) name.TextDecorations = TextDecorations.Strikethrough;
+            words.Children.Add(name);
+            var meta = new List<string>();
+            meta.Add(p.Items.Count == 0 ? "Empty" : p.Items.Count == 1 ? "1 item" : $"{p.Items.Count} items");
+            if (p.Seconds > 0) meta.Add(Spent(p.Seconds));
+            if (found) meta.Add("suggested");
+            if (p.Pinned) meta.Add("pinned");
+            words.Children.Add(WorkText(string.Join(" · ", meta), 9.5, A(TextTone, 0x88), wrap: false).Also(t => t.Margin = new Thickness(0, 1, 0, 0)));
+        }
+        Grid.SetColumn(words, 1);
+        head.Children.Add(words);
+
+        // pin · delete (asks once): shown on hover, and while it's open
+        var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Opacity = open || _confirmDelete == id ? 1 : 0 };
+        if (!done)
+            tools.Children.Add(IconButton(p.Pinned ? "\uE77A" : "\uE718", p.Pinned ? "Unpin" : found ? "Keep it (pin to the top)" : "Pin to the top", () =>
+            {
+                var m = WorkLog.Keep(p); m.Pinned = !m.Pinned; SaveWorkSoon(); FeelIt(m.Pinned ? Feel.Pin : Feel.Unpin); WorkSay(m.Pinned ? "Pinned" : "Unpinned"); RenderWorkTab(animate: false);
+            }, 11, p.Pinned ? WorkHot : null));
+        if (_confirmDelete == id)
+        {
+            var sure = new Border
+            {
+                Child = WorkText(Cap("Delete?"), 10, Colors.White, bold: true, wrap: false), Background = Frozen(Color.FromRgb(0xE5, 0x48, 0x4D)), CornerRadius = new CornerRadius(_cyber ? 0 : 9),
+                Padding = new Thickness(8, 2, 8, 3), Margin = new Thickness(4, 0, 0, 0), Cursor = Cursors.Hand, VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Your files and pages aren't touched: only the project goes",
+            };
+            sure.PreviewMouseLeftButtonDown += (_, _) => _maybeSwipe = false;
+            sure.MouseLeftButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                WorkLog.Hide(p);
+                _confirmDelete = null;
+                if (_openProject == id) _openProject = null;
+                SaveWorkSoon();
+                FeelIt(Feel.Eat);
+                WorkSay("Deleted (your files stay where they are)");
+                RenderWorkTab(animate: false);
+            };
+            tools.Children.Add(sure);
+        }
+        else
+            tools.Children.Add(IconButton("\uE74D", "Delete the project (your files stay)", () => AskToConfirm(id), 11));
+        Grid.SetColumn(tools, 2);
+        head.Children.Add(tools);
+        var chevron = new TextBlock { Text = open ? "\uE70E" : "\uE70D", FontFamily = icon, FontSize = 8.5, Foreground = Frozen(A(TextTone, 0x70)), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
+        Grid.SetColumn(chevron, 3);
+        head.Children.Add(chevron);
+        head.PreviewMouseLeftButtonDown += (_, _) => _maybeSwipe = false;
+        head.MouseLeftButtonUp += (_, e) =>
+        {
+            if (e.Handled || _renaming == id) return;
+            e.Handled = true;
+            _openProject = open ? null : id;
+            _askingIn = _merging = null;
+            FeelSound(Sfx.Cue.Tap);
+            RenderWorkTab(animate: false);
+        };
+        words.MouseLeftButtonDown += (_, e) => { if (e.ClickCount == 2 && !done && _renaming != id) { e.Handled = true; _renaming = WorkLog.Keep(p).Id; _openProject = _renaming; SaveWorkSoon(); RenderWorkTab(animate: false); } };
+        body.Children.Add(head);
+
+        if (open && _renaming != id) body.Children.Add(ProjectInside(p, id, body));
+
+        var card = WorkCard(body, hot: p.Pinned && !done, margin: new Thickness(0, 0, 0, 4));
+        card.Padding = new Thickness(10, 5, 10, 5);
+        if (done) card.Opacity = 0.75;
+        card.MouseEnter += (_, _) => tools.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(Eco ? 1 : 120)));
+        card.MouseLeave += (_, _) => { if (!open && _confirmDelete != id) tools.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(Eco ? 1 : 180))); };
+        MakeDropTarget(card, p);
+        return card;
+    }
+
+    /// <summary>An open project: its note, its files and pages, one line of actions, and what was asked about it.</summary>
+    FrameworkElement ProjectInside(WorkLog.Project p, string id, StackPanel card)
+    {
+        var inside = new StackPanel { Margin = new Thickness(22, 6, 0, 1) };
+        if (p.Kept?.Note is { Length: > 0 } note)
+            inside.Children.Add(WorkText("✎ " + note, 10.5, A(TextTone, 0xB8)).Also(t => t.Margin = new Thickness(0, 0, 0, 4)));
+        var items = new WrapPanel();
+        foreach (var it in p.Items.Take(8)) items.Children.Add(ItemChip(it, p));
+        if (p.Items.Count > 8) items.Children.Add(WorkText($"+{p.Items.Count - 8} more", 10, A(TextTone, 0x90), wrap: false).Also(t => t.Margin = new Thickness(2, 3, 0, 0)));
+        if (p.Items.Count == 0) items.Children.Add(WorkText("Drop files here from Explorer, or drag a chip in from another project", 10.5, A(TextTone, 0x80)).Also(t => t.Margin = new Thickness(0, 0, 0, 4)));
+        inside.Children.Add(items);
+
+        // one line of actions, as quiet text buttons
+        var acts = new WrapPanel { Margin = new Thickness(0, 3, 0, 0) };
+        void Act(string glyph, string label, string tip, Action a) => acts.Children.Add(TextAction(glyph, label, tip, a));
+        if (p.Items.Count > 0) Act("\uE8A7", "Open all", "Open every file and page of it again", async () => await ReopenAll(p));
+        if (p.Items.Count > 0) Act("\uE8BD", _askingIn == id ? "Close" : "Ask", "Ask about the whole project: its files and pages read together", () => { _askingIn = _askingIn == id ? null : id; RenderWorkTab(animate: false); });
+        Act("\uE8AC", "Rename", "Give it a name", () => { _renaming = WorkLog.Keep(p).Id; _openProject = _renaming; SaveWorkSoon(); RenderWorkTab(animate: false); });
+        var others = WorkLog.Projects().Where(o => (o.Kept?.Id ?? o.Id) != id && o.Stage < 2).ToList();
+        if (others.Count > 0) Act("\uE71B", _merging == id ? "Cancel" : "Merge", "Put it into another project", () => { _merging = _merging == id ? null : id; RenderWorkTab(animate: false); });
+        inside.Children.Add(acts);
+
+        if (_merging == id)
+        {
+            var into = new WrapPanel { Margin = new Thickness(0, 4, 0, 0) };
+            into.Children.Add(WorkText(Cap("Into"), 10, A(TextTone, 0x90), wrap: false).Also(t => t.Margin = new Thickness(0, 3, 6, 0)));
+            foreach (var o in others.Take(6))
+                into.Children.Add(WorkChip(o.Name, () => { WorkLog.Merge(WorkLog.Keep(o), WorkLog.Keep(p)); _merging = null; _openProject = WorkLog.Keep(o).Id; SaveWorkSoon(); FeelIt(Feel.Eat); WorkSay("Merged into " + o.Name); RenderWorkTab(animate: false); }));
+            inside.Children.Add(into);
+        }
+        if (_askingIn == id)
+        {
+            var box = WorkBox(_cyber ? "ASK THE WHOLE PROJECT…" : "Ask the whole project… (where does it stand? what's missing?)", q => AskOnCard(inside, q, q, ct => ProjectContext(p, ct), a => KeepAnswer(p, q, a), () => ClearAnswer(p)));
+            inside.Children.Add(BoxHost(box).Also(g => g.Margin = new Thickness(0, 4, 0, 0)));
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => BeginWorkTyping(box));
+        }
+        if (p.Kept is { LastAnswer.Length: > 0 } k) inside.Children.Add(AnswerBlock(k.LastAsk, k.LastAnswer, () => ClearAnswer(p)));
+        // it opens under its row
+        if (!Eco)
+        {
+            inside.Opacity = 0;
+            inside.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)));
+            var shift = new TranslateTransform(0, -4);
+            inside.RenderTransform = shift;
+            shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-4, 0, TimeSpan.FromMilliseconds(300)) { EasingFunction = new Controls.SpringEase { Damping = 0.8 } });
+        }
+        return inside;
+    }
+
+    /// <summary>A quiet action in a line of them: a small icon and a word, lit on hover.</summary>
+    FrameworkElement TextAction(string glyph, string label, string tip, Action act)
+    {
+        var tone = A(TextTone, 0xB0);
+        var hot = _cyber ? CyYellow : Lighten(WorkAcc, 0.35);
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 14, 2), Cursor = Cursors.Hand, Background = Brushes.Transparent, ToolTip = tip };
+        var g = new TextBlock { Text = glyph, FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 10, Foreground = Frozen(tone), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 1, 5, 0) };
+        var t = WorkText(Cap(label), 10.5, tone, bold: true, wrap: false);
+        row.Children.Add(g);
+        row.Children.Add(t);
+        row.MouseEnter += (_, _) => { g.Foreground = t.Foreground = Frozen(hot); };
+        row.MouseLeave += (_, _) => { g.Foreground = t.Foreground = Frozen(tone); };
+        row.PreviewMouseLeftButtonDown += (_, _) => _maybeSwipe = false;
+        row.MouseLeftButtonUp += (_, e) => { e.Handled = true; HideTip(); FeelSound(Sfx.Cue.Tap); act(); };
+        return row;
     }
 
     /// <summary>A card coming in: a quick flicker in Neon, a soft rise elsewhere (none on a light PC).</summary>
@@ -872,139 +1229,22 @@ public partial class NotchWindow
         var b = new TextBlock
         {
             Text = glyph, FontFamily = (FontFamily)FindResource("IconFont"), FontSize = size, Foreground = Frozen(c), Cursor = Cursors.Hand, ToolTip = tip,
-            Padding = new Thickness(4, 2, 4, 2), VerticalAlignment = VerticalAlignment.Center, Background = Brushes.Transparent,
+            Padding = new Thickness(6, 4, 6, 4), MinWidth = 22, TextAlignment = TextAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Background = Brushes.Transparent,
         };
         b.MouseEnter += (_, _) => b.Foreground = Frozen(_cyber ? CyYellow : Colors.White);
         b.MouseLeave += (_, _) => b.Foreground = Frozen(c);
         b.PreviewMouseLeftButtonDown += (_, _) => _maybeSwipe = false;
-        b.MouseLeftButtonUp += (_, e) => { e.Handled = true; act(); };
+        b.MouseLeftButtonUp += (_, e) => { e.Handled = true; HideTip(); act(); };
         return b;
-    }
-
-    Border ProjectCard(WorkLog.Project p)
-    {
-        bool done = p.Stage == 2;
-        string id = p.Kept?.Id ?? p.Id;
-        var body = new StackPanel();
-        // the title line: pin, name (double-click to rename), stage, time, ⋯
-        var head = new Grid();
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        head.ColumnDefinitions.Add(new ColumnDefinition());
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        head.Children.Add(IconButton(p.Pinned ? "" : "", p.Pinned ? "Unpin" : "Pin to the top", () => { var m = WorkLog.Keep(p); m.Pinned = !m.Pinned; SaveWorkSoon(); WorkSay(m.Pinned ? "Pinned" : "Unpinned"); RenderWorkTab(animate: false); }, 10.5, p.Pinned ? WorkHot : A(TextTone, 0x60)).Also(t => t.Margin = new Thickness(-4, 0, 3, 0)));
-        if (_renaming == id)
-        {
-            var box = WorkBox("Name", name => { var m = WorkLog.Keep(p); m.Name = name; _renaming = null; SaveWorkSoon(); WorkSay("Renamed"); RenderWorkTab(animate: false); }, p.Name);
-            var host = BoxHost(box);
-            Grid.SetColumn(host, 1);
-            head.Children.Add(host);
-            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { BeginWorkTyping(box); box.SelectAll(); });
-        }
-        else
-        {
-            var name = WorkText((done ? "✓ " : "") + p.Name, 12.5, _cyber ? CyYellow : Colors.White, bold: true, wrap: false);
-            name.ToolTip = "Double-click to rename";
-            name.Cursor = Cursors.IBeam;
-            name.MouseLeftButtonDown += (_, e) => { if (e.ClickCount == 2) { e.Handled = true; _renaming = WorkLog.Keep(p).Id; SaveWorkSoon(); RenderWorkTab(animate: false); } };
-            Grid.SetColumn(name, 1);
-            head.Children.Add(name);
-        }
-        var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        right.Children.Add(StageControl(p));
-        if (p.Seconds > 0) right.Children.Add(WorkText(Spent(p.Seconds), 9.5, A(TextTone, 0x80), wrap: false).Also(t => t.Margin = new Thickness(7, 0, 2, 0)));
-        right.Children.Add(IconButton(_managing == id ? "" : "", _managing == id ? "Close" : "More: rename, done, merge, delete", () => { _managing = _managing == id ? null : id; _merging = null; _confirmDelete = null; RenderWorkTab(animate: false); }));
-        Grid.SetColumn(right, 2);
-        head.Children.Add(right);
-        body.Children.Add(head);
-
-        // ⋯: everything you can do with it, right here (no pop-up)
-        if (_managing == id) body.Children.Add(ManageStrip(p, id));
-        if (p.Kept == null) body.Children.Add(WorkText(Cap("Found for you · pin or rename it to keep it"), 9, A(WorkAcc, 0xA0), wrap: false).Also(t => t.Margin = new Thickness(0, 1, 0, 0)));
-        if (p.Kept?.Note is { Length: > 0 } note)
-        {
-            var noteRow = new Grid { Margin = new Thickness(0, 3, 0, 0) };
-            noteRow.Children.Add(WorkText("✎ " + note, 10.5, A(TextTone, 0xB8)).Also(t => t.Margin = new Thickness(0, 0, 20, 0)));
-            noteRow.Children.Add(IconButton("", "Remove the note", () => { var m = WorkLog.Keep(p); m.Note = ""; SaveWorkSoon(); RenderWorkTab(animate: false); }, 8).Also(b => b.HorizontalAlignment = HorizontalAlignment.Right));
-            body.Children.Add(noteRow);
-        }
-
-        // its files and tabs
-        var items = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
-        foreach (var it in p.Items.Take(9)) items.Children.Add(ItemChip(it, p));
-        if (p.Items.Count > 9) items.Children.Add(WorkText($"+{p.Items.Count - 9}", 10, A(TextTone, 0x90), wrap: false).Also(t => t.Margin = new Thickness(2, 3, 0, 0)));
-        if (p.Items.Count == 0) items.Children.Add(WorkText("Empty: drag files from Explorer, or a chip from another project, onto this card", 10.5, A(TextTone, 0x80)));
-        body.Children.Add(items);
-
-        // what to do with it
-        var acts = new WrapPanel { Margin = new Thickness(0, 2, 0, 0) };
-        if (p.Items.Count > 0)
-        {
-            acts.Children.Add(WorkChip("Reopen all", async () => await ReopenAll(p), "Open every file and page of it again", strong: true));
-            acts.Children.Add(WorkChip(_askingIn == id ? "Ask ×" : "Ask", () => { _askingIn = _askingIn == id ? null : id; RenderWorkTab(animate: false); }, "A question about the whole project: its files and pages read together"));
-            acts.Children.Add(WorkChip("Summarize", () => AskOnCard(body, "Summarize", "Summarize this project: what it's about, where it stands, what's left.", ct => ProjectContext(p, ct), a => KeepAnswer(p, "Summarize", a), () => ClearAnswer(p)), "Where it stands, in a few lines"));
-        }
-        acts.Children.Add(WorkChip(p.Kept?.Note is { Length: > 0 } ? "Edit note" : "Note", () => { _noting = _noting == id ? null : WorkLog.Keep(p).Id; SaveWorkSoon(); RenderWorkTab(animate: false); }, "A note to yourself on this project"));
-        body.Children.Add(acts);
-        if (_askingIn == id)
-        {
-            var box = WorkBox(_cyber ? "ASK THE WHOLE PROJECT…" : "Ask the whole project… (do the numbers match? what's missing?)", q => AskOnCard(body, q, q, ct => ProjectContext(p, ct), a => KeepAnswer(p, q, a), () => ClearAnswer(p)));
-            body.Children.Add(BoxHost(box).Also(g => g.Margin = new Thickness(0, 2, 0, 0)));
-            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => BeginWorkTyping(box));
-        }
-        if (_noting == id)
-        {
-            var box = WorkBox("A note to yourself (Enter to save)", text => { var m = WorkLog.Keep(p); m.Note = text; _noting = null; SaveWorkSoon(); WorkSay("Note saved"); RenderWorkTab(animate: false); }, p.Kept?.Note ?? "");
-            body.Children.Add(BoxHost(box).Also(g => g.Margin = new Thickness(0, 2, 0, 0)));
-            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => BeginWorkTyping(box));
-        }
-        // the last answer about it, kept (until you clear it)
-        if (p.Kept is { LastAnswer.Length: > 0 } k) body.Children.Add(AnswerBlock(k.LastAsk, k.LastAnswer, () => ClearAnswer(p)));
-        if (done) body.Opacity = 0.7;
-        var card = WorkCard(body, hot: p.Pinned);
-        card.MouseRightButtonUp += (_, e) => { if (e.Handled) return; e.Handled = true; _managing = _managing == id ? null : id; RenderWorkTab(animate: false); };
-        MakeDropTarget(card, p);
-        return card;
     }
 
     void ClearAnswer(WorkLog.Project p)
     {
         if (p.Kept == null) return;
+        FeelIt(Feel.Eat);
         p.Kept.LastAnswer = "";
         p.Kept.LastAsk = "";
         SaveWorkSoon();
-    }
-
-    /// <summary>⋯ on a project: rename, done / reopen, merge into another, hide or delete (asks once).</summary>
-    FrameworkElement ManageStrip(WorkLog.Project p, string id)
-    {
-        var strip = new StackPanel { Margin = new Thickness(0, 5, 0, 2) };
-        var row = new WrapPanel();
-        row.Children.Add(WorkChip("Rename", () => { _renaming = WorkLog.Keep(p).Id; _managing = null; SaveWorkSoon(); RenderWorkTab(animate: false); }));
-        row.Children.Add(WorkChip(p.Stage == 2 ? "Reopen" : "Mark done", () => { var m = WorkLog.Keep(p); m.Stage = m.Stage == 2 ? 0 : 2; _managing = null; SaveWorkSoon(); WorkSay(m.Stage == 2 ? "Done: " + m.Name : "Back to work: " + m.Name); if (_cyber && m.Stage == 2) CyberGlitch(strong: false, tint: CyCyan); RenderWorkTab(animate: false); }));
-        var others = WorkLog.Projects().Where(o => (o.Kept?.Id ?? o.Id) != id).ToList();
-        if (others.Count > 0) row.Children.Add(WorkChip(_merging == id ? "Merge into… ×" : "Merge into…", () => { _merging = _merging == id ? null : id; RenderWorkTab(animate: false); }, "Put this project's files and tabs into another one"));
-        bool kept = p.Kept != null;
-        if (_confirmDelete == id)
-            row.Children.Add(WorkChip(kept ? "Sure? Delete it" : "Sure? Hide it", () =>
-            {
-                WorkLog.Hide(p);
-                _managing = _confirmDelete = null;
-                SaveWorkSoon();
-                WorkSay(kept ? "Deleted (your files stay where they are)" : "Hidden");
-                RenderWorkTab(animate: false);
-            }, "Your files and pages aren't touched: only the project goes", strong: true).Also(c => c.Background = Frozen(Color.FromRgb(0xE5, 0x48, 0x4D))));
-        else
-            row.Children.Add(WorkChip(kept ? "Delete" : "Hide", () => { _confirmDelete = id; RenderWorkTab(animate: false); After(4000, () => { if (_confirmDelete == id) { _confirmDelete = null; if (_page == WorkPage && _workTab == 1) RenderWorkTab(animate: false); } }); }, kept ? "Delete this project (your files stay)" : "Hide this found project"));
-        strip.Children.Add(row);
-        if (_merging == id)
-        {
-            var into = new WrapPanel { Margin = new Thickness(0, 2, 0, 0) };
-            into.Children.Add(WorkText(Cap("Into: "), 10, A(TextTone, 0x90), wrap: false).Also(t => t.Margin = new Thickness(0, 3, 4, 0)));
-            foreach (var o in others.Take(6))
-                into.Children.Add(WorkChip(o.Name, () => { WorkLog.Merge(WorkLog.Keep(o), WorkLog.Keep(p)); _managing = _merging = null; SaveWorkSoon(); WorkSay("Merged into " + o.Name); RenderWorkTab(animate: false); }));
-            strip.Children.Add(into);
-        }
-        return new Border { Child = strip, BorderBrush = Frozen(A(WorkAcc, 0x30)), BorderThickness = new Thickness(0, 1, 0, 1), Padding = new Thickness(0, 4, 0, 1), Margin = new Thickness(0, 4, 0, 0) };
     }
 
     /// <summary>A button that deletes asks once: it turns into "Sure?…" for 4 seconds.</summary>
@@ -1021,31 +1261,6 @@ public partial class NotchWindow
         m.LastAsk = asked.Length > 80 ? asked[..80] + "…" : asked;
         m.LastAnswer = answer.Length > 3000 ? answer[..3000] : answer;
         SaveWorkSoon();
-    }
-
-    /// <summary>The stage: three steps (Working, Review, Done) to click through; in Neon, three lit bars.</summary>
-    FrameworkElement StageControl(WorkLog.Project p)
-    {
-        var acc = WorkAcc;
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Cursor = Cursors.Hand, VerticalAlignment = VerticalAlignment.Center, Background = Brushes.Transparent, ToolTip = "Stage: " + Stages[p.Stage] + " (click for the next)" };
-        if (_cyber)
-            for (int s = 0; s < 3; s++)
-                row.Children.Add(new Border { Width = 9, Height = 4, Margin = new Thickness(0, 0, 2, 0), Background = Frozen(s <= p.Stage ? (p.Stage == 2 ? CyCyan : CyYellow) : A(CyCyan, 0x30)) });
-        else
-            row.Children.Add(new Ellipse { Width = 6, Height = 6, Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center, Fill = Frozen(p.Stage == 0 ? Color.FromRgb(0x4C, 0xD9, 0x64) : p.Stage == 1 ? Color.FromRgb(0xFF, 0xB7, 0x4D) : A(acc, 0xE0)) });
-        row.Children.Add(WorkText(Cap(Stages[p.Stage]), 9, p.Stage == 2 ? A(acc, 0xE0) : A(TextTone, 0xA0), wrap: false).Also(t => t.Margin = new Thickness(_cyber ? 3 : 0, 0, 0, 0)));
-        row.PreviewMouseLeftButtonDown += (_, _) => _maybeSwipe = false;
-        row.MouseLeftButtonUp += (_, e) =>
-        {
-            e.Handled = true;
-            var m = WorkLog.Keep(p);
-            m.Stage = (m.Stage + 1) % 3;
-            SaveWorkSoon();
-            WorkSay(Stages[m.Stage] + ": " + m.Name);
-            if (m.Stage == 2 && _cyber) CyberGlitch(strong: false, tint: CyCyan);
-            RenderWorkTab(animate: false);
-        };
-        return row;
     }
 
     /// <summary>A project's files and pages, read together (the first part of each), for a question about all of it.</summary>
@@ -1153,6 +1368,7 @@ public partial class NotchWindow
         var all = NotifHistory.Recent();
         var waiting = NotifHistory.Waiting();
         int people = all.Count(NotifHistory.FromPerson), apps = all.Count - people;
+        WorkHead(waiting.Count > 0 ? $"{waiting.Count} waiting" : all.Count > 0 ? $"{all.Count} kept" : "");
         // the views, and a search (in the lists)
         var filters = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
         void View(string id, string label, string tip) => filters.Children.Add(FilterChip(label, _inboxView == id && _inboxApp.Length == 0, () => { _inboxView = id; _inboxApp = ""; _inboxFind = ""; RenderWorkTab(animate: false); }).Also(c => c.ToolTip = tip));
@@ -1167,14 +1383,8 @@ public partial class NotchWindow
         {
             if (waiting.Count == 0)
             {
-                stack.Children.Add(WorkCard(new StackPanel
-                {
-                    Children =
-                    {
-                        WorkText(Cap("All caught up"), 11.5, _cyber ? CyCyan : Color.FromRgb(0x4C, 0xD9, 0x64), bold: true),
-                        WorkText("Nobody's waiting on you. When someone asks you something in a chat or a mail, it lands here with a reply ready to draft.", 11, A(TextTone, 0xB0)).Also(t => t.Margin = new Thickness(0, 3, 0, 0)),
-                    },
-                }));
+                stack.Children.Add(WorkEmpty(Controls.NotchFace.Emote.Love, "All caught up",
+                    "Nobody's waiting on you. When someone asks you something in a chat or a mail, it lands here with a reply ready to draft."));
             }
             int i = 0;
             foreach (var n in waiting) stack.Children.Add(Arriving(WaitingCard(n), i++));
@@ -1191,7 +1401,9 @@ public partial class NotchWindow
             .Where(n => _inboxFind.Length == 0 || (n.App + " " + n.Title + " " + n.Body).Contains(_inboxFind, StringComparison.CurrentCultureIgnoreCase)).Take(200).ToList();
         if (list.Count == 0)
         {
-            stack.Children.Add(WorkText(_inboxFind.Length > 0 ? "Nothing matches." : "Nothing here yet. Notifications are kept for two weeks, on this PC only.", 11, A(TextTone, 0x90)).Also(t => t.Margin = new Thickness(2, 2, 0, 4)));
+            stack.Children.Add(_inboxFind.Length > 0
+                ? WorkEmpty(Controls.NotchFace.Emote.Confused, "Nothing matches", $"No notification with “{_inboxFind}” in the last two weeks.")
+                : WorkEmpty(null, "Nothing here yet", "Notifications are kept for two weeks, on this PC only."));
         }
         else
             foreach (var day in Grouped(list).GroupBy(g => g.Latest.At.Date))
@@ -1371,7 +1583,6 @@ public partial class NotchWindow
             Child = row, Padding = new Thickness(6, 4, 6, 5), Margin = new Thickness(0, 0, 0, 3), CornerRadius = new CornerRadius(_cyber ? 0 : 8),
             Background = Frozen(open ? (_cyber ? Color.FromArgb(0x70, 0x00, 0x00, 0x00) : Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF)) : Colors.Transparent),
             BorderBrush = Frozen(_cyber ? A(NotifHistory.FromPerson(n) ? CyYellow : CyCyan, open ? (byte)0x70 : (byte)0x28) : Color.FromArgb(open ? (byte)0x20 : (byte)0x00, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(_cyber ? 2 : 1, 0, 0, _cyber ? 0 : 1),
-            ToolTip = open ? null : "Click to open",
         };
         card.MouseEnter += (_, _) => { if (!open) card.Background = Frozen(_cyber ? A(CyCyan, 0x10) : Color.FromArgb(0x0E, 0xFF, 0xFF, 0xFF)); };
         card.MouseLeave += (_, _) => { if (!open) card.Background = Brushes.Transparent; };

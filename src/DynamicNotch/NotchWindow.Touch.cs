@@ -189,6 +189,7 @@ public partial class NotchWindow
             _pressed = false;
             _pulling = true;
             _pull = dy;
+            FullWindow(); // it stretches far below the closed strip
             ApplyShape();
         }
         else if (_pulling && dy <= 6)

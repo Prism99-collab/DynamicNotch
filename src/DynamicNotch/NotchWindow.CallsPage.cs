@@ -179,7 +179,7 @@ public partial class NotchWindow
         deck.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
         deck.ColumnDefinitions.Add(new ColumnDefinition());
         deck.Children.Add(BuildOrb(look));
-        _cTiles = new UniformGrid { Columns = 3, Rows = 2, Margin = new Thickness(4, 2, 0, 2) };
+        _cTiles = new UniformGrid { Rows = 1, Margin = new Thickness(4, 5, 0, 5) }; // one even row (its columns: the tiles it has)
         Grid.SetColumn(_cTiles, 1);
         deck.Children.Add(_cTiles);
         Grid.SetRow(deck, 2);
@@ -192,7 +192,8 @@ public partial class NotchWindow
         levels.ColumnDefinitions.Add(new ColumnDefinition());
         _cMic = new PillSlider { Height = 20, TrackHeight = 5, VerticalAlignment = VerticalAlignment.Center, ToolTip = "Your microphone's level" };
         _cMic.ValueChanged += v => { _audio.SetMicVolume((float)v); if (_cMicPct != null) _cMicPct.Text = $"{(int)Math.Round(v * 100)}"; };
-        _cMicVoice = Own(new Rectangle { Height = 2, RadiusX = 1, RadiusY = 1, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, Width = 0, IsHitTestVisible = false, Margin = new Thickness(0, 0, 0, 1) });
+        // your voice, live: a light running inside the mic's track (not a loose line under it)
+        _cMicVoice = Own(new Rectangle { Height = 5, RadiusX = 2.5, RadiusY = 2.5, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Width = 0, IsHitTestVisible = false });
         levels.Children.Add(LevelRow("\uE720", _cMic, _cMicVoice, look, out _cMicPct));
         _cVol = new PillSlider { Height = 20, TrackHeight = 5, VerticalAlignment = VerticalAlignment.Center, ToolTip = "The call's volume (only the call)" };
         _cVol.ValueChanged += v => { if (_callMixKey != null) _audio.SetMixerVolume(_callMixKey, (float)v); if (_cVolPct != null) _cVolPct.Text = $"{(int)Math.Round(v * 100)}"; };
@@ -381,6 +382,7 @@ public partial class NotchWindow
         bool end = false; // leaving has its own button now (any app), in the header
         var shown = want.Take(end ? 5 : 6).ToList();
         if (end) shown.Add(CallBtn.HangUp);
+        _cTiles.Columns = Math.Max(1, shown.Count);
         var look = CallsLook();
         int i = 0;
         foreach (var kind in shown)
@@ -401,14 +403,18 @@ public partial class NotchWindow
         var tint = Tint(kind);
         var iconBrush = new SolidColorBrush(A(tint, 0x2C));
         var glyphBrush = new SolidColorBrush(tint);
-        var glyph = Own(new TextBlock { FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 12, Foreground = glyphBrush, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
-        var icon = Own(new Border { Width = 24, Height = 24, CornerRadius = new CornerRadius(look.Neon ? 0 : Math.Max(0, look.Radius - 3)), Background = iconBrush, Child = glyph });
-        var label = Own(new TextBlock { FontSize = 11, Foreground = Frozen(Color.FromArgb(0xEE, 0xFF, 0xFF, 0xFF)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(7, 0, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis, FontFamily = look.Font });
-        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 4, 0) };
-        row.Children.Add(icon);
-        row.Children.Add(label);
-        var btn = CallPlate(row, look, tint, out var plate, 36);
-        btn.Margin = new Thickness(3);
+        var glyph = Own(new TextBlock { FontFamily = (FontFamily)FindResource("IconFont"), FontSize = 13, Foreground = glyphBrush, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
+        var icon = Own(new Border { Width = 30, Height = 30, CornerRadius = new CornerRadius(look.Neon ? 0 : 15), Background = iconBrush, Child = glyph, HorizontalAlignment = HorizontalAlignment.Center });
+        var label = Own(new TextBlock
+        {
+            FontSize = 9.5, Foreground = Frozen(Color.FromArgb(0xDD, 0xFF, 0xFF, 0xFF)), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(2, 5, 2, 0),
+            TextTrimming = TextTrimming.CharacterEllipsis, FontFamily = look.Font, TextAlignment = TextAlignment.Center,
+        });
+        var col = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        col.Children.Add(icon);
+        col.Children.Add(label);
+        var btn = CallPlate(col, look, tint, out var plate, 68);
+        btn.Margin = new Thickness(2.5, 0, 2.5, 0);
         var t = new Tile { Btn = btn, Plate = plate, Kind = kind, Icon = iconBrush, Glyph = glyphBrush, Label = label, GlyphText = glyph };
         if (kind == CallBtn.HangUp) WireHangUp(t);
         else btn.Click += (_, _) => OnCallButton(kind);
@@ -425,10 +431,10 @@ public partial class NotchWindow
         {
             case CallBtn.Camera: t.GlyphText.Text = "\uE714"; t.Label.Text = Loc.T("Camera"); on = _privacy.CamInUse; t.Btn.ToolTip = "Turn the call's camera on or off"; break;
             case CallBtn.Share: t.GlyphText.Text = "\uE72D"; t.Label.Text = Loc.T("Share"); on = false; t.Btn.ToolTip = "Share your screen in the call"; break;
-            case CallBtn.Hand: t.GlyphText.Text = "\uE7C9"; t.Label.Text = Loc.T("Raise hand"); on = false; t.Btn.ToolTip = "Raise or lower your hand"; break;
+            case CallBtn.Hand: t.GlyphText.Text = "\uE7C9"; t.Label.Text = Loc.T("Hand"); on = false; t.Btn.ToolTip = "Raise or lower your hand"; break;
             case CallBtn.Deafen: t.GlyphText.Text = "\uE7F6"; t.Label.Text = _deafened ? Loc.T("Deafened") : Loc.T("Deafen"); on = _deafened; t.Btn.ToolTip = "Hear nothing and say nothing, in one click"; break;
             case CallBtn.Presenter: t.GlyphText.Text = "\uE7F4"; t.Label.Text = Loc.T("Present"); on = _presenter; t.Btn.ToolTip = "Presenter mode: notifications held, no pop-ups, a clean desktop (for screen sharing)"; break;
-            case CallBtn.Quiet: t.GlyphText.Text = "\uE74F"; t.Label.Text = Loc.T("Quiet others"); on = _ducked.Count > 0; t.Btn.ToolTip = "Turn the other apps down to a whisper"; break;
+            case CallBtn.Quiet: t.GlyphText.Text = "\uE74F"; t.Label.Text = Loc.T("Quiet"); on = _ducked.Count > 0; t.Btn.ToolTip = "Turn the other apps down to a whisper"; break;
             case CallBtn.Messages: t.GlyphText.Text = "\uE8BD"; t.Label.Text = Loc.T("Chat"); on = false; t.Btn.ToolTip = "Open the call's chat panel"; break;
             case CallBtn.Captions: t.GlyphText.Text = "\uE7F0"; t.Label.Text = Loc.T("Captions"); on = _captionsOn; t.Btn.ToolTip = "Windows live captions: everything said in the call, written out"; break;
             case CallBtn.Snip: t.GlyphText.Text = "\uE924"; t.Label.Text = Loc.T("Snip"); on = false; t.Btn.ToolTip = "Capture part of the screen, to paste in the call"; break;
@@ -506,7 +512,7 @@ public partial class NotchWindow
         foreach (var t in _tiles) PaintTile(t);
         if (_cMic is { IsDragging: false }) { _cMic.Value = _audio.MicVolume; _cMicPct!.Text = $"{(int)Math.Round(_cMic.Value * 100)}"; }
         _cMic!.FillBrush = Frozen(StateColor);
-        if (_cMicVoice != null) _cMicVoice.Fill = Frozen(A(StateColor, 0xE0));
+        if (_cMicVoice != null) _cMicVoice.Fill = Frozen(Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF));
         RefreshAudioBits();
     }
 
@@ -615,6 +621,7 @@ public partial class NotchWindow
     /// </summary>
     async Task SetCallMutedAsync(bool mute)
     {
+        if (FeelFace() is { } f) f.Play(mute ? Controls.NotchFace.Emote.Hush : Controls.NotchFace.Emote.Happy, mute ? 1.2 : .8); // silent: it's a call
         if (_call is not { } call) { if (_audio.MicMuted != mute) _audio.ToggleMic(); return; }
         if (!mute && _audio.MicMuted) _audio.SetMicMuted(false); // muted elsewhere (the Home toggle, Windows): on again
         bool reached = await AudioService.SetAppMicMutedAsync(call.Key, mute);

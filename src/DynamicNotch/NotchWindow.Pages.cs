@@ -161,6 +161,7 @@ public partial class NotchWindow
         page = Math.Clamp(page, 0, PageNames.Length - 1);
         if (PageHidden(page)) page = PageHidden(_page) ? 0 : _page; // switched off in Preferences
         bool changed = page != _page;
+        int dir = PagePos(page) > PagePos(_page) ? 1 : -1;
         if (changed) HideTip();
         if (changed && (_page == WorkPage || _page == 5)) EndWorkTyping(giveBack: true); // the Work page's or Settings' box had the keyboard
         if (changed && _page == CallsPage && _call != null) _leftCallsPage = true; // you moved on: the next opening stays where you are
@@ -178,7 +179,8 @@ public partial class NotchWindow
         }
         UpdateDots(animate: true);
         if (changed) OnPageShown(page);
-        if (page != 0) ShowDevices(false);
+        if (changed && !instant && !_swipeLanding) PageArrive(page, dir); // a swiped page was already in view as it moved
+        if (page != 0) { ShowDevices(false); CloseRadioSheet(); }
     }
 
     Button? _homeBtn;
@@ -214,6 +216,7 @@ public partial class NotchWindow
         if (page == 1) OnVitalsShown(); else VitalsHidden();
         UpdateCallUi(); // the call card's voice bars run only on Home
         if (page == 0) RefreshClockAndProgress();
+        WaveLife();
         MicLive(page == 0);
         if (page == 2) UpdateTimerUi();
         if (page == 3) { RenderClipboard(); _shelfTab = _shelf.Count > 0; RenderShelfOrRecent(); } // the shelf first when something is kept
@@ -288,8 +291,11 @@ public partial class NotchWindow
         int pos = PagePos(_page);
         double projected = -pos * PageWidth + dx + velocity * 0.18;
         int target = Math.Clamp((int)Math.Round(-projected / PageWidth), Math.Max(0, pos - 1), Math.Min(VisiblePageCount - 1, pos + 1));
-        GoToPage(PageAtPos(target), velocity);
+        _swipeLanding = true;
+        try { GoToPage(PageAtPos(target), velocity); } finally { _swipeLanding = false; }
     }
+
+    bool _swipeLanding;
 
     void OnHorizontalWheel(short delta)
     {
@@ -525,7 +531,7 @@ public partial class NotchWindow
             _timerRunning = false;
             _timerTick.Stop();
             _timerLeft = _timerTotal;
-            try { SystemSounds.Asterisk.Play(); } catch { }
+            Services.Sfx.Play(Services.Sfx.Cue.Timer, always: true); // a bright bell run (it used to be Windows' own ding)
             if (!_timerBreak)
             {
                 // a focus round done: offer the matching break
@@ -743,6 +749,8 @@ public partial class NotchWindow
         Add("Face in the notch", () => _settings.NotchFace, v => { _settings.NotchFace = v; RefreshBase(); });
         Add("Compact when resting", () => _settings.CompactWhenResting, v => { _settings.CompactWhenResting = v; FaceWake(); });
         Add("Face sounds", () => _settings.FaceSounds, v => _settings.FaceSounds = v);
+        Add("Interface sounds", () => _settings.UiSounds, v => _settings.UiSounds = v);
+        Add("Tips from Pixo", () => _settings.FaceTips, v => _settings.FaceTips = v);
         Add("Tuck pills into the notch", () => _settings.TuckPills, v => { _settings.TuckPills = v; RefreshIslands(); });
         BuildSettingsTabs(); // Smart is the third tab (its switches are built with the Smart page code)
         CompactSettings(); // short rows, the ask box on top (NotchWindow.SettingsAsk)
